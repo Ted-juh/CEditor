@@ -1,4 +1,7 @@
 import { get } from 'svelte/store';
+import { cleanPreset } from '../utils/animationPresetFormat.js';
+import { cleanSceneList } from '../utils/sceneFormat.js';
+import { cleanScenePreset } from '../utils/scenePresetFormat.js';
 import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
@@ -258,6 +261,25 @@ export function serializePanel(panel, options = {}) {
 
   // Text styles (utils/textStyles.js), same rule: deleting the last one leaves no empty key behind.
   if (!Array.isArray(data.textStyles) || data.textStyles.length === 0) delete data.textStyles;
+
+  // The animation presets the panel carries (stores/animationPresetLibrary.js), same rule. Each is
+  // read as data and checked (utils/animationPresetFormat.js cleanPreset); one that does not read is
+  // dropped rather than written back half-understood.
+  const animationPresets = Array.isArray(data.animationPresets) ? data.animationPresets.map(cleanPreset).filter(Boolean) : [];
+  if (animationPresets.length) data.animationPresets = animationPresets;
+  else delete data.animationPresets;
+
+  // The panel's animation scenes (the Animation Designer; utils/sceneFormat.js), same rule. Not
+  // `scenes`: HoSTage's performance scenes are scenes to the same people.
+  const animationScenes = cleanSceneList(data.animationScenes);
+  if (animationScenes.length) data.animationScenes = animationScenes;
+  else delete data.animationScenes;
+
+  // The scene presets the panel carries (stores/scenePresetLibrary.js), same rule: each read as data
+  // and checked (utils/scenePresetFormat.js), one that does not read dropped, none left no key.
+  const scenePresets = Array.isArray(data.scenePresets) ? data.scenePresets.map(cleanScenePreset).filter(Boolean) : [];
+  if (scenePresets.length) data.scenePresets = scenePresets;
+  else delete data.scenePresets;
 
   // Routes, same rule. Only the panel's OWN routes are stored — the ones derived from Macro slots
   // and Router destinations are a view, and writing them here would give the panel a stale second

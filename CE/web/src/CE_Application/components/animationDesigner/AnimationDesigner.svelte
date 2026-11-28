@@ -1,0 +1,835 @@
+<script>
+  /**
+   * The Animation Designer: a document tab of its own for one panel's animation (the design record,
+   * step 5; the owner's mockup, "Animation Designer: the full editor").
+   *
+   *   header     the panel, the transport: Play, the time, 0.25× / 0.5× / 1×, Snap, Loop
+   *   library    the effects (sceneModel.js SCENE_EFFECTS) and your own (Mine), to drag onto a
+   *              control on the stage or a track, or to click onto the control picked
+   *   stage      the panel, drawn live and posed at the playhead (stores/sceneStage.js); a click picks
+   *              a control, Hover and Press try a trigger. Nothing on it reaches the synth: its
+   *              controls are never touched, only shown, and no script runs for it
+   *   settings   the selected clip (ClipSettings.svelte)
+   *   scenes     the panel's scenes, and each control's own keyframe animations and text effects —
+   *              "separate AND as a scene": one animation, two views, never a copy
+   *   timeline   the scene's tracks and clips (SceneTimeline.svelte)
+   *
+   * It plays only under the playhead (the owner's rule): Play moves the playhead, and the stage is
+   * posed at each moment, at the chosen speed. Undo is its own (registerHistoryContext), over what it
+   * edits: the panel's scenes and its controls' Animations sections.
+   */
+  import { onDestroy, setContext } from 'svelte';
+  import { get, writable } from 'svelte/store';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import PanelPreviewSurface from '../../editor/PanelPreviewSurface.svelte';
+  import SceneTimeline from './SceneTimeline.svelte';
+  import ClipSettings from './ClipSettings.svelte';
+  import { panels, updatePanel, activeEditorTab } from '../../stores/panels.js';
+  import { applyControlPatchesById } from '../../stores/controls.js';
+  import { registerHistoryContext, scheduleSnapshot } from '../../stores/history.js';
+  import { updatePanelPreviewSession } from '../../stores/interactionPreview.js';
+  import { animationPresetLibrary, saveEffectAsPreset } from '../../stores/animationPresetLibrary.js';
+  import { fileCache } from '../../stores/fileCache.js';
+  import { SCENE_STAGE } from '../../stores/sceneStage.js';
+  import { cleanSceneList, cleanClock, cleanMarkers, newSceneId, patternPlace, SCENE_TRIGGER_TYPES, CLOCK_SOURCES, CLOCK_FOLLOWS, CLOCK_RELEASES, DRAG_DIRECTIONS } from '../../utils/sceneFormat.js';
+  import { MOTION_EVENTS } from '../../utils/stateMotion.js';
+  import { isRangeBehavior } from '../../utils/rangeBehavior.js';
+  import { controlDrawsValue } from '../../utils/valueDrawn.js';
+  import { sliderWordsPlace, sliderWordsRefusal } from '../../utils/anatomyWords.js';
+  import { midiTriggerText, midiNoteName } from '../../utils/sceneMidi.js';
+  import ScenePresetPanel from './ScenePresetPanel.svelte';
+  import EffectPreview from '../animation/EffectPreview.svelte';
+  import { scenePresetPreview } from '../../utils/effectPreview.js';
+  import { partRectOf } from '../../utils/sceneClock.js';
+  import {
+    scenePresetLibrary, scenePresetEntries, scenePresetsOf, saveScenePreset, removeScenePreset, carryScenePreset,
+    removeScenePresetFromPanel, keepPanelScenePreset, importScenePresetText,
+  } from '../../stores/scenePresetLibrary.js';
+  import { scenePresetFileText } from '../../utils/scenePresetFormat.js';
+  import { openTypedDocument, saveTypedDocumentAs } from '../../stores/typedDocuments.js';
+  import { scriptNames } from '../../scripting/scriptNames.js';
+  import { buildStateTargetOptions } from '../../utils/stateTargets.js';
+  import {
+    SCENE_EFFECTS, SCENE_EFFECT_CATEGORIES, sceneEffect, effectFromPreset, newScene, newClip, addClip, moveClip,
+    patternPlacesOf, effectOnlyMoves,
+    resizeClip, removeClip, duplicateClip, setClipEffect, setClipTarget, tracksOf, controlScenes, clipAnimation, targetLabel,
+  } from '../../utils/sceneModel.js';
+  import { flatControls, flatControlsWithPanelRects } from '../../utils/containment.js';
+  import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../../utils/backgroundCSS.js';
+  import { buildGridStyle } from '../../utils/gridCSS.js';
+
+  let { panelId } = $props();
+
+  let panel = $derived($panels.find((entry) => entry.id === panelId) ?? null);
+  let controls = $derived(panel?.controls ?? []);
+  let flat = $derived(flatControls(controls));
+  let panelScenes = $derived(cleanSceneList(panel?.animationScenes));
+  let ownScenes = $derived(controlScenes(controls));
+
+  let sceneId = $state('');
+  let scene = $derived(panelScenes.find((entry) => entry.id === sceneId) ?? ownScenes.find((entry) => entry.id === sceneId) ?? panelScenes[0] ?? ownScenes[0] ?? null);
+  let tracks = $derived(scene ? tracksOf(scene, controls) : []);
+  let clipId = $state('');
+  let clip = $derived(scene?.clips.find((entry) => entry.id === clipId) ?? null);
+  // A scene's markers (sceneFormat.js): moments that call a script's action as a play passes them,
+  // flags on the ruler; the picked one's settings stand where a clip's do.
+  let markerId = $state('');
+  let marker = $derived(clip ? null : scene?.markers?.find((entry) => entry.id === markerId) ?? null);
+  // The actions the panel's scripts register with ce.core.action, written out (scriptNames.js).
+  let actionNames = $derived([...new Set(scriptNames(panel?.scripts ?? []).defines.map((entry) => entry.name))].sort());
+  let clipControl = $derived(clip ? flat.find((entry) => entry._children?.Core?.id === clip.controlId) ?? null : null);
+  let pickedId = $state('');
+  let picked = $derived(flat.find((entry) => entry._children?.Core?.id === pickedId) ?? null);
+  let note = $state('');
+
+  // --- The playhead -------------------------------------------------------------------------------
+  let at = $state(0);
+  let playing = $state(false);
+  let speed = $state(1);
+  let snap = $state(10);
+  let frame = 0;
+  let lastTick = 0;
+
+  function tick(now) {
+    if (!playing || !scene) return;
+    const dt = lastTick ? (now - lastTick) * speed : 0;
+    lastTick = now;
+    let next = at + dt;
+    if (next >= scene.length) {
+      if (scene.loop) next %= scene.length;
+      else { at = scene.length; stop(); return; }
+    }
+    at = next;
+    frame = requestAnimationFrame(tick);
+  }
+  function play() {
+    if (!scene) return;
+    if (at >= scene.length) at = 0;
+    playing = true;
+    lastTick = 0;
+    frame = requestAnimationFrame(tick);
+  }
+  function stop() {
+    playing = false;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+  }
+  onDestroy(stop);
+  const seconds = (ms) => (ms / 1000).toFixed(2);
+
+  // The stage poses every control at the playhead; only the controls inside it see this.
+  const stage = writable({ scene: null, at: 0, playing: false, phase: 'a' });
+  setContext(SCENE_STAGE, stage);
+  $effect(() => { stage.set({ scene, at, playing: false, phase: 'a' }); });
+
+  // --- Undo -----------------------------------------------------------------------------------------
+  /** What the Designer edits, as plain data: the panel's scenes, and each animated control's Animations. */
+  function designerState() {
+    const current = get(panels).find((entry) => entry.id === panelId);
+    if (!current) return null;
+    const animations = {};
+    for (const control of flatControls(current.controls ?? [])) {
+      const section = control?._children?.Animations;
+      if (!section) continue;
+      if (Object.values(section._children ?? {}).some((node) => ['keyframes', 'text', 'value'].includes(String(node?.kind)))) {
+        animations[control._children.Core.id] = section;
+      }
+    }
+    return JSON.parse(JSON.stringify({ scenes: current.animationScenes ?? [], animations }));
+  }
+  $effect(() => registerHistoryContext({
+    kind: 'animationDesigner',
+    id: panelId,
+    isActive: () => { const tab = get(activeEditorTab); return tab?.type === 'animation' && tab.id === panelId; },
+    snapshot: designerState,
+    restore: (snapshot) => {
+      if (!snapshot) return;
+      const copy = JSON.parse(JSON.stringify(snapshot));
+      updatePanel(panelId, { animationScenes: copy.scenes });
+      const patches = new Map(Object.entries(copy.animations).map(([id, section]) => [id, { Animations: section }]));
+      if (patches.size) applyControlPatchesById(patches, panelId);
+    },
+  }));
+
+  // --- Writing --------------------------------------------------------------------------------------
+  function writeScenes(list, tag) {
+    updatePanel(panelId, { animationScenes: list });
+    scheduleSnapshot(tag);
+  }
+
+  /** A control's own animation, rewritten from its one clip: only the settings that changed. */
+  function writeOwn(previous, next, tag) {
+    const [before] = previous.clips;
+    const [after] = next.clips;
+    const base = `Animations.${previous.animation}`;
+    const patch = {};
+    if (after.start !== before.start) patch[`${base}.delay`] = after.start;
+    if (after.effect.kind !== 'text' && after.length !== before.length) patch[`${base}.duration`] = after.length;
+    if (after.target !== before.target) patch[`${base}.targets`] = [{ path: after.target }];
+    for (const key of new Set([...Object.keys(before.effect), ...Object.keys(after.effect)])) {
+      if (JSON.stringify(before.effect[key]) !== JSON.stringify(after.effect[key])) patch[`${base}.${key}`] = after.effect[key];
+    }
+    if (!Object.keys(patch).length) return;
+    applyControlPatchesById(new Map([[previous.controlId, patch]]), panelId);
+    scheduleSnapshot(tag);
+  }
+
+  function changeScene(next, tag) {
+    if (!scene || !next) return;
+    if (scene.own) writeOwn(scene, next, tag);
+    else writeScenes(panelScenes.map((entry) => (entry.id === next.id ? next : entry)), tag);
+  }
+
+  // --- Markers ---------------------------------------------------------------------------------------
+  const withMarkers = (markers) => ({ ...scene, markers: cleanMarkers(markers, scene.length) });
+  function addMarker() {
+    if (!scene || scene.own) return;
+    const added = { id: newSceneId('mk'), at: Math.round(at), action: actionNames[0] ?? '' };
+    changeScene(withMarkers([...(scene.markers ?? []), added]), 'marker:add');
+    markerId = added.id;
+    clipId = '';
+    note = added.action ? '' : 'Name the action the marker calls: one a script registers with ce.core.action.';
+  }
+  function setMarker(id, patch, tag) {
+    changeScene(withMarkers((scene.markers ?? []).map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))), tag);
+  }
+  function removeMarker(id) {
+    changeScene(withMarkers((scene.markers ?? []).filter((entry) => entry.id !== id)), 'marker:remove');
+    if (markerId === id) markerId = '';
+  }
+
+  // --- Scenes ---------------------------------------------------------------------------------------
+  function addScene() {
+    const next = newScene(`Scene ${panelScenes.length + 1}`, { type: panelScenes.length ? 'script' : 'panelOpen' });
+    writeScenes([...panelScenes, next], 'scene:add');
+    sceneId = next.id;
+    clipId = '';
+    at = 0;
+  }
+  function removeScene() {
+    if (!scene || scene.own) return;
+    writeScenes(panelScenes.filter((entry) => entry.id !== scene.id), 'scene:remove');
+    sceneId = '';
+    clipId = '';
+  }
+  function selectScene(id) {
+    stop();
+    sceneId = id;
+    clipId = '';
+    at = 0;
+  }
+  const TRIGGER_LABELS = { panelOpen: 'Panel opens', state: 'A control enters a state', event: 'A gesture on a control', beat: 'The beat', midi: 'MIDI in', script: 'A script asks' };
+  // MIDI in (utils/sceneMidi.js): what it listens for, and the choices for each.
+  const MIDI_MESSAGE_LABELS = { note: 'A note', noteOff: 'A note let go', cc: 'A controller past', program: 'A program change' };
+  const MIDI_CHANNELS = [{ value: 0, label: 'Any channel' }, ...Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: `Channel ${i + 1}` }))];
+  const MIDI_NOTES = [{ value: -1, label: 'Any note' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `${midiNoteName(n)} (${n})` }))];
+  const MIDI_PROGRAMS = [{ value: -1, label: 'Any program' }, ...Array.from({ length: 128 }, (_, n) => ({ value: n, label: `Program ${n + 1}` }))];
+  const controlLabel = (id) => {
+    const control = flat.find((entry) => entry._children.Core.id === id);
+    return String(control?._children?.Core?.name || id || 'a control');
+  };
+  /** The states a scene can wait for on a control: its own (Hover, Pressed, one it was given), and Base. */
+  function triggerStatesOf(controlId) {
+    const control = flat.find((entry) => entry._children.Core.id === controlId);
+    const options = buildStateTargetOptions(control?._children?.States, { includeBase: false })
+      .map((option) => ({ value: String(option.id).trim().toLowerCase(), label: option.fullLabel }));
+    return [...options, { value: 'default', label: 'Back to Base' }];
+  }
+  let triggerStates = $derived(scene?.trigger?.type === 'state' ? triggerStatesOf(scene.trigger.controlId) : []);
+  /** What a scene waits for, in words: "Cutoff enters Hover", "Click on Start", "Every 4 beats". */
+  function triggerText(trigger) {
+    if (trigger?.type === 'state') {
+      if (trigger.to === 'default') return `${controlLabel(trigger.controlId)} returns to Base`;
+      const state = triggerStatesOf(trigger.controlId).find((option) => option.value === trigger.to);
+      return `${controlLabel(trigger.controlId)} enters ${state?.label ?? trigger.to}`;
+    }
+    if (trigger?.type === 'event') {
+      const gesture = MOTION_EVENTS.find((event) => event.id === trigger.event);
+      return `${gesture?.label ?? trigger.event} on ${controlLabel(trigger.controlId)}`;
+    }
+    if (trigger?.type === 'beat') return Number(trigger.every) > 1 ? `Every ${trigger.every} beats` : 'Every beat';
+    if (trigger?.type === 'midi') return midiTriggerText(trigger);
+    return TRIGGER_LABELS[trigger?.type] ?? '';
+  }
+  const setTrigger = (patch) => changeScene({ ...scene, trigger: { ...scene.trigger, ...patch } }, 'scene:trigger');
+
+  // What moves a scene's playhead (utils/sceneClock.js): time, from its trigger, or a hand on a control.
+  const CLOCK_LABELS = { time: 'Time, from its trigger', value: 'A control\'s value', drag: 'A drag on a control', wheel: 'The wheel on a control', pointerX: 'The pointer across a control', pointerY: 'The pointer down a control' };
+  const FOLLOW_LABELS = { exact: 'Exactly', smooth: 'Smoothly', spring: 'On a spring' };
+  const RELEASE_LABELS = { stay: 'Stays', back: 'Goes back', carry: 'Carries on' };
+  const DIRECTION_LABELS = { up: 'Up', down: 'Down', left: 'Left', right: 'Right' };
+  /** Set a scene's clock; back to time drops it. A new clock starts on the picked control. */
+  function setClock(patch) {
+    if (!scene) return;
+    const merged = { ...(scene.clock ?? { controlId: pickedId || flat[0]?._children?.Core?.id || '' }), ...patch };
+    if ('source' in patch && patch.source !== scene.clock?.source) delete merged.span;
+    const clock = cleanClock(merged);
+    const next = { ...scene };
+    if (clock) next.clock = clock; else delete next.clock;
+    changeScene(next, 'scene:clock');
+  }
+  /**
+   * A gesture the control already uses is shared, never taken (the owner's rule): said when it is
+   * picked, so nobody wonders why the knob still turns.
+   */
+  function clockShares(clock) {
+    const control = flat.find((entry) => entry._children.Core.id === clock?.controlId);
+    if (!control || !(clock.source === 'drag' || clock.source === 'wheel')) return '';
+    if (!isRangeBehavior(control._children.Behavior)) return '';
+    const name = controlLabel(clock.controlId);
+    return clock.source === 'drag'
+      ? `Dragging ${name} still changes its value; the scene follows along.`
+      : `The wheel still turns ${name}; the scene follows along.`;
+  }
+  /** The parts of the clock's control it can be heard on alone: those with a place of their own. */
+  function clockPartsOf(clock) {
+    const control = flat.find((entry) => entry._children.Core.id === clock?.controlId);
+    return Object.keys(control?._children?.Parts?._children ?? {}).filter((part) => partRectOf(control, part));
+  }
+  /** What drives a scene, in words, for the scene list: "Drag on Cutoff". */
+  function clockText(clock) {
+    const on = clock.part ? `${controlLabel(clock.controlId)} › ${targetLabel(`Parts.${clock.part}`)}` : controlLabel(clock.controlId);
+    if (clock.source === 'value') return `${on}'s value`;
+    if (clock.source === 'drag') return `Drag on ${on}`;
+    if (clock.source === 'wheel') return `Wheel on ${on}`;
+    return `Pointer ${clock.source === 'pointerX' ? 'across' : 'down'} ${on}`;
+  }
+
+  // --- Clips ----------------------------------------------------------------------------------------
+  function effectFor(id) {
+    if (String(id).startsWith('mine:')) {
+      const preset = $animationPresetLibrary.find((entry) => entry.id === String(id).slice(5));
+      return preset ? effectFromPreset(preset) : null;
+    }
+    return sceneEffect(id);
+  }
+
+  /** An effect onto a control at a time: a new clip, in the scene shown, or a new scene if none. */
+  function placeEffect(effectId, controlId, start = at, target = null) {
+    const entry = effectFor(effectId);
+    const control = flat.find((c) => c._children?.Core?.id === controlId);
+    if (!entry || !control) return;
+    if (scene?.own) { note = 'A control\'s own animation has one clip. Make a scene (+ Scene) to put effects together.'; return; }
+    let place = target ?? entry.target ?? 'Transform';
+    const controlName = control._children.Core.name || controlId;
+    // What the value draws takes a value effect and nothing else, and a value effect plays nowhere else.
+    if (entry.effect.kind === 'value') place = 'Value';
+    else if (place === 'Value') place = entry.target && entry.target !== 'Value' ? entry.target : 'Transform';
+    // A Pattern effect goes on the control's first pattern, or a part's if it has none of its own,
+    // unless dropped on another's track.
+    if (place === 'Patterns') {
+      place = patternPlacesOf(control)[0] ?? '';
+      if (!place) { note = `${controlName} has no pattern: add one on its Background tab, or a part's, then put the effect on it.`; return; }
+    }
+    // A pattern shows a move or a fade, nothing else: words, a value, a colour or a gradient go on their own place.
+    if (patternPlace(place) && !effectOnlyMoves(entry.effect)) {
+      if (entry.effect.kind === 'keyframes') { note = `“${entry.label}” paints a fill; a pattern takes a move or a fade.`; return; }
+      place = entry.target && entry.target !== 'Patterns' ? entry.target : 'Transform';
+    }
+    // A text effect dropped on a knob as a whole plays on the words it draws: its scale's numbers,
+    // its ticks or its handle labels (utils/anatomyWords.js), and says why where it draws none.
+    if (entry.effect.kind === 'text' && !String(place).startsWith('Parts.')) place = sliderWordsPlace(control) ?? 'Text';
+    if (entry.effect.kind === 'text') {
+      const refusal = sliderWordsRefusal(control, String(place).startsWith('Parts.') ? String(place).slice('Parts.'.length) : '');
+      if (refusal) { note = refusal; return; }
+    }
+    if (place === 'Text' && !control._children?.Text) { note = `${control._children.Core.name || controlId} has no words of its own: a text effect plays on a Label, or on a part with text.`; return; }
+    if (place === 'Value' && !controlDrawsValue(control)) { note = `${control._children.Core.name || controlId} draws no value to move: a value effect plays on a knob, a slider, a Macro or a meter.`; return; }
+    let base = scene;
+    let list = panelScenes;
+    if (!base) {
+      base = newScene('Scene 1', { type: 'panelOpen' });
+      list = [...panelScenes, base];
+      sceneId = base.id;
+    }
+    const added = newClip({ controlId, target: place, start: Math.max(0, Math.round(start / snap) * snap), length: entry.length ?? 600, effect: entry.effect, label: entry.label });
+    const next = addClip(base, added);
+    writeScenes(list.map((s) => (s.id === next.id ? next : s)), 'clip:add');
+    clipId = added.id;
+    pickedId = controlId;
+    note = '';
+  }
+
+  function onmove(id, start, { copy } = {}) { changeScene(copy ? duplicateClip(scene, id, start, snap) : moveClip(scene, id, start, snap), copy ? 'clip:copy' : `clip:move:${id}`); }
+  function onresize(id, length) { changeScene(resizeClip(scene, id, length, snap), `clip:length:${id}`); }
+  function ondelete(id) { if (scene?.own) return; changeScene(removeClip(scene, id), 'clip:remove'); if (clipId === id) clipId = ''; }
+
+  // --- The library ----------------------------------------------------------------------------------
+  let category = $state('All');
+  let mine = $derived($animationPresetLibrary
+    .map((preset) => ({ preset, entry: effectFromPreset(preset) }))
+    .filter(({ entry }) => entry)
+    .map(({ preset, entry }) => ({ id: `mine:${preset.id}`, label: preset.name, category: 'Mine', ...entry })));
+  let shownEffects = $derived(category === 'Mine' ? mine : category === 'All' ? [...SCENE_EFFECTS, ...mine] : SCENE_EFFECTS.filter((entry) => entry.category === category));
+  // Whole scenes kept to use again (utils/scenePreset.js), under Scenes: the built-in ones, yours, and
+  // those this panel carries (stores/scenePresetLibrary.js); each one a .cescene file to export.
+  const LIBRARY_CATEGORIES = [...SCENE_EFFECT_CATEGORIES, 'Scenes'];
+  let scenePresetCards = $derived(scenePresetEntries($scenePresetLibrary, scenePresetsOf(panel)));
+  let presetPick = $state('');
+  let pickedEntry = $derived(category === 'Scenes' ? scenePresetCards.find((entry) => entry.preset.id === presetPick) ?? null : null);
+  let pickedPreset = $derived(pickedEntry?.preset ?? null);
+  const WHERE_LABEL = { builtin: 'Built in', mine: 'Mine', panel: 'This panel' };
+  // The card whose preview plays: the one pointed at, or focused (EffectPreview.svelte).
+  let previewId = $state('');
+  const previewOn = (id) => ({
+    onpointerenter: () => { previewId = id; },
+    onpointerleave: () => { if (previewId === id) previewId = ''; },
+    onfocus: () => { previewId = id; },
+    onblur: () => { if (previewId === id) previewId = ''; },
+  });
+  async function exportScenePreset(preset) {
+    const result = await saveTypedDocumentAs('scenePreset', preset.name, scenePresetFileText(preset));
+    if (result.ok) note = `${preset.name} saved as ${result.name || 'a .cescene file'}.`;
+    else if (!result.cancelled) note = `${preset.name} could not be saved.`;
+  }
+  async function importScenePreset() {
+    const result = await openTypedDocument('scenePreset');
+    if (!result.ok) { if (!result.cancelled) note = 'That file could not be read.'; return; }
+    const imported = importScenePresetText(result.data);
+    note = imported.error ?? `${imported.preset.name} ${imported.replaced ? 'updated' : 'added'} in your scene presets.`;
+    if (imported.preset) presetPick = imported.preset.id;
+  }
+  function carryPicked() {
+    const result = carryScenePreset(pickedPreset, panelId);
+    note = result.reason ?? `${pickedPreset.name} is carried by this panel now: it goes wherever the panel goes.`;
+  }
+  function keepPicked() {
+    const result = keepPanelScenePreset(pickedPreset.id, panelId);
+    note = result.reason ?? `${pickedPreset.name} is in your scene presets now, for any panel.`;
+  }
+  function removePicked() {
+    const { preset, where, carried } = pickedEntry;
+    if (where === 'mine') {
+      removeScenePreset(preset.id);
+      note = `${preset.name} is out of your library${carried ? '; this panel still carries it' : ''}. Scenes made from it stay.`;
+    } else {
+      removeScenePresetFromPanel(preset.id, panelId);
+      note = `This panel no longer carries ${preset.name}. Scenes made from it stay.`;
+    }
+    presetPick = '';
+  }
+  function addSceneFromPreset(made) {
+    writeScenes([...panelScenes, made], 'scene:preset');
+    sceneId = made.id;
+    clipId = '';
+    at = 0;
+    presetPick = '';
+    const controlsIn = new Set(made.clips.map((entry) => entry.controlId)).size;
+    note = `${made.name}: a new scene on ${controlsIn} ${controlsIn === 1 ? 'control' : 'controls'}.`;
+  }
+  function saveSceneAsPreset() {
+    if (!scene || scene.own) return;
+    const { preset, reason } = saveScenePreset(scene, controls);
+    note = reason ?? `${preset.name} is in your scene presets: Library › Scenes, for this panel or any other.`;
+  }
+  function dragEffect(event, id) {
+    event.dataTransfer?.setData('application/x-ce-effect', id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  // --- The stage ------------------------------------------------------------------------------------
+  let stageBox = $state(null);
+  let boxSize = $state({ width: 600, height: 400 });
+  $effect(() => {
+    if (!stageBox || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => { boxSize = { width: stageBox.clientWidth, height: stageBox.clientHeight }; });
+    observer.observe(stageBox);
+    return () => observer.disconnect();
+  });
+  let scale = $derived(panel ? Math.max(0.1, Math.min((boxSize.width - 24) / panel.width, (boxSize.height - 24) / panel.height, 2)) : 1);
+  let rects = $derived(flatControlsWithPanelRects(controls));
+  let bgLayers = $derived(panel ? {
+    solid: buildSolidStyle(panel),
+    gradient: buildGradientStyle(panel),
+    image: buildLayerStyle(panel, 'Image', panel.bgImage ? $fileCache[panel.bgImage] : null),
+    texture: buildLayerStyle(panel, 'Texture', panel.bgTexture ? $fileCache[panel.bgTexture] : null),
+  } : {});
+  let gridStyle = $derived(panel ? buildGridStyle(panel, { gridEnabled: false }) : '');
+
+  /** The topmost control under a point on the stage, or null. */
+  function controlAt(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - box.left) / scale;
+    const y = (event.clientY - box.top) / scale;
+    for (let i = rects.length - 1; i >= 0; i -= 1) {
+      const t = rects[i]._children.Transform;
+      if (x >= t.x && y >= t.y && x <= t.x + (t.width ?? 0) && y <= t.y + (t.height ?? 0)) return rects[i]._children.Core.id;
+    }
+    return null;
+  }
+  let pickedRect = $derived(rects.find((entry) => entry._children.Core.id === pickedId)?._children.Transform ?? null);
+  let dropOver = $state(false);
+  function stageDrop(event) {
+    dropOver = false;
+    const id = event.dataTransfer?.getData('application/x-ce-effect');
+    const controlId = controlAt(event);
+    if (!id || !controlId) return;
+    event.preventDefault();
+    placeEffect(id, controlId, at);
+  }
+  /** Hover or Press on the picked control, for a moment: its own animations show what they do. */
+  function tryTrigger(flags) {
+    if (!pickedId) { note = 'Pick a control on the stage first.'; return; }
+    updatePanelPreviewSession(pickedId, flags);
+    setTimeout(() => updatePanelPreviewSession(pickedId, Object.fromEntries(Object.keys(flags).map((key) => [key, false]))), 900);
+  }
+
+  // --- Clip settings --------------------------------------------------------------------------------
+  function savePreset(name) {
+    if (!clip) return;
+    const kind = clip.effect.kind;
+    const { preset, reason } = saveEffectAsPreset(clipAnimation(clip), { name, category: kind === 'text' ? 'Text' : kind === 'value' ? 'Value' : 'Move' });
+    note = reason ?? `${preset.name} is in your library (Mine), to drop on any ${kind === 'value' ? 'knob, slider, Macro or meter' : 'control'}.`;
+  }
+</script>
+
+<div class="ad" data-animation-designer={panelId}>
+  <header class="head">
+    <div class="title">
+      <b>Animation Designer</b>
+      <span>{panel?.name ?? 'No panel'} · plays here under the playhead; in Preview and the plug-in by itself, when what it waits for happens</span>
+    </div>
+    <div class="transport">
+      <button type="button" class="tbtn" data-play aria-label={playing ? 'Stop' : 'Play scene'} disabled={!scene} onclick={() => (playing ? stop() : play())}>
+        {#if playing}<Square size={14} />{:else}<Play size={14} />{/if} {playing ? 'Stop' : 'Play scene'}
+      </button>
+      <span class="time" data-time>{seconds(at)} / {seconds(scene?.length ?? 0)} s</span>
+      <span class="seg" role="group" aria-label="Speed">
+        {#each [0.25, 0.5, 1] as value (value)}
+          <button type="button" class:on={speed === value} aria-pressed={speed === value} onclick={() => { speed = value; }}>{value}×</button>
+        {/each}
+      </span>
+      <label class="snap">Snap
+        <select value={String(snap)} onchange={(event) => { snap = Number(event.currentTarget.value); }}>
+          {#each [10, 50, 100] as value (value)}<option value={String(value)}>{value} ms</option>{/each}
+        </select>
+      </label>
+      {#if note}<span class="note" role="status">{note}</span>{/if}
+    </div>
+  </header>
+
+  <aside class="lib" aria-label="Library">
+    <div class="ph">Library</div>
+    <div class="cats" role="group" aria-label="Library filter">
+      {#each LIBRARY_CATEGORIES as name (name)}
+        <button type="button" class:on={category === name} aria-pressed={category === name} onclick={() => { category = name; }}>{name}</button>
+      {/each}
+    </div>
+    <div class="cards">
+      {#if category === 'Scenes'}
+        <button type="button" class="tb import" data-import-scene-preset onclick={importScenePreset}
+                title="Bring in a .cescene file someone sent you, into your scene presets">Import…</button>
+        {#each scenePresetCards as entry (entry.preset.id)}
+          {@const shown = scenePresetPreview(entry.preset)}
+          <button type="button" class="card" class:sel={presetPick === entry.preset.id} data-scene-preset={entry.preset.id} data-where={entry.where}
+                  onclick={() => { presetPick = presetPick === entry.preset.id ? '' : entry.preset.id; }}
+                  {...previewOn(entry.preset.id)}
+                  title="A whole scene: click to put it on this panel">
+            <span class="minis">{#each shown.minis as mini, i (i)}<EffectPreview entry={mini.entry} delay={mini.delay} period={shown.period} small active={previewId === entry.preset.id} />{/each}</span>
+            <span class="cn named">{entry.preset.name}</span><span class="cc">{WHERE_LABEL[entry.where]}{entry.carried && entry.where !== 'panel' ? ' · on this panel' : ''}</span>
+          </button>
+        {/each}
+      {:else}
+      {#each shownEffects as entry (entry.id)}
+        <button type="button" class="card" draggable="true" data-effect={entry.id}
+                title={pickedId ? `Click: onto ${picked?._children?.Core?.name ?? pickedId} at the playhead. Or drag onto a control or a track.` : 'Drag onto a control on the stage or a track, or pick a control and click'}
+                {...previewOn(entry.id)}
+                ondragstart={(event) => dragEffect(event, entry.id)} onclick={() => (pickedId ? placeEffect(entry.id, pickedId) : (note = 'Pick a control on the stage, or drag the effect onto one.'))}>
+          <EffectPreview {entry} active={previewId === entry.id} />
+          <span class="cn">{entry.label}</span><span class="cc">{entry.category}</span>
+        </button>
+      {:else}
+        <p class="empty">Nothing here yet. Save an effect as a preset and it is here.</p>
+      {/each}
+      {/if}
+    </div>
+    {#if pickedPreset}
+      <ScenePresetPanel preset={pickedPreset} {controls} where={pickedEntry.where} carried={pickedEntry.carried} onadd={addSceneFromPreset}
+                        oncancel={() => { presetPick = ''; }} onremove={removePicked} onexport={() => exportScenePreset(pickedPreset)}
+                        oncarry={carryPicked} onkeep={keepPicked} />
+    {/if}
+    <p class="hint">{category === 'Scenes' ? 'A scene preset becomes a new scene: on controls you choose, or on every one that fits.' : 'Drag an effect onto a control, or onto a track.'}</p>
+  </aside>
+
+  <section class="stage" aria-label="Stage">
+    <div class="stagebar">
+      <span>Try a trigger:</span>
+      <button type="button" class="tb" onclick={() => tryTrigger({ hover: true })}>Hover</button>
+      <button type="button" class="tb" onclick={() => tryTrigger({ hover: true, pressed: true })}>Press</button>
+      <span class="safe">Nothing on the stage reaches the synth</span>
+    </div>
+    <div class="stagebox" bind:this={stageBox}>
+      {#if panel}
+        <div class="board" style={`width:${panel.width * scale}px;height:${panel.height * scale}px`}>
+          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} />
+          <!-- Clicks pick, and a dropped effect lands on the control under it; the controls under
+               this layer are never touched, so nothing is turned, pressed or sent. -->
+          <div class="pick" class:drop={dropOver} role="button" tabindex="-1" aria-label="Pick a control"
+               data-pick
+               onclick={(event) => { pickedId = controlAt(event) ?? ''; }}
+               onkeydown={() => {}}
+               ondragover={(event) => { if (event.dataTransfer?.types?.includes('application/x-ce-effect')) { event.preventDefault(); dropOver = true; } }}
+               ondragleave={() => { dropOver = false; }}
+               ondrop={stageDrop}>
+            {#if pickedRect}
+              <span class="picked" style={`left:${pickedRect.x * scale}px;top:${pickedRect.y * scale}px;width:${(pickedRect.width ?? 0) * scale}px;height:${(pickedRect.height ?? 0) * scale}px`}>
+                <i>{picked?._children?.Core?.name ?? pickedId}</i>
+              </span>
+            {/if}
+          </div>
+        </div>
+      {:else}
+        <p class="empty">This panel is not open.</p>
+      {/if}
+    </div>
+  </section>
+
+  <aside class="set" aria-label="Clip settings">
+    <div class="ph">{clip ? 'Clip' : marker ? 'Marker' : 'Settings'}</div>
+    {#if marker}
+      <div class="mk" data-marker-settings={marker.id}>
+        <label class="mkrow"><span>At</span>
+          <input class="txt num" type="number" min="0" max={scene.length} step="10" value={marker.at} aria-label="When, in ms" data-marker-at
+                 onchange={(event) => setMarker(marker.id, { at: Math.round(Number(event.currentTarget.value) || 0) }, `marker:at:${marker.id}`)} /> ms</label>
+        <label class="mkrow"><span>Calls</span>
+          <input class="txt" type="text" list="ad-actions" value={marker.action} placeholder="An action's name" aria-label="The action it calls" data-marker-action
+                 onchange={(event) => setMarker(marker.id, { action: event.currentTarget.value.trim() }, `marker:action:${marker.id}`)} /></label>
+        <datalist id="ad-actions">{#each actionNames as name (name)}<option value={name}></option>{/each}</datalist>
+        <p class="hint">{actionNames.length
+          ? `As a play passes it, in Preview and the plug-in, it calls the action a script registers with ce.core.action: ${actionNames.join(', ')}.`
+          : 'As a play passes it, in Preview and the plug-in, it calls an action a script registers with ce.core.action("name", function). No script registers one yet.'}</p>
+        <button type="button" class="tb" data-marker-remove onclick={() => removeMarker(marker.id)}>Remove marker</button>
+      </div>
+    {:else}
+    <ClipSettings {clip} control={clipControl} own={!!scene?.own} sceneName={scene?.own ? '' : scene?.name ?? ''}
+                  onpatch={(patch) => changeScene(setClipEffect(scene, clip.id, patch), `clip:effect:${clip.id}`)}
+                  ontarget={(target) => changeScene(setClipTarget(scene, clip.id, target), `clip:target:${clip.id}`)}
+                  onstart={(start) => changeScene(moveClip(scene, clip.id, start, 1), `clip:move:${clip.id}`)}
+                  onlength={(length) => changeScene(resizeClip(scene, clip.id, length, 1), `clip:length:${clip.id}`)}
+                  ondelete={() => ondelete(clip.id)}
+                  onsavepreset={savePreset} />
+    {/if}
+  </aside>
+
+  <section class="bottom">
+    <nav class="scenes" aria-label="Scenes">
+      <div class="ph">Scenes <button type="button" class="tb add" data-add-scene onclick={addScene}><Plus size={12} /> Scene</button></div>
+      {#each panelScenes as entry (entry.id)}
+        <button type="button" class="srow" class:sel={scene?.id === entry.id} data-scene={entry.id} onclick={() => selectScene(entry.id)}>
+          <span class="sn">{entry.name}</span><span class="st">{entry.clock ? clockText(entry.clock) : triggerText(entry.trigger)}</span>
+        </button>
+      {/each}
+      {#if ownScenes.length}
+        <div class="sub">Controls' own</div>
+        {#each ownScenes as entry (entry.id)}
+          <button type="button" class="srow own" class:sel={scene?.id === entry.id} data-scene={entry.id} onclick={() => selectScene(entry.id)}>
+            <span class="sn">{entry.name}</span>
+          </button>
+        {/each}
+      {/if}
+      {#if scene && !scene.own}
+        <div class="sedit">
+          <input class="txt" type="text" value={scene.name} aria-label="Scene name"
+                 onchange={(event) => changeScene({ ...scene, name: event.currentTarget.value }, 'scene:name')} />
+          <select class="txt" value={scene.clock?.source ?? 'time'} aria-label="What drives the scene" data-scene-clock
+                  onchange={(event) => setClock({ source: event.currentTarget.value })}>
+            {#each CLOCK_SOURCES as source (source)}<option value={source}>{CLOCK_LABELS[source]}</option>{/each}
+          </select>
+          {#if scene.clock}
+            <select class="txt" value={scene.clock.controlId} aria-label="Driving control" data-clock-control
+                    onchange={(event) => setClock({ controlId: event.currentTarget.value })}>
+              {#each flat as control (control._children.Core.id)}<option value={control._children.Core.id}>{control._children.Core.name || control._children.Core.id}</option>{/each}
+            </select>
+            {#if scene.clock.source !== 'value' && clockPartsOf(scene.clock).length}
+              <label class="beats">Heard on
+                <select class="txt" value={scene.clock.part ?? ''} aria-label="Heard on" data-clock-part
+                        onchange={(event) => setClock({ part: event.currentTarget.value })}>
+                  <option value="">The whole control</option>
+                  {#each clockPartsOf(scene.clock) as part (part)}<option value={part}>{targetLabel(`Parts.${part}`)}</option>{/each}
+                </select></label>
+            {/if}
+            {#if scene.clock.source === 'drag'}
+              <label class="beats">
+                <select class="txt" value={scene.clock.direction} aria-label="Drag direction" data-clock-direction
+                        onchange={(event) => setClock({ direction: event.currentTarget.value })}>
+                  {#each DRAG_DIRECTIONS as direction (direction)}<option value={direction}>{DIRECTION_LABELS[direction]}</option>{/each}
+                </select>
+                <input class="txt num" type="number" min="10" max="4000" step="10" value={scene.clock.span} aria-label="Pixels for the whole scene" data-clock-span
+                       onchange={(event) => setClock({ span: Number(event.currentTarget.value) })} />
+                px for the whole scene</label>
+            {:else if scene.clock.source === 'wheel'}
+              <label class="beats">
+                <input class="txt num" type="number" min="1" max="400" step="1" value={scene.clock.span} aria-label="Notches for the whole scene" data-clock-span
+                       onchange={(event) => setClock({ span: Number(event.currentTarget.value) })} />
+                notches for the whole scene</label>
+            {/if}
+            <label class="beats">Follows
+              <select class="txt" value={scene.clock.follow} aria-label="How the scene follows" data-clock-follow
+                      onchange={(event) => setClock({ follow: event.currentTarget.value })}>
+                {#each CLOCK_FOLLOWS as follow (follow)}<option value={follow}>{FOLLOW_LABELS[follow]}</option>{/each}
+              </select></label>
+            {#if scene.clock.source === 'drag' || scene.clock.source === 'pointerX' || scene.clock.source === 'pointerY'}
+              <label class="beats">{scene.clock.source === 'drag' ? 'Let go, it' : 'When the pointer leaves, it'}
+                <select class="txt" value={scene.clock.release} aria-label="When let go" data-clock-release
+                        onchange={(event) => setClock({ release: event.currentTarget.value })}>
+                  {#each CLOCK_RELEASES.filter((release) => release !== 'carry' || scene.clock.source === 'drag') as release (release)}<option value={release}>{RELEASE_LABELS[release]}</option>{/each}
+                </select></label>
+            {/if}
+            {#if clockShares(scene.clock)}<span class="cnote" data-clock-shares>{clockShares(scene.clock)}</span>{/if}
+          {:else}
+          <select class="txt" value={scene.trigger.type} aria-label="Scene trigger"
+                  onchange={(event) => changeScene({ ...scene, trigger: { ...scene.trigger, type: event.currentTarget.value, controlId: scene.trigger.controlId ?? pickedId } }, 'scene:trigger')}>
+            {#each SCENE_TRIGGER_TYPES as type (type)}<option value={type}>{TRIGGER_LABELS[type]}</option>{/each}
+          </select>
+          {#if scene.trigger.type === 'state' || scene.trigger.type === 'event'}
+            <select class="txt" value={scene.trigger.controlId ?? ''} aria-label="Trigger control"
+                    onchange={(event) => setTrigger({ controlId: event.currentTarget.value })}>
+              {#each flat as control (control._children.Core.id)}<option value={control._children.Core.id}>{control._children.Core.name || control._children.Core.id}</option>{/each}
+            </select>
+          {/if}
+          {#if scene.trigger.type === 'state'}
+            <select class="txt" value={scene.trigger.to ?? 'hover'} aria-label="Trigger state" data-trigger-state
+                    onchange={(event) => setTrigger({ to: event.currentTarget.value })}>
+              {#each triggerStates as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+            </select>
+          {:else if scene.trigger.type === 'event'}
+            <select class="txt" value={scene.trigger.event ?? 'click'} aria-label="Trigger gesture" data-trigger-event
+                    onchange={(event) => setTrigger({ event: event.currentTarget.value })}>
+              {#each MOTION_EVENTS as gesture (gesture.id)}<option value={gesture.id}>{gesture.label}</option>{/each}
+            </select>
+          {:else if scene.trigger.type === 'beat'}
+            <label class="beats">Every
+              <input class="txt num" type="number" min="1" max="64" step="1" value={scene.trigger.every ?? 1} aria-label="Beats between plays" data-trigger-beats
+                     onchange={(event) => setTrigger({ every: Math.max(1, Math.min(64, Math.round(Number(event.currentTarget.value) || 1))) })} />
+              beats</label>
+          {:else if scene.trigger.type === 'midi'}
+            <select class="txt" value={scene.trigger.message ?? 'note'} aria-label="MIDI message" data-trigger-midi
+                    onchange={(event) => setTrigger({ message: event.currentTarget.value })}>
+              {#each Object.entries(MIDI_MESSAGE_LABELS) as [value, label] (value)}<option {value}>{label}</option>{/each}
+            </select>
+            {#if scene.trigger.message === 'cc'}
+              <label class="beats">CC
+                <input class="txt num" type="number" min="0" max="119" step="1" value={scene.trigger.cc ?? 64} aria-label="Controller number" data-trigger-cc
+                       onchange={(event) => setTrigger({ cc: Number(event.currentTarget.value) })} />
+                past
+                <input class="txt num" type="number" min="0" max="126" step="1" value={scene.trigger.above ?? 63} aria-label="Fires when the controller passes this, going up" data-trigger-above
+                       onchange={(event) => setTrigger({ above: Number(event.currentTarget.value) })} /></label>
+            {:else if scene.trigger.message === 'program'}
+              <select class="txt" value={scene.trigger.program ?? -1} aria-label="Program" onchange={(event) => setTrigger({ program: Number(event.currentTarget.value) })}>
+                {#each MIDI_PROGRAMS as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+              </select>
+            {:else}
+              <select class="txt" value={scene.trigger.note ?? -1} aria-label="Note" data-trigger-note onchange={(event) => setTrigger({ note: Number(event.currentTarget.value) })}>
+                {#each MIDI_NOTES as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+              </select>
+            {/if}
+            <select class="txt" value={scene.trigger.channel ?? 0} aria-label="MIDI channel" data-trigger-channel onchange={(event) => setTrigger({ channel: Number(event.currentTarget.value) })}>
+              {#each MIDI_CHANNELS as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+            </select>
+          {/if}
+          {/if}
+          <span class="srowtools">
+            {#if scene.clock}<span></span>{:else}
+            <label class="chk"><input type="checkbox" checked={scene.loop} onchange={(event) => changeScene({ ...scene, loop: event.currentTarget.checked }, 'scene:loop')} /> Loop</label>
+            {/if}
+            {#if !scene.own}
+              <button type="button" class="tb" data-add-marker onclick={addMarker}
+                      title="A moment that calls a script's action as the scene passes it, at the playhead">+ Marker</button>
+            {/if}
+            <button type="button" class="tb" data-save-scene-preset disabled={!scene.clips.length} onclick={saveSceneAsPreset}
+                    title="Keep this whole scene, to put on other controls or another panel">Save as preset</button>
+            <button type="button" class="tb" aria-label="Remove scene" onclick={removeScene}><Trash2 size={12} /></button>
+          </span>
+        </div>
+      {/if}
+    </nav>
+    <SceneTimeline {scene} {tracks} {at} {snap} selectedClipId={clipId} readOnlyAdd={!!scene?.own}
+                   selectedMarkerId={marker?.id ?? ''}
+                   onmarkerselect={(id) => { markerId = id; clipId = ''; }}
+                   onmarkermove={(id, t) => setMarker(id, { at: t }, `marker:move:${id}`)}
+                   onmarkerdelete={removeMarker}
+                   onseek={(t) => { stop(); at = t; }}
+                   onselect={(id) => { clipId = id; markerId = ''; pickedId = scene?.clips.find((c) => c.id === id)?.controlId ?? pickedId; }}
+                   {onmove} {onresize} {ondelete}
+                   ondropeffect={({ effectId, controlId, target, start }) => placeEffect(effectId, controlId, start, target)} />
+  </section>
+</div>
+
+<style>
+  .ad {
+    height: 100%; min-height: 0; display: grid; overflow: hidden;
+    grid-template-columns: 236px minmax(0, 1fr) 380px;
+    grid-template-rows: auto minmax(220px, 1fr) minmax(190px, 36%);
+    background: #0F1215; color: #E8EEF3; font: 400 13px/1.35 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  .head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid #2B323A; background: #151A1E; }
+  .title { display: flex; flex-direction: column; min-width: 0; }
+  .title b { font-size: 15px; font-weight: 600; }
+  .title span { font-size: 12px; color: #8A96A3; }
+  .transport { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tbtn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2E7D6B; border-radius: 6px; background: #10362F; color: #BFF3E6; font: 500 13px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer; }
+  .tbtn:disabled { opacity: 0.45; cursor: default; }
+  .time { font: 500 13px/1 'IBM Plex Mono', ui-monospace, monospace; color: #E8EEF3; min-width: 104px; }
+  .seg { display: inline-flex; border: 1px solid #3A434D; border-radius: 6px; overflow: hidden; }
+  .seg button { height: 28px; padding: 0 9px; border: 0; background: #1E2328; color: #CCD3DA; font: inherit; font-size: 12px; cursor: pointer; }
+  .seg button.on { background: #173A5A; color: #E8F4FF; }
+  .snap { display: inline-flex; align-items: center; gap: 6px; color: #AEB9C4; font-size: 12px; }
+  .snap select, .txt { height: 28px; box-sizing: border-box; padding: 0 6px; border: 1px solid #3A434D; border-radius: 5px; background: #12161A; color: #E8EEF3; font: inherit; font-size: 12px; min-width: 0; }
+  .note { color: #F6D58A; font-size: 12px; max-width: 420px; }
+  .ph { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8A96A3; border-bottom: 1px solid #20262C; }
+  .lib, .set { min-height: 0; display: flex; flex-direction: column; background: #151A1E; }
+  .lib { border-right: 1px solid #2B323A; }
+  .set { border-left: 1px solid #2B323A; }
+  .set :global(.cs), .set :global(.none) { padding: 10px; overflow: auto; }
+  .set { overflow: auto; }
+  .cats { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; }
+  .cats button { height: 24px; padding: 0 8px; border: 1px solid #3A434D; border-radius: 12px; background: #1E2328; color: #CCD3DA; font: inherit; font-size: 12px; cursor: pointer; }
+  .cats button.on { border-color: #5AA9E6; background: #173A5A; color: #E8F4FF; }
+  .cards { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 10px 8px; }
+  .cards .tb.import { align-self: flex-start; flex: 0 0 auto; }
+  .card .cn { flex: 1; min-width: 0; }
+  .minis { display: inline-flex; gap: 2px; flex: 0 0 auto; }
+  .card { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid #2B323A; border-radius: 6px; background: #1A1F24; color: #E8EEF3; font: inherit; text-align: left; cursor: grab; }
+  .card:hover { border-color: #5B6670; }
+  .cn { text-transform: capitalize; }
+  .card.sel { border-color: #5AA9E6; }
+  .cn.named { text-transform: none; }
+  .cc { font-size: 11px; color: #8A96A3; }
+  .hint, .empty { margin: 0; padding: 8px 10px; font-size: 12px; color: #8A96A3; }
+  .cnote { font-size: 12px; color: #8A96A3; }
+  .stage { min-height: 0; display: flex; flex-direction: column; background: #0B0E10; }
+  .stagebar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #20262C; color: #AEB9C4; font-size: 12px; }
+  .safe { margin-left: auto; color: #8A96A3; }
+  .stagebox { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .board { position: relative; flex: none; box-shadow: 0 0 0 1px #2B323A; }
+  .pick { position: absolute; inset: 0; cursor: crosshair; outline: none; }
+  .pick.drop { background: rgba(90, 169, 230, 0.08); }
+  .picked { position: absolute; box-sizing: border-box; border: 2px solid #5AA9E6; border-radius: 3px; pointer-events: none; }
+  .picked i { position: absolute; left: -2px; top: -20px; padding: 1px 6px; border-radius: 3px; background: #5AA9E6; color: #0B1620; font: 600 11px/1.4 'IBM Plex Sans', system-ui, sans-serif; font-style: normal; white-space: nowrap; }
+  .bottom { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); border-top: 1px solid #2B323A; }
+  .scenes { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-right: 1px solid #2B323A; background: #151A1E; }
+  .srow { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; margin: 0 6px; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #E8EEF3; font: inherit; text-align: left; cursor: pointer; }
+  .srow:hover { background: #1E2328; }
+  .srow.sel { border-color: #5AA9E6; background: #173A5A; }
+  .srow.own .sn { color: #CCD3DA; }
+  .sn { font-weight: 600; font-size: 13px; }
+  .st { font-size: 11px; color: #8A96A3; }
+  .sub { margin: 6px 14px 2px; font-size: 11px; color: #8A96A3; }
+  .sedit { display: flex; flex-direction: column; gap: 5px; margin: 8px 8px 0; padding-top: 8px; border-top: 1px solid #20262C; }
+  .srowtools { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .mk { display: flex; flex-direction: column; gap: 8px; padding: 10px; font-size: 12px; color: #CCD3DA; }
+  .mkrow { display: flex; align-items: center; gap: 8px; }
+  .mkrow > span { flex: 0 0 44px; color: #8A96A3; }
+  .mkrow .txt:not(.num) { flex: 1; min-width: 0; }
+  .mk .hint { margin: 0; color: #8A96A3; line-height: 1.4; }
+  .mk .tb { align-self: flex-start; }
+  .chk { display: inline-flex; gap: 5px; align-items: center; color: #CCD3DA; font-size: 12px; }
+  .beats { display: inline-flex; gap: 6px; align-items: center; color: #CCD3DA; font-size: 12px; }
+  .beats .num { width: 56px; }
+  .tb { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border: 1px solid #3A434D; border-radius: 5px; background: #1E2328; color: #E8EEF3; font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer; text-transform: none; letter-spacing: 0; }
+  .tb:hover { border-color: #5B6670; }
+  .tb.add { font-weight: 500; }
+</style>

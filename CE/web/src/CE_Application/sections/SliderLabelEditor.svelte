@@ -7,6 +7,7 @@
   import Type from 'lucide-svelte/icons/type';
   import TextEditor from './TextEditor.svelte';
   import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
+  import { getSliderGeometry } from '../utils/sliderBehavior.js';
 
   let { control = null } = $props();
 
@@ -66,6 +67,10 @@
   let selectedLabelTarget = $derived(LABEL_TARGETS.find((target) => target.id === selectedLabelId) ?? LABEL_TARGETS[0]);
   let selectedLabelPart = $derived(parts?._children?.[selectedLabelTarget?.id] ?? null);
   let selectedLabelText = $derived(selectedLabelPart?._children?.Text ?? null);
+  // A knob's readout rides its pointer, or sits in the middle of the dial (`anchor: centre`): a big
+  // number in the cap, a stepped knob's choice. Only the current value's label, and only on a dial.
+  let offersCap = $derived(selectedLabelTarget?.id === 'labelCurrent' && getSliderGeometry(behavior) === 'circular');
+  let inCap = $derived(String(selectedLabelPart?.anchor ?? '') === 'centre');
 </script>
 
 {#if $selectedComponentIds.size <= 1}
@@ -94,6 +99,14 @@
     <PropertyCell label="Reset Label" span={3} hint="Reset the selected label's text styling basics.">
       <button class="label-action-btn" type="button" onclick={resetSelectedLabelText}>Reset label text</button>
     </PropertyCell>
+    {#if offersCap}
+      <PropertyCell label="Sits" span={4} hint="Where the value's label is: riding the pointer's tip as it turns, or still, in the middle of the dial.">
+        <div class="label-target-grid two" data-label-anchor>
+          <button class="label-target-btn" class:active={!inCap} type="button" aria-pressed={!inCap} onclick={() => set('Parts.labelCurrent.anchor', 'tip')}>At the tip</button>
+          <button class="label-target-btn" class:active={inCap} type="button" aria-pressed={inCap} onclick={() => set('Parts.labelCurrent.anchor', 'centre')}>In the cap</button>
+        </div>
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   {#key selectedLabelTarget.id}
@@ -112,6 +125,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
+  }
+
+  .label-target-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .label-target-btn,

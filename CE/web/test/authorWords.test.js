@@ -56,6 +56,7 @@ test('the words', () => {
   assert.equal(propertyPathWords('meta.sliderControl.domFocus'), 'keyboard focus');
   assert.equal(stateConditionWords({}), 'manual', 'a state with no condition is applied by hand');
   assert.equal(stateConditionWords({ hover: false }), 'not hovered');
+  assert.equal(stateConditionWords({ peerHover: true }), 'another option hovered', 'a choice group\'s option, the pointer on another');
   assert.equal(controlTypeLabel('CustomComponent'), 'Custom Component');
   assert.equal(controlTypeLabel('Harmoniser'), 'Harmoniser', 'the Insert menu\'s description is not the name');
   assert.equal(controlTypeLabel('SomethingNew'), 'Something New', 'a type the catalogue does not list is still words');

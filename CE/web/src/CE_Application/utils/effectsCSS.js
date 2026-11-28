@@ -33,6 +33,36 @@ export function buildShadowCSS(effects) {
   return parts.length ? `box-shadow: ${parts.join(', ')};` : '';
 }
 
+/**
+ * Whether a layer INSIDE a control has a blend mode of its own: a part's (`Effects.Blend.mode`), a
+ * fill's gradient or picture, a pattern's, or one a state or an animation sets. Such a layer blends
+ * with whatever is behind the control. A Photoshop knob's light and shadow layers do (multiply,
+ * color-dodge, plus-lighter over the panel), so the control must not be a stacking context of its
+ * own (CanvasControl's `.stacks-alone`); in one, they would blend with nothing, and a dodge over
+ * nothing is white. The control's own `Effects.Blend` sits on its root and blends outward either
+ * way, so it does not count. Any key ending in "blend" that holds a mode other than normal counts,
+ * which is broad on purpose: a control kept out of its own stacking context draws as it always did.
+ */
+export function blendsThroughControl(control) {
+  const seen = new Set();
+  const blends = (node) => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return false;
+    seen.add(node);
+    for (const [key, value] of Object.entries(node)) {
+      if (typeof value === 'string') {
+        if (/blend$/i.test(key) && value && value !== 'normal') return true;
+      } else if (key === 'Blend' && value && typeof value === 'object' && value.mode && value.mode !== 'normal') {
+        return true;
+      } else if (value && typeof value === 'object' && blends(value)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const sections = control?._children ?? {};
+  return Object.entries(sections).some(([name, section]) => name !== 'Effects' && blends(section));
+}
+
 export function buildBlendCSS(effects) {
   const mode = effects?._children?.Blend?.mode;
   return mode && mode !== 'normal' ? `mix-blend-mode: ${mode};` : '';

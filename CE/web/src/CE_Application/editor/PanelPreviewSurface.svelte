@@ -5,7 +5,7 @@
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { sharedAnimationFrame } from '../utils/sharedAnimationFrame.js';
   import { hostWindowShown } from '../stores/hostWindow.js';
-  import { onDestroy, setContext, untrack, tick } from 'svelte';
+  import { getContext, onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { PANEL_SURFACE_CONTEXT_KEY } from '../utils/linearEdges.js';
@@ -59,18 +59,23 @@
     updatePanelPreviewSession,
     commitPanelPreviewSelectAction,
     setPreviewInspectedControlId,
+    previewSwitchOn,
   } from '../stores/interactionPreview.js';
   import { keyframeOverlays } from '../stores/keyframeOverlays.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
+  import { sceneControlIds, sceneMoveReach } from '../utils/sceneFormat.js';
+  import { SCENE_STAGE, createSceneRunStore, registerSceneRun } from '../stores/sceneStage.js';
+  import { partRectOf, pointInRect, pointerInRect } from '../utils/sceneClock.js';
+  import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
   import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls, controlPanelRect } from '../utils/containment.js';
-  import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import { choiceKeyAtPoint, choiceSelectionMode, isChoiceGroupBehavior, selectedChoiceKeys, stepChoice } from '../utils/choiceGroupLayout.js';
   import {
     listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
     listboxConfig, listboxIndexOfValue, listboxStep, listboxScrollIntoView, listboxRowHeight,
@@ -81,6 +86,7 @@
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
   import { decibelFraction, decibelPosition, meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
+  import { meterBallistics, meterTestLevel, meterValueAt, stepNeedle } from '../utils/meterMotion.js';
   import { meterNeedsPeak } from '../models/meterDeviceParts.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
@@ -249,7 +255,7 @@
   } from '../utils/timedButtonPreview.js';
   import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
   import { labelShows, labelSourceId } from '../utils/labelShows.js';
-  import { shownText } from '../utils/labelText.js';
+  import { shownAs, shownText } from '../utils/labelText.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,
@@ -326,7 +332,8 @@
     sliderControlWheelValue,
   } from '../utils/sliderControlPart.js';
   import { floating } from '../utils/floatingUi.js';
-  import { dispatchInteraction, dispatchKeyEvent, scriptsHear } from '../scripting/panelRuntime.js';
+  import { dispatchInteraction, dispatchKeyEvent, scriptsHear, runMarkerAction } from '../scripting/panelRuntime.js';
+  import { playGesture, watchGesture } from '../utils/gestureEvents.js';
   import {
     registerKeysSurface, isLiveSurface, keysCapture, keysBubble, keysUp, letGo as keysLetGo,
     noteRaised as keysNoteRaised, keyFields, pianoSilence, keyIsTheEditors,
@@ -343,6 +350,9 @@
     bgLayers = {},
     gridStyle = '',
     surfaceRef = $bindable(null),
+    // A meter's test signal (utils/meterMotion.js) moves it with nothing connected: in the editor's
+    // Preview and its stages, never in an exported plug-in (Player.svelte says false).
+    testSignals = true,
   } = $props();
 
   // Several control families own self-scheduling animation loops. Their data remains reachable
@@ -399,8 +409,90 @@
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
   // is untouched, because every other thing in this file that reads it is asking about behaviour
   // rather than about paint.
+  // A control a scene animates stays live too (utils/sceneFormat.js sceneControlIds).
+  let neverFold = $derived.by(() => {
+    const scened = sceneControlIds(panel?.animationScenes);
+    return scened.size ? new Set([...($scriptTouchedControlIds ?? []), ...scened]) : $scriptTouchedControlIds;
+  });
+  // And covers everywhere a scene moves it, so a control it slides under is not folded beneath it.
+  let sceneMoves = $derived(sceneMoveReach(panel?.animationScenes));
   let previewPlan = $derived(buildSceneryRenderPlan(panel,
-    { preview: true, fold: true, neverFold: $scriptTouchedControlIds }));
+    { preview: true, fold: true, neverFold, moves: sceneMoves }));
+
+  // The panel's scenes, playing on their triggers (stores/sceneStage.js, utils/sceneRuntime.js): in
+  // Preview and the plug-in, which are this surface. Not inside the Animation Designer's stage, which
+  // is this surface too and has a stage of its own: there a scene moves only under the playhead.
+  const outerSceneStage = getContext(SCENE_STAGE) ?? null;
+  // A scene's markers call the scripts' actions as it passes them (scripting/panelRuntime.js).
+  const sceneRun = outerSceneStage ? null : createSceneRunStore({ onMarker: (action, { scene }) => runMarkerAction(action, { scene: scene?.name ?? '' }) });
+  if (sceneRun) setContext(SCENE_STAGE, sceneRun);
+  $effect(() => { sceneRun?.setScenes(panel?.animationScenes ?? []); });
+  $effect(() => { sceneRun?.setReducedMotion($systemReducedMotion); });
+  // The panel opens: when this surface first shows it, and when it shows another. Preview mounts the
+  // surface each time it starts, so entering Preview plays the panel's opening again.
+  let openedPanelId;
+  $effect(() => {
+    const id = panel?.id ?? null;
+    if (!sceneRun || id === openedPanelId) return;
+    openedPanelId = id;
+    untrack(() => sceneRun.open());
+  });
+  // The beat, only while some scene waits on it: a panel without one does not hear the transport.
+  let sceneBeatWanted = $derived(!!sceneRun && (panel?.animationScenes ?? []).some((scene) => scene?.trigger?.type === 'beat'));
+  $effect(() => {
+    if (!sceneBeatWanted) return undefined;
+    return transport.subscribe((state) => sceneRun.beat(state?.running ? state.beats : null));
+  });
+  // Scripts reach it by the panel they belong to (ce.anim.play(scene), seek, effect, swap).
+  $effect(() => {
+    const id = panel?.id ?? null;
+    if (!sceneRun || id == null) return undefined;
+    return registerSceneRun(id, sceneRun);
+  });
+  onDestroy(() => sceneRun?.destroy());
+  /** A gesture on a control, for the scenes that wait on it. */
+  const sceneGesture = (control, eventId) => {
+    const id = getControlId(control);
+    if (sceneRun && id) sceneRun.fire({ type: 'event', controlId: id, event: eventId });
+  };
+  /**
+   * Input for the scenes a gesture drives (utils/sceneClock.js): 'pointer', 'wheel', or a drag's
+   * 'press', 'drag' and 'release'. Asked only of a control some scene listens to; returns whether
+   * one did.
+   */
+  const sceneInput = (control, kind, payload, local = null) => {
+    const id = getControlId(control);
+    const hears = kind === 'press' || kind === 'drag' || kind === 'release' ? 'drag' : kind;
+    if (!sceneRun || !id || !sceneRun.listens(hears, id)) return false;
+    // A clock on the whole control hears it all; one on a part (utils/sceneClock.js partRectOf),
+    // only what is over that part as it is drawn, its set applied.
+    const drawn = resolvedPreviewFor(control)?.control ?? control;
+    for (const part of sceneRun.clockParts(hears, id)) {
+      if (!part) { sceneRun.input(id, kind, payload); continue; }
+      const rect = partRectOf(drawn, part);
+      if (!rect) continue;
+      if (kind === 'pointer') sceneRun.input(id, kind, { ...(payload?.inside === false || !local ? { x: 0, y: 0, inside: false } : pointerInRect(local, rect)), part });
+      else if (kind === 'wheel' && pointInRect(local, rect)) sceneRun.input(id, kind, { ...payload, part });
+    }
+    return true;
+  };
+  /** A drag, for the scenes it drives: on the whole control, and on each part it was pressed on. */
+  function dragForScenes(control, id) {
+    let engaged = [];
+    return (kind, payload) => {
+      if (kind === 'press') {
+        const drawn = resolvedPreviewFor(control)?.control ?? control;
+        engaged = [...sceneRun.clockParts('drag', id)].filter((part) => !part || pointInRect(payload, partRectOf(drawn, part)));
+      }
+      for (const part of engaged) sceneRun.input(id, kind, part ? { ...payload, part } : payload);
+    };
+  }
+  /** Where the pointer is over a control, 0 to 1 across and down, from the element it is over. */
+  const pointerFraction = (event, inside = true) => {
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    if (!rect || !rect.width || !rect.height) return { x: 0, y: 0, inside: false };
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height, inside };
+  };
 
   /**
    * Which folded controls are drawn live over their own ground.
@@ -764,7 +856,9 @@
     // something is read as it stands, so two Labels showing each other cannot go round for ever.
     const live = !labelShows(source) ? (resolvedPreviewFor(source)?.control ?? source) : source;
     const content = shownText(live, shows, sessionFor(source));
-    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content } } } };
+    // Which text it is, for a text swap's "when the value arrives" (utils/textEffects.js).
+    const as = shownAs(shows, sessionFor(source));
+    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content, shownAs: as } } } };
   }
 
   function applyDeviceSyncStatus(control) {
@@ -899,7 +993,7 @@
       const row = getValueRows(src).find((r) => String(rowValue(r)) === String(choice ?? ''));
       info.text = String(row?.displayText ?? choice ?? '');
     } else if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
-      info.on = session?.checked === true || behavior?.defaultValue === true;
+      info.on = previewSwitchOn(behavior, session);
       info.text = info.on ? 'On' : 'Off';
       info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
       info.selector = info.on ? '1' : '0';
@@ -1788,8 +1882,9 @@
     if (meterTickerRunning) return;
     meterTickerRunning = true;
     const loop = () => {
+      // A falling peak, a test signal or a needle on its way (utils/meterMotion.js) each want a frame.
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
-        (isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true) || peakChannels(c).length > 0);
+        (isMeterFamily(c?._children?.Core?.controlType) && meterMoves(c?._children?.Meter)) || peakChannels(c).length > 0);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
@@ -1839,6 +1934,14 @@
     return peaks;
   }
 
+  // What moves a meter on the ticker: its peak falling, a test signal, a needle's ballistics.
+  const meterTestKind = (meter) => (testSignals ? String(meter?.testSignal ?? '') : '');
+  function meterMoves(meter) {
+    return meter?.peakHold === true || !!meterTestKind(meter) || !!meterBallistics(meter);
+  }
+  // Each needle with ballistics: where it is drawn, how fast it is going, and when that was.
+  let meterNeedleState = {};
+
   // Inject the meter's live value + peak-hold onto the resolved Meter section:
   // the value comes from a routed/session value, a linked range control
   // (valueSourceId), or the static config; the peak decays via the ticker. The renderer reads Meter.__value /
@@ -1852,11 +1955,31 @@
     const range = meter.valueSourceId ? lcdRangeForSource(meter.valueSourceId) : null;
     const session = sessionFor(control);
     const routed = session?.valueOverrideEnabled === true;
+    // A test signal is the level only while nothing else gives one (utils/meterMotion.js).
+    const testKind = !routed && !(range && range.value !== undefined) ? meterTestKind(meter) : '';
+    if (testKind) { ensureMeterTicker(); void meterClock; }
     const value = routed
       ? numberOr(session.valueOverride, 0)
-      : range && range.value !== undefined ? range.value : numberOr(meter.value, 0);
+      : range && range.value !== undefined ? range.value
+        : testKind ? meterValueAt(meterTestLevel(testKind, Date.now()), meter)
+          : numberOr(meter.value, 0);
     const nextMeter = { ...meter, __value: value };
     if (range && !routed) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
+
+    // A needle's ballistics: the drawing goes to the level as a spring would (`__drawn`, 0 to 1 along
+    // the scale); the reading, the Label and the animations keep the level itself.
+    const ballistics = meterBallistics(meter);
+    if (ballistics) {
+      ensureMeterTicker();
+      void meterClock;
+      const id = getControlId(control);
+      const now = Date.now();
+      const target = meterPosition(value, nextMeter);
+      const prev = meterNeedleState[id];
+      const next = stepNeedle(prev ?? { pos: target, vel: 0 }, target, prev ? now - prev.at : 0, ballistics);
+      meterNeedleState[id] = { ...next, at: now };
+      nextMeter.__drawn = next.pos;
+    }
 
     // Crossing into a different threshold band, which is what an overload LED is lit from. The
     // zones are the meter's OWN, via meterZoneIndexAt, so the band a script hears about is the
@@ -6994,29 +7117,51 @@
     return nearestRole;
   }
 
+  // A choice group's option under a point: the drawn option there (ChoiceGroup.svelte), so the
+  // click lands on what is seen. '' between options, or off them.
   function resolveRadioGroupPreviewValue(control, clientX, clientY) {
-    if (String(getBehavior(control)?.buttonType ?? '') !== 'radio') return '';
-
+    if (!isChoiceGroupBehavior(getBehavior(control))) return '';
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return '';
+    const s = scale || 1;
+    return choiceKeyAtPoint(pointerActiveElement, (clientX - rect.left) / s, (clientY - rect.top) / s);
+  }
 
-    const transformSection = control?._children?.Transform ?? null;
-    const contentLayout = control?._children?.ContentLayout ?? null;
-    const layout = resolveRadioGroupLayout({
-      behavior: getBehavior(control),
-      valueRows: control?._children?.Value?.rows ?? [],
-      width: transformSection?.width ?? rect.width,
-      height: transformSection?.height ?? rect.height,
-      paddingLeft: contentLayout?.paddingLeft ?? 0,
-      paddingRight: contentLayout?.paddingRight ?? 0,
-      paddingTop: contentLayout?.paddingTop ?? 0,
-      paddingBottom: contentLayout?.paddingBottom ?? 0,
-      gap: contentLayout?.gap ?? 8,
-    });
+  /** The option a choice group's keyboard acts on: the focused one, else the one chosen last. */
+  function currentChoiceKey(control) {
+    const session = sessionFor(control);
+    if (session?.choiceFocus) return String(session.choiceFocus);
+    const values = session?.valueOverrideEnabled === true
+      ? (Array.isArray(session.valueOverride) ? session.valueOverride : [session.valueOverride])
+      : [...selectedChoiceKeys(getValueRows(control), getBehavior(control))];
+    return String([...values].reverse().find((value) => value !== '' && value != null) ?? '');
+  }
 
-    const localX = ((clientX - rect.left) / Math.max(rect.width, 1)) * (transformSection?.width ?? rect.width);
-    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
-    return resolveRadioGroupValueAtPoint(layout, localX, localY);
+  /**
+   * A choice group's keys, as a radio group's are: the arrows and Home/End move the choice (in a
+   * multi-select group, the focus), and Space or Enter, acted on at the key-up, chooses or toggles
+   * the focused option. True when the key was the group's.
+   */
+  function handleChoiceKey(control, event) {
+    const behavior = getBehavior(control);
+    if (!isChoiceGroupBehavior(behavior)) return false;
+    const controlId = getControlId(control);
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      const focus = currentChoiceKey(control);
+      patchControlSession(controlId, { focused: true, pressed: true, choicePressed: focus, choiceFocus: focus, choiceHover: '', inputModality: 'keyboard' });
+      return true;
+    }
+    const current = currentChoiceKey(control);
+    const next = stepChoice(getValueRows(control), current, event.key);
+    if (next == null) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (choiceSelectionMode(behavior) !== 'multi' && next !== current) {
+      commitSelectActionAndEmit(control, { value: next });
+    }
+    patchControlSession(controlId, { focused: true, choiceFocus: next, choiceHover: '', inputModality: 'keyboard' });
+    return true;
   }
 
   function activeDeviceBindings(control) {
@@ -7135,6 +7280,8 @@
     const stop = untrack(() => latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInboundPayload) return;
       lastInboundPayload = payload;
+      // A scene that starts on MIDI in (utils/sceneMidi.js) hears it too.
+      sceneRun?.midi(payload.hex);
       // The assembler runs even with nothing bound, so its channel selections stay in step with the
       // stream; an NRPN begun before a binding existed still resolves once one does.
       const assembly = applyNrpnEvents(nrpnState, expressionEventsFromHex(payload.hex));
@@ -7934,6 +8081,26 @@
     return true;
   }
 
+  // --- Gestures with no duration (utils/gestureEvents.js) ---------------------------------------
+  // A click, a long press and a flick on a control play its Events-row animations (the States tab's,
+  // docs/design/animation-designer.md), and a long press and a flick raise 'onLongPress' and
+  // 'onFlick' for scripts, beside onClick and onDoubleClick. A gesture the control already uses is
+  // shared, never taken: a knob dragged and let go fast still turned, and was also flicked.
+  let stopGesture = () => {};
+  onDestroy(() => stopGesture());
+
+  function beginGesture(control, event) {
+    stopGesture();
+    const id = getControlId(control);
+    stopGesture = watchGesture(control, event, {
+      scale: scale || 1,
+      onLongPress: (payload) => dispatchInteraction(id, 'onLongPress', payload),
+      onFlick: (payload) => dispatchInteraction(id, 'onFlick', payload),
+      onGesture: (eventId) => sceneGesture(control, eventId),
+      onDrag: sceneRun?.listens('drag', id) ? dragForScenes(control, id) : null,
+    });
+  }
+
   // Control-local coordinates (logical px) for a pointer/wheel event — the payload for interaction scripts.
   function controlLocalPoint(event) {
     const rect = event?.currentTarget?.getBoundingClientRect?.() ?? pointerActiveElement?.getBoundingClientRect?.();
@@ -7969,6 +8136,11 @@
       deltaX: event.deltaX,
       deltaY: event.deltaY,
     });
+    playGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
+    sceneGesture(control, event.deltaY < 0 ? 'wheelUp' : 'wheelDown');
+    // A scene the wheel drives on this control takes the wheel there, so the page does not scroll
+    // under it; the value still turns only where the control's own Wheel switch says.
+    if (sceneInput(control, 'wheel', { notches: event.deltaY < 0 ? 1 : -1 }, controlLocalPoint(event))) event.preventDefault();
     // Hardware style: while an LCD edit zone is active, the wheel acts as a data
     // knob — cycling the char under the caret (text) or the option (choice).
     if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
@@ -8166,6 +8338,12 @@
   }
 
   function handlePointerMove(control, event) {
+    sceneInput(control, 'pointer', pointerFraction(event), controlLocalPoint(event));
+    if (isChoiceGroupBehavior(getBehavior(control)) && !isDisabled(control)) {
+      const at = controlLocalPoint(event);
+      const key = choiceKeyAtPoint(event.currentTarget, at.x, at.y);
+      if (key !== String(sessionFor(control)?.choiceHover ?? '')) patchControlSession(getControlId(control), { choiceHover: key, inputModality: 'pointer' });
+    }
     // onPointerMove: throttled (~30fps) hover-move over a control, control-local coords. Fires for any
     // control; the built-in custom-hit-zone hover tracking below still only runs for custom components.
     const moveAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -8358,11 +8536,15 @@
   }
 
   function handlePointerLeave(control) {
+    sceneInput(control, 'pointer', { x: 0, y: 0, inside: false });
     if (isDisabled(control)) return;
     const controlId = getControlId(control);
     // Drop any listbox hover-row highlight when the pointer leaves.
     if (isListboxControl(control) && (sessionFor(control)?.listboxHoverIndex ?? -1) !== -1) {
       patchControlSession(controlId, { listboxHoverIndex: -1 });
+    }
+    if (isChoiceGroupBehavior(getBehavior(control)) && sessionFor(control)?.choiceHover) {
+      patchControlSession(controlId, { choiceHover: '' });
     }
     if (pointerActiveControlId === controlId) {
       patchControlSession(controlId, {
@@ -8442,8 +8624,11 @@
     const downAt = Number.isFinite(event?.timeStamp) && event.timeStamp > 0 ? event.timeStamp
       : (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
+    beginGesture(control, event);
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
+      playGesture(control, 'doubleClick');
+      sceneGesture(control, 'doubleClick');
       if (!lastPointerMoved && Math.hypot(event.clientX - lastPointerDownPosition.x,
         event.clientY - lastPointerDownPosition.y) <= 5 && resetRangeOnDoubleClick(control, event)) {
         event.preventDefault(); event.stopPropagation();
@@ -8715,7 +8900,11 @@
     // script runtime is still dispatching the first and is dropped, which is how press-to-talk came
     // to report its release and never its press.
     const momentaryPress = momentaryButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));
+    const choicePressed = isChoiceGroupBehavior(getBehavior(control))
+      ? choiceKeyAtPoint(event.currentTarget, pointerDownLocal.x, pointerDownLocal.y)
+      : null;
     patchControlSession(pointerActiveControlId, {
+      ...(choicePressed != null ? { choicePressed, choiceHover: choicePressed, inputModality: 'pointer' } : {}),
       hover: true,
       pressed: true,
       focused: false,
@@ -9058,10 +9247,16 @@
             focused: true,
             hover: true,
           });
-        } else {
+        } else if (isChoiceGroupBehavior(getBehavior(activeControl))) {
+          // The option let go on; between options nothing is chosen (it used to choose the default).
           const value = resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY);
+          if (value) {
+            commitSelectActionAndEmit(activeControl, { value });
+            patchControlSession(activeId, { choiceFocus: value });
+          }
+        } else {
           commitSelectActionAndEmit(activeControl, {
-            value,
+            value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
           });
         }
       }
@@ -9106,7 +9301,9 @@
       : '';
     patchControlSession(controlId, knobZone
       ? { focused: true, activeCustomHitZone: knobZone, domFocusCustomHitZone: knobZone, ...sliderControlFocusZonePatch(sessionFor(control), knobZone) }
-      : { focused: true });
+      : isChoiceGroupBehavior(getBehavior(control))
+        ? { focused: true, choiceFocus: currentChoiceKey(control), inputModality: 'keyboard' }
+        : { focused: true });
   }
 
   function handleBlur(control, event) {
@@ -9163,6 +9360,7 @@
     inspectPreviewControl(controlId);
 
     if (handleComboboxKey(control, event)) return;
+    if (handleChoiceKey(control, event)) return;
 
     if (linkedEnvKey(control, event)) {
       event.preventDefault(); event.stopPropagation();
@@ -9345,6 +9543,11 @@
       timedButtonPreview.releasePress(controlId, getBehavior(control), { inside: true });
     } else if (isCustomComponent(control)) {
       patchCustomKeyboardActivation(control, event);
+    } else if (isChoiceGroupBehavior(getBehavior(control))) {
+      const focus = currentChoiceKey(control);
+      if (focus) commitSelectActionAndEmit(control, { value: focus });
+      patchControlSession(controlId, { focused: true, pressed: false, choicePressed: '', choiceFocus: focus, inputModality: 'keyboard' });
+      return;
     } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
       if (isComboboxControl(control)) {
         toggleCombobox(controlId);
@@ -9377,7 +9580,9 @@
     // wrapper a button role creates an invalid interactive listbox-in-button.
     if (buttonType === 'listbox') return '';
     if (buttonType === 'combobox') return 'combobox';
-    if (buttonType === 'radio') return 'radiogroup';
+    // A choice group is one tab stop holding its options, each a radio (a checkbox when several
+    // can be chosen), named by aria-activedescendant (ChoiceGroup.svelte).
+    if (buttonType === 'radio') return choiceSelectionMode(behavior) === 'multi' ? 'group' : 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
     if (role === 'toggle' || role === 'checkbox') return 'checkbox';
     return 'button';
@@ -9433,6 +9638,7 @@
     if (isDisabled(control)) return undefined;
     if (isTextInputControl(control)) return undefined;
     if (String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox') return 0;
+    if (isChoiceGroupBehavior(getBehavior(control))) return 0;
     const role = previewRoleFor(control);
     return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }

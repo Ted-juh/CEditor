@@ -34,6 +34,14 @@ export function meterPosition(value, cfg = {}) {
   return decibelPosition(frac, cfg.dbFloor, cfg.dbCeil);
 }
 
+// Where a meter's level is DRAWN, 0..1: where its needle is on the way to the level, when its
+// ballistics move it there (`__drawn`, utils/meterMotion.js), else where the level stands.
+export function meterDrawnPosition(cfg = {}) {
+  const drawn = Number(cfg.__drawn);
+  if (cfg.__drawn !== undefined && cfg.__drawn !== null && Number.isFinite(drawn)) return clamp01(drawn);
+  return meterPosition(cfg.__value !== undefined ? cfg.__value : cfg.value, cfg);
+}
+
 // Where a linear fraction (0..1) stands on a decibel scale from `floor` to `ceil` dB (0..1): the
 // one curve a meter, a binding on a decibel scale and a held peak all read through.
 export function decibelPosition(fraction, floor = -60, ceil = 6) {
@@ -194,4 +202,26 @@ export function meterArcPath(cx, cy, r, fromPos, toPos, startDeg = 135, sweepDeg
   const largeArc = Math.abs(a1 - a0) > 180 ? 1 : 0;
   const sweepFlag = a1 >= a0 ? 1 : 0;
   return `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${num(r, 0).toFixed(2)} ${num(r, 0).toFixed(2)} 0 ${largeArc} ${sweepFlag} ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`;
+}
+
+// Where a meter clips, 0..1 along its scale, for an animation played When it clips
+// (utils/keyframeAnimation.js): the level its clip lamp lights at, where it draws one
+// (models/meterDeviceParts.js, `clipFrom`); else where its top zone starts, the band an overload
+// LED is lit from; else full scale.
+export function meterClipAt(control) {
+  const lamp = control?._children?.Parts?._children?.lamp;
+  if (lamp?.visible === true && String(lamp.motion ?? 'clip') === 'clip') return clamp01(num(lamp.clipFrom, 0.9));
+  const zones = meterZones(meterConfig(control));
+  const top = zones[zones.length - 1];
+  return zones.length > 1 && top.from > 0 ? top.from : 1;
+}
+
+// A meter's level as the value its animations hear (the Meter, phase 2: docs/design/component-
+// presets.md): where its reading stands on its scale, the reading, and where it clips. Its reading as
+// it arrives (Meter.__value, PanelPreviewSurface's applyMeterValueSource), not as a needle's
+// ballistics draw it. Heard, never sent: a meter has no value of its own to send (exportValues []).
+export function meterLevelSignals(control) {
+  const cfg = meterConfig(control);
+  const raw = num(cfg.__value !== undefined ? cfg.__value : cfg.value, 0);
+  return { valueRaw: raw, valueNormalized: meterPosition(raw, cfg), clipAt: meterClipAt(control) };
 }

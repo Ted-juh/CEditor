@@ -50,6 +50,7 @@ import {
   EASING_NAMES,
   EASING_BEZIERS,
   targetStatus,
+  sequenceTargetStatus,
   describeAnimation,
   readAnimations,
   animationsEnabled,
@@ -320,13 +321,15 @@ test('a custom bezier and a spring draw their own shape, and an unknown name dra
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('three animation kinds play: transitions, keyframes, and sequences', () => {
+test('four animation kinds play: transitions, keyframes, sequences, and text', () => {
   // This said "one animation kind plays; keyframes are not built yet" until phase 4 of the overhaul
   // gave the runtime a keyframe player (utils/keyframeAnimation.js). The transition trigger types
   // are unchanged; keyframes answer three more. The third kind, `sequence`, came from main in the
   // merge: it was built there under the name `keyframes` too, and is a different thing (tracks on a
   // time axis driving values; test/sequenceAnimations.test.js), so it took a name of its own.
-  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence']);
+  // The fourth, `text`, is the Text engine of the Animation Designer's step 2 (2026-11-24): real text
+  // a piece at a time (utils/textEffects.js), played by the keyframe player.
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence', 'text']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
   assert.deepEqual(Object.keys(KEYFRAME_TRIGGER_LABELS), KEYFRAME_TRIGGER_TYPES);
 });
@@ -554,12 +557,27 @@ test('every shipped control and starter names only states it has, and has no cla
   }
 });
 
-test('a working colour target says that only a solid colour fades', () => {
+test('a working colour target says what fades, what glides and what still switches', () => {
   // Phase 2 of the overhaul: colour animates, and the one thing it cannot do is said on the row.
+  // Since the Paint engine (gradientPaint.js, 2026-11-24) a gradient glides too; an image does not.
   const colour = targetStatus({ path: 'Parts.label.Background.Fill.colour' }, ['label']);
   assert.equal(colour.works, true);
-  assert.match(colour.note, /gradient, an image or a material switches/);
+  assert.match(colour.note, /a gradient glides/);
+  assert.match(colour.note, /An image or a material switches/);
+  const gradient = targetStatus({ path: 'Background.Fill.gradient' }, []);
+  assert.equal(gradient.works, true);
+  assert.equal(gradient.animates, 'colour');
   assert.equal(targetStatus({ path: 'Transform.scale' }, []).note, undefined, 'scale has nothing to warn about');
+});
+
+test('a gradient is a transition\'s target, not a sequence\'s, and a sequence says why', async () => {
+  const { offeredTargetsFor } = await import('../src/CE_Application/utils/animationModel.js');
+  const control = createControl('Label');
+  assert.ok(offeredTargetsFor(control, 'transition', { onControl: true }).some((entry) => entry.label === 'Gradient'));
+  assert.ok(!offeredTargetsFor(control, 'sequence', { onControl: true }).some((entry) => entry.label === 'Gradient'));
+  const status = sequenceTargetStatus({ path: 'Background.Fill.gradient' }, []);
+  assert.equal(status.works, false);
+  assert.match(status.detail, /a gradient is neither/);
 });
 
 // --- Phase 3: a curve you draw, and one that bounces ---------------------------------------------

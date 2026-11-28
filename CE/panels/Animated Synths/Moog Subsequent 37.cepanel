@@ -1,0 +1,2234 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "f3e50bcf-5e17-4a0c-b6d2-f3e50bcff3e5",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Moog Subsequent 37",
+  "scriptId": "synth_moog-subsequent-37",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1200,
+  "height": 520,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF151618",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [
+    {
+      "role": "Moog Subsequent 37",
+      "profileId": "moog-subsequent-37",
+      "version": "*"
+    }
+  ],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Lfo1Rate.value",
+      "label": "Lfo1Rate",
+      "controlName": "Lfo1Rate",
+      "path": "Lfo1Rate.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 7400,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "lfo1.lfo1Rate"
+    },
+    {
+      "id": "Lfo2Rate.value",
+      "label": "Lfo2Rate",
+      "controlName": "Lfo2Rate",
+      "path": "Lfo2Rate.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 4900,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "lfo2.lfo2Rate"
+    },
+    {
+      "id": "PitchAmt.value",
+      "label": "PitchAmt",
+      "controlName": "PitchAmt",
+      "path": "PitchAmt.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 2400,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "mod1.mod1PitchAmt"
+    },
+    {
+      "id": "FilterAmt.value",
+      "label": "FilterAmt",
+      "controlName": "FilterAmt",
+      "path": "FilterAmt.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 5700,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "mod1.mod1FilterAmt"
+    },
+    {
+      "id": "Glide.value",
+      "label": "Glide",
+      "controlName": "Glide",
+      "path": "Glide.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 1600,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "glide.glideTime"
+    },
+    {
+      "id": "Osc1Octave.value",
+      "label": "Osc1Octave",
+      "controlName": "Osc1Octave",
+      "path": "Osc1Octave.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc1Octave"
+    },
+    {
+      "id": "Osc1Wave.value",
+      "label": "Osc1Wave",
+      "controlName": "Osc1Wave",
+      "path": "Osc1Wave.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 10200,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc1Wave"
+    },
+    {
+      "id": "Osc2Octave.value",
+      "label": "Osc2Octave",
+      "controlName": "Osc2Octave",
+      "path": "Osc2Octave.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc2Octave"
+    },
+    {
+      "id": "Osc2Freq.value",
+      "label": "Osc2Freq",
+      "controlName": "Osc2Freq",
+      "path": "Osc2Freq.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 9000,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc2Freq"
+    },
+    {
+      "id": "BeatFreq.value",
+      "label": "BeatFreq",
+      "controlName": "BeatFreq",
+      "path": "BeatFreq.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 8192,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc2BeatFreq"
+    },
+    {
+      "id": "Osc2Wave.value",
+      "label": "Osc2Wave",
+      "controlName": "Osc2Wave",
+      "path": "Osc2Wave.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 4900,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc2Wave"
+    },
+    {
+      "id": "Osc1Level.value",
+      "label": "Osc1Level",
+      "controlName": "Osc1Level",
+      "path": "Osc1Level.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 112,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc1Level"
+    },
+    {
+      "id": "SubLevel.value",
+      "label": "SubLevel",
+      "controlName": "SubLevel",
+      "path": "SubLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc1SubLevel"
+    },
+    {
+      "id": "Osc2Level.value",
+      "label": "Osc2Level",
+      "controlName": "Osc2Level",
+      "path": "Osc2Level.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 96,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.osc2Level"
+    },
+    {
+      "id": "NoiseLevel.value",
+      "label": "NoiseLevel",
+      "controlName": "NoiseLevel",
+      "path": "NoiseLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.noiseLevel"
+    },
+    {
+      "id": "FeedbackLevel.value",
+      "label": "FeedbackLevel",
+      "controlName": "FeedbackLevel",
+      "path": "FeedbackLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 20,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "oscillators.feedbackExtLevel"
+    },
+    {
+      "id": "Cutoff.value",
+      "label": "Cutoff",
+      "controlName": "Cutoff",
+      "path": "Cutoff.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 9800,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filter.filterCutoff"
+    },
+    {
+      "id": "Resonance.value",
+      "label": "Resonance",
+      "controlName": "Resonance",
+      "path": "Resonance.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 9400,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filter.filterResonance"
+    },
+    {
+      "id": "EgAmt.value",
+      "label": "EgAmt",
+      "controlName": "EgAmt",
+      "path": "EgAmt.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 10400,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgAmt"
+    },
+    {
+      "id": "Drive.value",
+      "label": "Drive",
+      "controlName": "Drive",
+      "path": "Drive.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 4100,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filter.filterMultidrive"
+    },
+    {
+      "id": "KbAmt.value",
+      "label": "KbAmt",
+      "controlName": "KbAmt",
+      "path": "KbAmt.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 8192,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filter.filterKbAmt"
+    },
+    {
+      "id": "FilterEgA.value",
+      "label": "FilterEgA",
+      "controlName": "FilterEgA",
+      "path": "FilterEgA.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 2600,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgAttackTime"
+    },
+    {
+      "id": "FilterEgD.value",
+      "label": "FilterEgD",
+      "controlName": "FilterEgD",
+      "path": "FilterEgD.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 7200,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgDecayTime"
+    },
+    {
+      "id": "FilterEgS.value",
+      "label": "FilterEgS",
+      "controlName": "FilterEgS",
+      "path": "FilterEgS.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 9800,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgSustainTime"
+    },
+    {
+      "id": "FilterEgR.value",
+      "label": "FilterEgR",
+      "controlName": "FilterEgR",
+      "path": "FilterEgR.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 6100,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgReleaseTime"
+    },
+    {
+      "id": "AmpEgA.value",
+      "label": "AmpEgA",
+      "controlName": "AmpEgA",
+      "path": "AmpEgA.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 900,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgAttackTime"
+    },
+    {
+      "id": "AmpEgD.value",
+      "label": "AmpEgD",
+      "controlName": "AmpEgD",
+      "path": "AmpEgD.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 8200,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgDecayTime"
+    },
+    {
+      "id": "AmpEgS.value",
+      "label": "AmpEgS",
+      "controlName": "AmpEgS",
+      "path": "AmpEgS.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 12800,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgSustainTime"
+    },
+    {
+      "id": "AmpEgR.value",
+      "label": "AmpEgR",
+      "controlName": "AmpEgR",
+      "path": "AmpEgR.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 5400,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgReleaseTime"
+    },
+    {
+      "id": "FilterEgDelay.value",
+      "label": "FilterEgDelay",
+      "controlName": "FilterEgDelay",
+      "path": "FilterEgDelay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgDelay"
+    },
+    {
+      "id": "FilterEgHold.value",
+      "label": "FilterEgHold",
+      "controlName": "FilterEgHold",
+      "path": "FilterEgHold.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "filterEg.filterEgHold"
+    },
+    {
+      "id": "AmpEgDelay.value",
+      "label": "AmpEgDelay",
+      "controlName": "AmpEgDelay",
+      "path": "AmpEgDelay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgDelay"
+    },
+    {
+      "id": "AmpEgHold.value",
+      "label": "AmpEgHold",
+      "controlName": "AmpEgHold",
+      "path": "AmpEgHold.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "ampEg.ampEgHold"
+    },
+    {
+      "id": "Master.value",
+      "label": "Master",
+      "controlName": "Master",
+      "path": "Master.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 11500,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Moog Subsequent 37",
+      "deviceParameterId": "program.masterVolume"
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "deep-flute"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"CheekL","id":"ctrl_1741874255000","controlType":"Label"},
+        "Transform": {"width":34,"height":520},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2234%22%20height%3D%22520%22%20viewBox%3D%220%200%2034%20520%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22w%22%20x1%3D%220%22%20x2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234a2c16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%237a4a26%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234a2c16%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2234%22%20height%3D%22520%22%20fill%3D%22url(%23w)%22%2F%3E%3Cpath%20d%3D%22M5%200%20C2%20130%209%20260%204%20390%20S6%20500%205%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M9%200%20C6%20130%2013%20260%208%20390%20S10%20500%209%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M13%200%20C10%20130%2017%20260%2012%20390%20S14%20500%2013%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M17%200%20C14%20130%2021%20260%2016%20390%20S18%20500%2017%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M21%200%20C18%20130%2025%20260%2020%20390%20S22%20500%2021%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M25%200%20C22%20130%2029%20260%2024%20390%20S26%20500%2025%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M29%200%20C26%20130%2033%20260%2028%20390%20S30%20500%2029%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E","imageFit":"cover"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CheekR","id":"ctrl_1741874255001","controlType":"Label"},
+        "Transform": {"x":1166,"width":34,"height":520},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2234%22%20height%3D%22520%22%20viewBox%3D%220%200%2034%20520%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22w%22%20x1%3D%220%22%20x2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234a2c16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%237a4a26%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234a2c16%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2234%22%20height%3D%22520%22%20fill%3D%22url(%23w)%22%2F%3E%3Cpath%20d%3D%22M5%200%20C2%20130%209%20260%204%20390%20S6%20500%205%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M9%200%20C6%20130%2013%20260%208%20390%20S10%20500%209%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M13%200%20C10%20130%2017%20260%2012%20390%20S14%20500%2013%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M17%200%20C14%20130%2021%20260%2016%20390%20S18%20500%2017%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M21%200%20C18%20130%2025%20260%2020%20390%20S22%20500%2021%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M25%200%20C22%20130%2029%20260%2024%20390%20S26%20500%2025%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3Cpath%20d%3D%22M29%200%20C26%20130%2033%20260%2028%20390%20S30%20500%2029%20520%22%20fill%3D%22none%22%20stroke%3D%22%232e1a0c%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E","imageFit":"cover"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Model","id":"ctrl_1741874255002","controlType":"Label"},
+        "Transform": {"x":60,"y":20,"width":300,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SUBSEQUENT 37","_children":{"Fill":{"colour":"FFF2F0EA"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":800,"size":20,"letterSpacing":3},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kind","id":"ctrl_1741874255003","controlType":"Label"},
+        "Transform": {"x":780,"y":25,"width":360,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PARAPHONIC ANALOG SYNTHESIZER","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":11,"letterSpacing":2},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModFrame","id":"ctrl_1741874255004","controlType":"Label"},
+        "Transform": {"x":52,"y":66,"width":180,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22180%22%20height%3D%22360%22%20viewBox%3D%220%200%20180%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22179%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModTitle","id":"ctrl_1741874255005","controlType":"Label"},
+        "Transform": {"x":62,"y":57,"width":117,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"MODULATION","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lfo1Rate","id":"ctrl_1741874255006","description":"LFO 1 RATE — cc3","controlType":"Knob"},
+        "Transform": {"x":78,"y":108,"width":44,"height":44},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":7400,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"lfo1.lfo1Rate","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lfo1RateName","id":"ctrl_1741874255007","attachedTo":"ctrl_1741874255006","controlType":"Label"},
+        "Transform": {"x":52,"y":156,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO 1 RATE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lfo2Rate","id":"ctrl_1741874255008","description":"LFO 2 RATE — cc8","controlType":"Knob"},
+        "Transform": {"x":162,"y":108,"width":44,"height":44},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":4900,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"lfo2.lfo2Rate","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lfo2RateName","id":"ctrl_1741874255009","attachedTo":"ctrl_1741874255008","controlType":"Label"},
+        "Transform": {"x":136,"y":156,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO 2 RATE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PitchAmt","id":"ctrl_1741874255010","description":"MOD 1 PITCH AMT — cc4","controlType":"Knob"},
+        "Transform": {"x":82,"y":214,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":2400,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"mod1.mod1PitchAmt","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PitchAmtName","id":"ctrl_1741874255011","attachedTo":"ctrl_1741874255010","controlType":"Label"},
+        "Transform": {"x":52,"y":254,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PITCH AMT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterAmt","id":"ctrl_1741874255012","description":"MOD 1 FILTER AMT — cc11","controlType":"Knob"},
+        "Transform": {"x":166,"y":214,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":5700,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"mod1.mod1FilterAmt","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterAmtName","id":"ctrl_1741874255013","attachedTo":"ctrl_1741874255012","controlType":"Label"},
+        "Transform": {"x":136,"y":254,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FILTER AMT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glide","id":"ctrl_1741874255014","description":"GLIDE TIME — cc5","controlType":"Knob"},
+        "Transform": {"x":124,"y":314,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":1600,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"glide.glideTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideName","id":"ctrl_1741874255015","attachedTo":"ctrl_1741874255014","controlType":"Label"},
+        "Transform": {"x":94,"y":354,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"GLIDE TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OscFrame","id":"ctrl_1741874255016","controlType":"Label"},
+        "Transform": {"x":246,"y":66,"width":200,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22360%22%20viewBox%3D%220%200%20200%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22199%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OscTitle","id":"ctrl_1741874255017","controlType":"Label"},
+        "Transform": {"x":256,"y":57,"width":127,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSCILLATORS","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1Octave","id":"ctrl_1741874255018","description":"OSC 1 OCTAVE — cc74","controlType":"Knob"},
+        "Transform": {"x":276,"y":106,"width":48,"height":48},
+        "Behavior": {"valueType":"enum","defaultValue":"16","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc1Octave","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"16","displayText":"16'","internalValue":"16","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"8","displayText":"8'","internalValue":"8","sendValue":32,"receiveValue":32},{"id":"4","displayText":"4'","internalValue":"4","sendValue":64,"receiveValue":64},{"id":"2","displayText":"2'","internalValue":"2","sendValue":96,"receiveValue":96}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1OctaveName","id":"ctrl_1741874255019","attachedTo":"ctrl_1741874255018","controlType":"Label"},
+        "Transform": {"x":252,"y":158,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 1 OCT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1Wave","id":"ctrl_1741874255020","description":"OSC 1 WAVE — cc9","controlType":"Knob"},
+        "Transform": {"x":368,"y":106,"width":48,"height":48},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":10200,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc1Wave","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1WaveName","id":"ctrl_1741874255021","attachedTo":"ctrl_1741874255020","controlType":"Label"},
+        "Transform": {"x":344,"y":158,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 1 WAVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2Octave","id":"ctrl_1741874255022","description":"OSC 2 OCTAVE — cc75","controlType":"Knob"},
+        "Transform": {"x":276,"y":226,"width":48,"height":48},
+        "Behavior": {"valueType":"enum","defaultValue":"16","defaultCurrentValue":0},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc2Octave","parameterType":"choice"}]},
+        "Value": {"rows":[{"id":"16","displayText":"16'","internalValue":"16","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"8","displayText":"8'","internalValue":"8","sendValue":32,"receiveValue":32},{"id":"4","displayText":"4'","internalValue":"4","sendValue":64,"receiveValue":64},{"id":"2","displayText":"2'","internalValue":"2","sendValue":96,"receiveValue":96}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2OctaveName","id":"ctrl_1741874255023","attachedTo":"ctrl_1741874255022","controlType":"Label"},
+        "Transform": {"x":252,"y":278,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 2 OCT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2Freq","id":"ctrl_1741874255024","description":"OSC 2 FREQ — cc12","controlType":"Knob"},
+        "Transform": {"x":368,"y":226,"width":48,"height":48},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":9000,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc2Freq","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2FreqName","id":"ctrl_1741874255025","attachedTo":"ctrl_1741874255024","controlType":"Label"},
+        "Transform": {"x":344,"y":278,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 2 FREQ","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatFreq","id":"ctrl_1741874255026","description":"OSC 2 BEAT FREQ — cc13","controlType":"Knob"},
+        "Transform": {"x":282,"y":334,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":8192,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc2BeatFreq","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatFreqName","id":"ctrl_1741874255027","attachedTo":"ctrl_1741874255026","controlType":"Label"},
+        "Transform": {"x":252,"y":374,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"BEAT FREQ","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2Wave","id":"ctrl_1741874255028","description":"OSC 2 WAVE — cc14","controlType":"Knob"},
+        "Transform": {"x":374,"y":334,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":4900,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc2Wave","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2WaveName","id":"ctrl_1741874255029","attachedTo":"ctrl_1741874255028","controlType":"Label"},
+        "Transform": {"x":344,"y":374,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 2 WAVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MixFrame","id":"ctrl_1741874255030","controlType":"Label"},
+        "Transform": {"x":460,"y":66,"width":140,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22140%22%20height%3D%22360%22%20viewBox%3D%220%200%20140%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22139%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MixTitle","id":"ctrl_1741874255031","controlType":"Label"},
+        "Transform": {"x":470,"y":57,"width":68,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"MIXER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Line1","id":"ctrl_1741874255032","controlType":"Label"},
+        "Transform": {"x":522,"y":102,"width":84,"height":352},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2284%22%20height%3D%22352%22%20viewBox%3D%220%200%2084%20352%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-50%25%22%20y%3D%22-50%25%22%20width%3D%22200%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.6%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20350%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.55%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20350%22%20fill%3D%22none%22%20stroke%3D%22%23ffc07a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Line2","id":"ctrl_1741874255033","controlType":"Label"},
+        "Transform": {"x":522,"y":168,"width":84,"height":286},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2284%22%20height%3D%22286%22%20viewBox%3D%220%200%2084%20286%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-50%25%22%20y%3D%22-50%25%22%20width%3D%22200%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.6%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20284%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.55%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20284%22%20fill%3D%22none%22%20stroke%3D%22%23ffc07a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Line3","id":"ctrl_1741874255034","controlType":"Label"},
+        "Transform": {"x":522,"y":234,"width":84,"height":220},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2284%22%20height%3D%22220%22%20viewBox%3D%220%200%2084%20220%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-50%25%22%20y%3D%22-50%25%22%20width%3D%22200%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.6%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20218%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.55%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20218%22%20fill%3D%22none%22%20stroke%3D%22%23ffc07a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Line4","id":"ctrl_1741874255035","controlType":"Label"},
+        "Transform": {"x":522,"y":300,"width":84,"height":154},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2284%22%20height%3D%22154%22%20viewBox%3D%220%200%2084%20154%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-50%25%22%20y%3D%22-50%25%22%20width%3D%22200%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.6%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20152%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.55%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%20152%22%20fill%3D%22none%22%20stroke%3D%22%23ffc07a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Line5","id":"ctrl_1741874255036","controlType":"Label"},
+        "Transform": {"x":522,"y":366,"width":84,"height":88},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2284%22%20height%3D%2288%22%20viewBox%3D%220%200%2084%2088%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-50%25%22%20y%3D%22-50%25%22%20width%3D%22200%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.6%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%2086%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.55%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M2%206%20L66%206%20Q78%206%2078%2018%20L78%2086%22%20fill%3D%22none%22%20stroke%3D%22%23ffc07a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1Level","id":"ctrl_1741874255037","description":"OSC 1 LEVEL — cc114","controlType":"Knob"},
+        "Transform": {"x":488,"y":91,"width":34,"height":34},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":112,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc1Level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc1LevelName","id":"ctrl_1741874255038","attachedTo":"ctrl_1741874255037","controlType":"Label"},
+        "Transform": {"x":457,"y":129,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 1","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SubLevel","id":"ctrl_1741874255039","description":"OSC 1 SUB LEVEL — cc115","controlType":"Knob"},
+        "Transform": {"x":488,"y":157,"width":34,"height":34},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc1SubLevel","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SubLevelName","id":"ctrl_1741874255040","attachedTo":"ctrl_1741874255039","controlType":"Label"},
+        "Transform": {"x":457,"y":195,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SUB 1","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2Level","id":"ctrl_1741874255041","description":"OSC 2 LEVEL — cc116","controlType":"Knob"},
+        "Transform": {"x":488,"y":223,"width":34,"height":34},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":96,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.osc2Level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Osc2LevelName","id":"ctrl_1741874255042","attachedTo":"ctrl_1741874255041","controlType":"Label"},
+        "Transform": {"x":457,"y":261,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSC 2","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NoiseLevel","id":"ctrl_1741874255043","description":"NOISE LEVEL — cc117","controlType":"Knob"},
+        "Transform": {"x":488,"y":289,"width":34,"height":34},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":8,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.noiseLevel","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NoiseLevelName","id":"ctrl_1741874255044","attachedTo":"ctrl_1741874255043","controlType":"Label"},
+        "Transform": {"x":457,"y":327,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NOISE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FeedbackLevel","id":"ctrl_1741874255045","description":"FEEDBACK/EXT LEVEL — cc118","controlType":"Knob"},
+        "Transform": {"x":488,"y":355,"width":34,"height":34},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":20,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"oscillators.feedbackExtLevel","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FeedbackLevelName","id":"ctrl_1741874255046","attachedTo":"ctrl_1741874255045","controlType":"Label"},
+        "Transform": {"x":457,"y":393,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FB / EXT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterFrame","id":"ctrl_1741874255047","controlType":"Label"},
+        "Transform": {"x":614,"y":66,"width":250,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22250%22%20height%3D%22360%22%20viewBox%3D%220%200%20250%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22249%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterTitle","id":"ctrl_1741874255048","controlType":"Label"},
+        "Transform": {"x":624,"y":57,"width":78,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"FILTER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterScreen","id":"ctrl_1741874255049","controlType":"Label"},
+        "Transform": {"x":630,"y":88,"width":218,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"FF07080A"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterGrid","id":"ctrl_1741874255050","controlType":"Label"},
+        "Transform": {"x":630,"y":88,"width":218,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22218%22%20height%3D%2296%22%20viewBox%3D%220%200%20218%2096%22%3E%3Cline%20x1%3D%2236%22%20y1%3D%222%22%20x2%3D%2236%22%20y2%3D%2294%22%20stroke%3D%22%23151a1f%22%2F%3E%3Cline%20x1%3D%2272%22%20y1%3D%222%22%20x2%3D%2272%22%20y2%3D%2294%22%20stroke%3D%22%23151a1f%22%2F%3E%3Cline%20x1%3D%22108%22%20y1%3D%222%22%20x2%3D%22108%22%20y2%3D%2294%22%20stroke%3D%22%23151a1f%22%2F%3E%3Cline%20x1%3D%22144%22%20y1%3D%222%22%20x2%3D%22144%22%20y2%3D%2294%22%20stroke%3D%22%23151a1f%22%2F%3E%3Cline%20x1%3D%22180%22%20y1%3D%222%22%20x2%3D%22180%22%20y2%3D%2294%22%20stroke%3D%22%23151a1f%22%2F%3E%3Cline%20x1%3D%222%22%20y1%3D%2240%22%20x2%3D%22216%22%20y2%3D%2240%22%20stroke%3D%22%23151a1f%22%20stroke-dasharray%3D%222%204%22%2F%3E%3Crect%20x%3D%22.5%22%20y%3D%22.5%22%20width%3D%22217%22%20height%3D%2295%22%20rx%3D%225%22%20fill%3D%22none%22%20stroke%3D%22%232b2e33%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterCurve","id":"ctrl_1741874255051","controlType":"Label"},
+        "Transform": {"x":630,"y":88,"width":218,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22654%22%20height%3D%2296%22%20viewBox%3D%220%200%20654%2096%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-10%25%22%20y%3D%22-50%25%22%20width%3D%22120%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.4%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M0.0%2040.3L2.7%2040.3L5.5%2040.3L8.2%2040.3L10.9%2040.3L13.6%2040.3L16.4%2040.3L19.1%2040.3L21.8%2040.3L24.5%2040.3L27.3%2040.3L30.0%2040.3L32.7%2040.3L35.4%2040.3L38.1%2040.3L40.9%2040.3L43.6%2040.3L46.3%2040.3L49.0%2040.3L51.8%2040.3L54.5%2040.3L57.2%2040.3L59.9%2040.3L62.7%2040.3L65.4%2040.3L68.1%2040.3L70.9%2040.3L73.6%2040.3L76.3%2040.3L79.0%2040.3L81.8%2040.3L84.5%2040.3L87.2%2040.3L89.9%2040.3L92.6%2040.3L95.4%2040.3L98.1%2040.3L100.8%2040.3L103.5%2040.3L106.3%2040.3L109.0%2040.3L111.7%2040.3L114.4%2040.3L117.2%2040.3L119.9%2040.3L122.6%2040.3L125.4%2040.3L128.1%2040.3L130.8%2040.3L133.5%2040.3L136.3%2040.3L139.0%2040.3L141.7%2040.3L144.4%2040.3L147.2%2040.3L149.9%2040.3L152.6%2040.3L155.3%2040.3L158.1%2040.3L160.8%2040.3L163.5%2040.3L166.2%2040.3L169.0%2040.3L171.7%2040.3L174.4%2040.3L177.1%2040.3L179.9%2040.3L182.6%2040.3L185.3%2040.3L188.0%2040.3L190.8%2040.3L193.5%2040.3L196.2%2040.3L198.9%2040.3L201.7%2040.3L204.4%2040.3L207.1%2040.3L209.8%2040.3L212.6%2040.3L215.3%2040.3L218.0%2040.3L220.7%2040.3L223.5%2040.3L226.2%2040.3L228.9%2040.3L231.6%2040.3L234.3%2040.3L237.1%2040.3L239.8%2040.3L242.5%2040.3L245.3%2040.3L248.0%2040.3L250.7%2040.3L253.4%2040.3L256.1%2040.3L258.9%2040.3L261.6%2040.3L264.3%2040.3L267.1%2040.3L269.8%2040.3L272.5%2040.3L275.2%2040.3L277.9%2040.3L280.7%2040.3L283.4%2040.3L286.1%2040.3L288.8%2040.3L291.6%2040.3L294.3%2040.3L297.0%2040.3L299.8%2040.3L302.5%2040.3L305.2%2040.3L307.9%2040.3L310.6%2040.3L313.4%2040.3L316.1%2040.3L318.8%2040.3L321.6%2040.3L324.3%2040.3L327.0%2040.3L329.7%2044.2L332.4%2048.0L335.2%2051.8L337.9%2055.7L340.6%2059.5L343.4%2063.4L346.1%2067.2L348.8%2071.0L351.5%2074.9L354.3%2078.7L357.0%2082.6L359.7%2086.4L362.4%2090.2L365.2%2094.1L367.9%2097.9L370.6%20101.8L373.3%20105.6L376.0%20109.4L378.8%20113.3L381.5%20117.1L384.2%20121.0L386.9%20124.8L389.7%20128.6L392.4%20132.5L395.1%20136.3L397.8%20140.2L400.6%20144.0L403.3%20147.8L406.0%20151.7L408.8%20155.5L411.5%20155.5L414.2%20155.5L416.9%20155.5L419.7%20155.5L422.4%20155.5L425.1%20155.5L427.8%20155.5L430.6%20155.5L433.3%20155.5L436.0%20155.5L438.7%20155.5L441.5%20155.5L444.2%20155.5L446.9%20155.5L449.6%20155.5L452.3%20155.5L455.1%20155.5L457.8%20155.5L460.5%20155.5L463.3%20155.5L466.0%20155.5L468.7%20155.5L471.4%20155.5L474.1%20155.5L476.9%20155.5L479.6%20155.5L482.3%20155.5L485.1%20155.5L487.8%20155.5L490.5%20155.5L493.2%20155.5L495.9%20155.5L498.7%20155.5L501.4%20155.5L504.1%20155.5L506.9%20155.5L509.6%20155.5L512.3%20155.5L515.0%20155.5L517.8%20155.5L520.5%20155.5L523.2%20155.5L525.9%20155.5L528.6%20155.5L531.4%20155.5L534.1%20155.5L536.8%20155.5L539.5%20155.5L542.3%20155.5L545.0%20155.5L547.7%20155.5L550.5%20155.5L553.2%20155.5L555.9%20155.5L558.6%20155.5L561.4%20155.5L564.1%20155.5L566.8%20155.5L569.5%20155.5L572.3%20155.5L575.0%20155.5L577.7%20155.5L580.4%20155.5L583.1%20155.5L585.9%20155.5L588.6%20155.5L591.3%20155.5L594.0%20155.5L596.8%20155.5L599.5%20155.5L602.2%20155.5L605.0%20155.5L607.7%20155.5L610.4%20155.5L613.1%20155.5L615.9%20155.5L618.6%20155.5L621.3%20155.5L624.0%20155.5L626.8%20155.5L629.5%20155.5L632.2%20155.5L634.9%20155.5L637.6%20155.5L640.4%20155.5L643.1%20155.5L645.8%20155.5L648.6%20155.5L651.3%20155.5L654.0%20155.5%22%20fill%3D%22none%22%20stroke%3D%22%23ff9a3c%22%20stroke-width%3D%226%22%20stroke-opacity%3D%22.35%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M0.0%2040.3L2.7%2040.3L5.5%2040.3L8.2%2040.3L10.9%2040.3L13.6%2040.3L16.4%2040.3L19.1%2040.3L21.8%2040.3L24.5%2040.3L27.3%2040.3L30.0%2040.3L32.7%2040.3L35.4%2040.3L38.1%2040.3L40.9%2040.3L43.6%2040.3L46.3%2040.3L49.0%2040.3L51.8%2040.3L54.5%2040.3L57.2%2040.3L59.9%2040.3L62.7%2040.3L65.4%2040.3L68.1%2040.3L70.9%2040.3L73.6%2040.3L76.3%2040.3L79.0%2040.3L81.8%2040.3L84.5%2040.3L87.2%2040.3L89.9%2040.3L92.6%2040.3L95.4%2040.3L98.1%2040.3L100.8%2040.3L103.5%2040.3L106.3%2040.3L109.0%2040.3L111.7%2040.3L114.4%2040.3L117.2%2040.3L119.9%2040.3L122.6%2040.3L125.4%2040.3L128.1%2040.3L130.8%2040.3L133.5%2040.3L136.3%2040.3L139.0%2040.3L141.7%2040.3L144.4%2040.3L147.2%2040.3L149.9%2040.3L152.6%2040.3L155.3%2040.3L158.1%2040.3L160.8%2040.3L163.5%2040.3L166.2%2040.3L169.0%2040.3L171.7%2040.3L174.4%2040.3L177.1%2040.3L179.9%2040.3L182.6%2040.3L185.3%2040.3L188.0%2040.3L190.8%2040.3L193.5%2040.3L196.2%2040.3L198.9%2040.3L201.7%2040.3L204.4%2040.3L207.1%2040.3L209.8%2040.3L212.6%2040.3L215.3%2040.3L218.0%2040.3L220.7%2040.3L223.5%2040.3L226.2%2040.3L228.9%2040.3L231.6%2040.3L234.3%2040.3L237.1%2040.3L239.8%2040.3L242.5%2040.3L245.3%2040.3L248.0%2040.3L250.7%2040.3L253.4%2040.3L256.1%2040.3L258.9%2040.3L261.6%2040.3L264.3%2040.3L267.1%2040.3L269.8%2040.3L272.5%2040.3L275.2%2040.3L277.9%2040.3L280.7%2040.3L283.4%2040.3L286.1%2040.3L288.8%2040.3L291.6%2040.3L294.3%2040.3L297.0%2040.3L299.8%2040.3L302.5%2040.3L305.2%2040.3L307.9%2040.3L310.6%2040.3L313.4%2040.3L316.1%2040.3L318.8%2040.3L321.6%2040.3L324.3%2040.3L327.0%2040.3L329.7%2044.2L332.4%2048.0L335.2%2051.8L337.9%2055.7L340.6%2059.5L343.4%2063.4L346.1%2067.2L348.8%2071.0L351.5%2074.9L354.3%2078.7L357.0%2082.6L359.7%2086.4L362.4%2090.2L365.2%2094.1L367.9%2097.9L370.6%20101.8L373.3%20105.6L376.0%20109.4L378.8%20113.3L381.5%20117.1L384.2%20121.0L386.9%20124.8L389.7%20128.6L392.4%20132.5L395.1%20136.3L397.8%20140.2L400.6%20144.0L403.3%20147.8L406.0%20151.7L408.8%20155.5L411.5%20155.5L414.2%20155.5L416.9%20155.5L419.7%20155.5L422.4%20155.5L425.1%20155.5L427.8%20155.5L430.6%20155.5L433.3%20155.5L436.0%20155.5L438.7%20155.5L441.5%20155.5L444.2%20155.5L446.9%20155.5L449.6%20155.5L452.3%20155.5L455.1%20155.5L457.8%20155.5L460.5%20155.5L463.3%20155.5L466.0%20155.5L468.7%20155.5L471.4%20155.5L474.1%20155.5L476.9%20155.5L479.6%20155.5L482.3%20155.5L485.1%20155.5L487.8%20155.5L490.5%20155.5L493.2%20155.5L495.9%20155.5L498.7%20155.5L501.4%20155.5L504.1%20155.5L506.9%20155.5L509.6%20155.5L512.3%20155.5L515.0%20155.5L517.8%20155.5L520.5%20155.5L523.2%20155.5L525.9%20155.5L528.6%20155.5L531.4%20155.5L534.1%20155.5L536.8%20155.5L539.5%20155.5L542.3%20155.5L545.0%20155.5L547.7%20155.5L550.5%20155.5L553.2%20155.5L555.9%20155.5L558.6%20155.5L561.4%20155.5L564.1%20155.5L566.8%20155.5L569.5%20155.5L572.3%20155.5L575.0%20155.5L577.7%20155.5L580.4%20155.5L583.1%20155.5L585.9%20155.5L588.6%20155.5L591.3%20155.5L594.0%20155.5L596.8%20155.5L599.5%20155.5L602.2%20155.5L605.0%20155.5L607.7%20155.5L610.4%20155.5L613.1%20155.5L615.9%20155.5L618.6%20155.5L621.3%20155.5L624.0%20155.5L626.8%20155.5L629.5%20155.5L632.2%20155.5L634.9%20155.5L637.6%20155.5L640.4%20155.5L643.1%20155.5L645.8%20155.5L648.6%20155.5L651.3%20155.5L654.0%20155.5%22%20fill%3D%22none%22%20stroke%3D%22%23ffb35c%22%20stroke-width%3D%222.2%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterPeak","id":"ctrl_1741874255052","controlType":"Label"},
+        "Transform": {"x":630,"y":88,"width":218,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22654%22%20height%3D%2296%22%20viewBox%3D%220%200%20654%2096%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%20x%3D%22-10%25%22%20y%3D%22-50%25%22%20width%3D%22120%25%22%20height%3D%22200%25%22%3E%3CfeGaussianBlur%20stdDeviation%3D%222.4%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M0.0%2040.3L2.7%2040.3L5.5%2040.3L8.2%2040.3L10.9%2040.3L13.6%2040.3L16.4%2040.3L19.1%2040.3L21.8%2040.3L24.5%2040.3L27.3%2040.3L30.0%2040.3L32.7%2040.3L35.4%2040.3L38.1%2040.3L40.9%2040.3L43.6%2040.3L46.3%2040.3L49.0%2040.3L51.8%2040.3L54.5%2040.3L57.2%2040.3L59.9%2040.3L62.7%2040.3L65.4%2040.3L68.1%2040.3L70.9%2040.3L73.6%2040.3L76.3%2040.3L79.0%2040.3L81.8%2040.3L84.5%2040.3L87.2%2040.3L89.9%2040.3L92.6%2040.3L95.4%2040.3L98.1%2040.3L100.8%2040.3L103.5%2040.3L106.3%2040.3L109.0%2040.3L111.7%2040.3L114.4%2040.3L117.2%2040.3L119.9%2040.3L122.6%2040.3L125.4%2040.3L128.1%2040.3L130.8%2040.3L133.5%2040.3L136.3%2040.3L139.0%2040.3L141.7%2040.3L144.4%2040.3L147.2%2040.3L149.9%2040.3L152.6%2040.3L155.3%2040.3L158.1%2040.3L160.8%2040.3L163.5%2040.3L166.2%2040.3L169.0%2040.3L171.7%2040.3L174.4%2040.3L177.1%2040.3L179.9%2040.3L182.6%2040.3L185.3%2040.3L188.0%2040.3L190.8%2040.3L193.5%2040.3L196.2%2040.3L198.9%2040.3L201.7%2040.3L204.4%2040.3L207.1%2040.3L209.8%2040.3L212.6%2040.3L215.3%2040.3L218.0%2040.3L220.7%2040.3L223.5%2040.3L226.2%2040.3L228.9%2040.3L231.6%2040.3L234.3%2040.3L237.1%2040.3L239.8%2040.3L242.5%2040.3L245.3%2040.3L248.0%2040.3L250.7%2040.3L253.4%2040.3L256.1%2040.3L258.9%2040.3L261.6%2040.3L264.3%2040.3L267.1%2040.3L269.8%2040.3L272.5%2040.3L275.2%2040.3L277.9%2040.3L280.7%2040.3L283.4%2040.3L286.1%2040.3L288.8%2040.3L291.6%2040.3L294.3%2040.3L297.0%2040.1L299.8%2039.9L302.5%2039.3L305.2%2038.3L307.9%2036.4L310.6%2033.5L313.4%2029.3L316.1%2024.0L318.8%2018.2L321.6%2012.9L324.3%209.1L327.0%207.7L329.7%2012.9L332.4%2020.6L335.2%2029.8L337.9%2039.4L340.6%2048.5L343.4%2056.5L346.1%2063.3L348.8%2069.0L351.5%2073.9L354.3%2078.3L357.0%2082.4L359.7%2086.3L362.4%2090.2L365.2%2094.1L367.9%2097.9L370.6%20101.8L373.3%20105.6L376.0%20109.4L378.8%20113.3L381.5%20117.1L384.2%20121.0L386.9%20124.8L389.7%20128.6L392.4%20132.5L395.1%20136.3L397.8%20140.2L400.6%20144.0L403.3%20147.8L406.0%20151.7L408.8%20155.5L411.5%20155.5L414.2%20155.5L416.9%20155.5L419.7%20155.5L422.4%20155.5L425.1%20155.5L427.8%20155.5L430.6%20155.5L433.3%20155.5L436.0%20155.5L438.7%20155.5L441.5%20155.5L444.2%20155.5L446.9%20155.5L449.6%20155.5L452.3%20155.5L455.1%20155.5L457.8%20155.5L460.5%20155.5L463.3%20155.5L466.0%20155.5L468.7%20155.5L471.4%20155.5L474.1%20155.5L476.9%20155.5L479.6%20155.5L482.3%20155.5L485.1%20155.5L487.8%20155.5L490.5%20155.5L493.2%20155.5L495.9%20155.5L498.7%20155.5L501.4%20155.5L504.1%20155.5L506.9%20155.5L509.6%20155.5L512.3%20155.5L515.0%20155.5L517.8%20155.5L520.5%20155.5L523.2%20155.5L525.9%20155.5L528.6%20155.5L531.4%20155.5L534.1%20155.5L536.8%20155.5L539.5%20155.5L542.3%20155.5L545.0%20155.5L547.7%20155.5L550.5%20155.5L553.2%20155.5L555.9%20155.5L558.6%20155.5L561.4%20155.5L564.1%20155.5L566.8%20155.5L569.5%20155.5L572.3%20155.5L575.0%20155.5L577.7%20155.5L580.4%20155.5L583.1%20155.5L585.9%20155.5L588.6%20155.5L591.3%20155.5L594.0%20155.5L596.8%20155.5L599.5%20155.5L602.2%20155.5L605.0%20155.5L607.7%20155.5L610.4%20155.5L613.1%20155.5L615.9%20155.5L618.6%20155.5L621.3%20155.5L624.0%20155.5L626.8%20155.5L629.5%20155.5L632.2%20155.5L634.9%20155.5L637.6%20155.5L640.4%20155.5L643.1%20155.5L645.8%20155.5L648.6%20155.5L651.3%20155.5L654.0%20155.5%22%20fill%3D%22none%22%20stroke%3D%22%23ffe2a8%22%20stroke-width%3D%227%22%20stroke-opacity%3D%22.5%22%20filter%3D%22url(%23g)%22%2F%3E%3Cpath%20d%3D%22M0.0%2040.3L2.7%2040.3L5.5%2040.3L8.2%2040.3L10.9%2040.3L13.6%2040.3L16.4%2040.3L19.1%2040.3L21.8%2040.3L24.5%2040.3L27.3%2040.3L30.0%2040.3L32.7%2040.3L35.4%2040.3L38.1%2040.3L40.9%2040.3L43.6%2040.3L46.3%2040.3L49.0%2040.3L51.8%2040.3L54.5%2040.3L57.2%2040.3L59.9%2040.3L62.7%2040.3L65.4%2040.3L68.1%2040.3L70.9%2040.3L73.6%2040.3L76.3%2040.3L79.0%2040.3L81.8%2040.3L84.5%2040.3L87.2%2040.3L89.9%2040.3L92.6%2040.3L95.4%2040.3L98.1%2040.3L100.8%2040.3L103.5%2040.3L106.3%2040.3L109.0%2040.3L111.7%2040.3L114.4%2040.3L117.2%2040.3L119.9%2040.3L122.6%2040.3L125.4%2040.3L128.1%2040.3L130.8%2040.3L133.5%2040.3L136.3%2040.3L139.0%2040.3L141.7%2040.3L144.4%2040.3L147.2%2040.3L149.9%2040.3L152.6%2040.3L155.3%2040.3L158.1%2040.3L160.8%2040.3L163.5%2040.3L166.2%2040.3L169.0%2040.3L171.7%2040.3L174.4%2040.3L177.1%2040.3L179.9%2040.3L182.6%2040.3L185.3%2040.3L188.0%2040.3L190.8%2040.3L193.5%2040.3L196.2%2040.3L198.9%2040.3L201.7%2040.3L204.4%2040.3L207.1%2040.3L209.8%2040.3L212.6%2040.3L215.3%2040.3L218.0%2040.3L220.7%2040.3L223.5%2040.3L226.2%2040.3L228.9%2040.3L231.6%2040.3L234.3%2040.3L237.1%2040.3L239.8%2040.3L242.5%2040.3L245.3%2040.3L248.0%2040.3L250.7%2040.3L253.4%2040.3L256.1%2040.3L258.9%2040.3L261.6%2040.3L264.3%2040.3L267.1%2040.3L269.8%2040.3L272.5%2040.3L275.2%2040.3L277.9%2040.3L280.7%2040.3L283.4%2040.3L286.1%2040.3L288.8%2040.3L291.6%2040.3L294.3%2040.3L297.0%2040.1L299.8%2039.9L302.5%2039.3L305.2%2038.3L307.9%2036.4L310.6%2033.5L313.4%2029.3L316.1%2024.0L318.8%2018.2L321.6%2012.9L324.3%209.1L327.0%207.7L329.7%2012.9L332.4%2020.6L335.2%2029.8L337.9%2039.4L340.6%2048.5L343.4%2056.5L346.1%2063.3L348.8%2069.0L351.5%2073.9L354.3%2078.3L357.0%2082.4L359.7%2086.3L362.4%2090.2L365.2%2094.1L367.9%2097.9L370.6%20101.8L373.3%20105.6L376.0%20109.4L378.8%20113.3L381.5%20117.1L384.2%20121.0L386.9%20124.8L389.7%20128.6L392.4%20132.5L395.1%20136.3L397.8%20140.2L400.6%20144.0L403.3%20147.8L406.0%20151.7L408.8%20155.5L411.5%20155.5L414.2%20155.5L416.9%20155.5L419.7%20155.5L422.4%20155.5L425.1%20155.5L427.8%20155.5L430.6%20155.5L433.3%20155.5L436.0%20155.5L438.7%20155.5L441.5%20155.5L444.2%20155.5L446.9%20155.5L449.6%20155.5L452.3%20155.5L455.1%20155.5L457.8%20155.5L460.5%20155.5L463.3%20155.5L466.0%20155.5L468.7%20155.5L471.4%20155.5L474.1%20155.5L476.9%20155.5L479.6%20155.5L482.3%20155.5L485.1%20155.5L487.8%20155.5L490.5%20155.5L493.2%20155.5L495.9%20155.5L498.7%20155.5L501.4%20155.5L504.1%20155.5L506.9%20155.5L509.6%20155.5L512.3%20155.5L515.0%20155.5L517.8%20155.5L520.5%20155.5L523.2%20155.5L525.9%20155.5L528.6%20155.5L531.4%20155.5L534.1%20155.5L536.8%20155.5L539.5%20155.5L542.3%20155.5L545.0%20155.5L547.7%20155.5L550.5%20155.5L553.2%20155.5L555.9%20155.5L558.6%20155.5L561.4%20155.5L564.1%20155.5L566.8%20155.5L569.5%20155.5L572.3%20155.5L575.0%20155.5L577.7%20155.5L580.4%20155.5L583.1%20155.5L585.9%20155.5L588.6%20155.5L591.3%20155.5L594.0%20155.5L596.8%20155.5L599.5%20155.5L602.2%20155.5L605.0%20155.5L607.7%20155.5L610.4%20155.5L613.1%20155.5L615.9%20155.5L618.6%20155.5L621.3%20155.5L624.0%20155.5L626.8%20155.5L629.5%20155.5L632.2%20155.5L634.9%20155.5L637.6%20155.5L640.4%20155.5L643.1%20155.5L645.8%20155.5L648.6%20155.5L651.3%20155.5L654.0%20155.5%22%20fill%3D%22none%22%20stroke%3D%22%23ffd08a%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterNote","id":"ctrl_1741874255053","controlType":"Label"},
+        "Transform": {"x":630,"y":186,"width":218,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CUTOFF · RESONANCE","_children":{"Fill":{"colour":"FF5D6168"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cutoff","id":"ctrl_1741874255054","description":"FILTER CUTOFF — cc19","controlType":"Knob"},
+        "Transform": {"x":646,"y":222,"width":88,"height":88},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":9800,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filter.filterCutoff","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffName","id":"ctrl_1741874255055","attachedTo":"ctrl_1741874255054","controlType":"Label"},
+        "Transform": {"x":642,"y":314,"width":96,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":11,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Resonance","id":"ctrl_1741874255056","description":"FILTER RESONANCE — cc21","controlType":"Knob"},
+        "Transform": {"x":792,"y":216,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":9400,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filter.filterResonance","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceName","id":"ctrl_1741874255057","attachedTo":"ctrl_1741874255056","controlType":"Label"},
+        "Transform": {"x":764,"y":260,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RESONANCE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgAmt","id":"ctrl_1741874255058","description":"FILTER EG AMT — cc27","controlType":"Knob"},
+        "Transform": {"x":792,"y":302,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":10400,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgAmt","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EgAmtName","id":"ctrl_1741874255059","attachedTo":"ctrl_1741874255058","controlType":"Label"},
+        "Transform": {"x":764,"y":346,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EG AMT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drive","id":"ctrl_1741874255060","description":"FILTER MULTIDRIVE — cc18","controlType":"Knob"},
+        "Transform": {"x":641,"y":369,"width":30,"height":30},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":4100,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filter.filterMultidrive","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DriveName","id":"ctrl_1741874255061","attachedTo":"ctrl_1741874255060","controlType":"Label"},
+        "Transform": {"x":608,"y":403,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DRIVE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KbAmt","id":"ctrl_1741874255062","description":"FILTER KB AMT — cc22","controlType":"Knob"},
+        "Transform": {"x":713,"y":369,"width":30,"height":30},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":8192,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filter.filterKbAmt","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KbAmtName","id":"ctrl_1741874255063","attachedTo":"ctrl_1741874255062","controlType":"Label"},
+        "Transform": {"x":680,"y":403,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KB AMT","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvFrame","id":"ctrl_1741874255064","controlType":"Label"},
+        "Transform": {"x":878,"y":66,"width":190,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22360%22%20viewBox%3D%220%200%20190%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22189%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvTitle","id":"ctrl_1741874255065","controlType":"Label"},
+        "Transform": {"x":888,"y":57,"width":107,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"ENVELOPES","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgName","id":"ctrl_1741874255066","controlType":"Label"},
+        "Transform": {"x":890,"y":84,"width":166,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FILTER EG","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgA","id":"ctrl_1741874255067","description":"FILTER EG ATTACK TIME — cc23","controlType":"Knob"},
+        "Transform": {"x":890,"y":114,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":2600,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgAttackTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgAName","id":"ctrl_1741874255068","attachedTo":"ctrl_1741874255067","controlType":"Label"},
+        "Transform": {"x":858,"y":150,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgD","id":"ctrl_1741874255069","description":"FILTER EG DECAY TIME — cc24","controlType":"Knob"},
+        "Transform": {"x":934,"y":114,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":7200,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgDecayTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgDName","id":"ctrl_1741874255070","attachedTo":"ctrl_1741874255069","controlType":"Label"},
+        "Transform": {"x":902,"y":150,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgS","id":"ctrl_1741874255071","description":"FILTER EG SUSTAIN TIME — cc25","controlType":"Knob"},
+        "Transform": {"x":978,"y":114,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":9800,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgSustainTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgSName","id":"ctrl_1741874255072","attachedTo":"ctrl_1741874255071","controlType":"Label"},
+        "Transform": {"x":946,"y":150,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"S","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgR","id":"ctrl_1741874255073","description":"FILTER EG RELEASE TIME — cc26","controlType":"Knob"},
+        "Transform": {"x":1022,"y":114,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":6100,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgReleaseTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgRName","id":"ctrl_1741874255074","attachedTo":"ctrl_1741874255073","controlType":"Label"},
+        "Transform": {"x":990,"y":150,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"R","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgName","id":"ctrl_1741874255075","controlType":"Label"},
+        "Transform": {"x":890,"y":194,"width":166,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AMP EG","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgA","id":"ctrl_1741874255076","description":"AMP EG ATTACK TIME — cc28","controlType":"Knob"},
+        "Transform": {"x":890,"y":224,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":900,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgAttackTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgAName","id":"ctrl_1741874255077","attachedTo":"ctrl_1741874255076","controlType":"Label"},
+        "Transform": {"x":858,"y":260,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgD","id":"ctrl_1741874255078","description":"AMP EG DECAY TIME — cc29","controlType":"Knob"},
+        "Transform": {"x":934,"y":224,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":8200,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgDecayTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgDName","id":"ctrl_1741874255079","attachedTo":"ctrl_1741874255078","controlType":"Label"},
+        "Transform": {"x":902,"y":260,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgS","id":"ctrl_1741874255080","description":"AMP EG SUSTAIN TIME — cc30","controlType":"Knob"},
+        "Transform": {"x":978,"y":224,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":12800,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgSustainTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgSName","id":"ctrl_1741874255081","attachedTo":"ctrl_1741874255080","controlType":"Label"},
+        "Transform": {"x":946,"y":260,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"S","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgR","id":"ctrl_1741874255082","description":"AMP EG RELEASE TIME — cc31","controlType":"Knob"},
+        "Transform": {"x":1022,"y":224,"width":32,"height":32},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":5400,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgReleaseTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgRName","id":"ctrl_1741874255083","attachedTo":"ctrl_1741874255082","controlType":"Label"},
+        "Transform": {"x":990,"y":260,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"R","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayHoldName","id":"ctrl_1741874255084","controlType":"Label"},
+        "Transform": {"x":890,"y":304,"width":166,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DELAY · HOLD","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgDelay","id":"ctrl_1741874255085","description":"FILTER EG DELAY — cc103","controlType":"Knob"},
+        "Transform": {"x":892,"y":336,"width":28,"height":28},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgDelay","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgDelayName","id":"ctrl_1741874255086","attachedTo":"ctrl_1741874255085","controlType":"Label"},
+        "Transform": {"x":858,"y":368,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"F DLY","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgHold","id":"ctrl_1741874255087","description":"FILTER EG HOLD — cc105","controlType":"Knob"},
+        "Transform": {"x":936,"y":336,"width":28,"height":28},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"filterEg.filterEgHold","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FilterEgHoldName","id":"ctrl_1741874255088","attachedTo":"ctrl_1741874255087","controlType":"Label"},
+        "Transform": {"x":902,"y":368,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"F HLD","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgDelay","id":"ctrl_1741874255089","description":"AMP EG DELAY — cc104","controlType":"Knob"},
+        "Transform": {"x":980,"y":336,"width":28,"height":28},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgDelay","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgDelayName","id":"ctrl_1741874255090","attachedTo":"ctrl_1741874255089","controlType":"Label"},
+        "Transform": {"x":946,"y":368,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A DLY","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgHold","id":"ctrl_1741874255091","description":"AMP EG HOLD — cc106","controlType":"Knob"},
+        "Transform": {"x":1024,"y":336,"width":28,"height":28},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"ampEg.ampEgHold","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AmpEgHoldName","id":"ctrl_1741874255092","attachedTo":"ctrl_1741874255091","controlType":"Label"},
+        "Transform": {"x":990,"y":368,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A HLD","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OutFrame","id":"ctrl_1741874255093","controlType":"Label"},
+        "Transform": {"x":1082,"y":66,"width":80,"height":360},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%22360%22%20viewBox%3D%220%200%2080%20360%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%2279%22%20height%3D%22359%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OutTitle","id":"ctrl_1741874255094","controlType":"Label"},
+        "Transform": {"x":1092,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF151618"},"Border":{"enabled":false}}},
+        "Text": {"content":"OUT","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Master","id":"ctrl_1741874255095","description":"MASTER VOLUME — cc7","controlType":"Knob"},
+        "Transform": {"x":1100,"y":128,"width":44,"height":44},
+        "Behavior": {"valueType":"int","max":16383,"defaultCurrentValue":11500,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Moog Subsequent 37","parameterId":"program.masterVolume","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MasterName","id":"ctrl_1741874255096","attachedTo":"ctrl_1741874255095","controlType":"Label"},
+        "Transform": {"x":1074,"y":176,"width":96,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MASTER","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Gate","id":"ctrl_1741874255097","controlType":"Label"},
+        "Transform": {"x":1112,"y":268,"width":20,"height":20},
+        "Background": {"_children":{"Fill":{"colour":"FF3A2414"},"Border":{"enabled":false},"Corners":{"radius":10}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GateName","id":"ctrl_1741874255098","controlType":"Label"},
+        "Transform": {"x":1092,"y":294,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NOTE","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Rail","id":"ctrl_1741874255099","controlType":"Label"},
+        "Transform": {"x":596,"y":450.5,"width":528,"height":3},
+        "Background": {"_children":{"Fill":{"colour":"8CFF9A3C"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RailUp","id":"ctrl_1741874255100","controlType":"Label"},
+        "Transform": {"x":1120.5,"y":316,"width":3,"height":136},
+        "Background": {"_children":{"Fill":{"colour":"8CFF9A3C"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ladder","id":"ctrl_1741874255101","controlType":"Label"},
+        "Transform": {"x":683,"y":445,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF151618","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%227%22%20r%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%23FF9A3C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LadderName","id":"ctrl_1741874255102","controlType":"Label"},
+        "Transform": {"x":650,"y":464,"width":80,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LADDER","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Vca","id":"ctrl_1741874255103","controlType":"Label"},
+        "Transform": {"x":963,"y":445,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF151618","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%227%22%20r%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%23FF9A3C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcaName","id":"ctrl_1741874255104","controlType":"Label"},
+        "Transform": {"x":930,"y":464,"width":80,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCA","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OutNode","id":"ctrl_1741874255105","controlType":"Label"},
+        "Transform": {"x":1115,"y":445,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF151618","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%227%22%20r%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%23FF9A3C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OutNodeName","id":"ctrl_1741874255106","controlType":"Label"},
+        "Transform": {"x":1082,"y":464,"width":80,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OUT","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse1","id":"ctrl_1741874255107","controlType":"Label"},
+        "Transform": {"x":593,"y":445,"width":14,"height":14,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE2A8"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":12,"spread":1,"colour":"FFFF9A3C"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse2","id":"ctrl_1741874255108","controlType":"Label"},
+        "Transform": {"x":594.5,"y":446.5,"width":11,"height":11,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"FFFFC07A"},"Border":{"enabled":false},"Corners":{"radius":5.5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse3","id":"ctrl_1741874255109","controlType":"Label"},
+        "Transform": {"x":596,"y":448,"width":8,"height":8,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"FFFF9A3C"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse4","id":"ctrl_1741874255110","controlType":"Label"},
+        "Transform": {"x":597,"y":449,"width":6,"height":6,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"FFFF9A3C"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Hint","id":"ctrl_1741874255111","controlType":"Label"},
+        "Transform": {"x":60,"y":488,"width":1080,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"every knob is bound to the Subsequent 37 profile · the lines are the mix, the curve is the filter, a note travels the path","_children":{"Fill":{"colour":"FF6C7076"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":500,"size":10,"letterSpacing":1},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_moog-subsequent-37",
+      "name": "Mixer OSC 1",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_1",
+          "controlId": "ctrl_1741874255032",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.08
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255037",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_2",
+      "name": "Mixer SUB 1",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_2",
+          "controlId": "ctrl_1741874255033",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.08
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255039",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_3",
+      "name": "Mixer OSC 2",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_3",
+          "controlId": "ctrl_1741874255034",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.08
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255041",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_4",
+      "name": "Mixer NOISE",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_4",
+          "controlId": "ctrl_1741874255035",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.08
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255043",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_5",
+      "name": "Mixer FB / EXT",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_5",
+          "controlId": "ctrl_1741874255036",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.08
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255045",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_6",
+      "name": "Filter cutoff",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_6",
+          "controlId": "ctrl_1741874255051",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "zoom": 3,
+                "panX": -40,
+                "panY": 0
+              },
+              {
+                "at": 1,
+                "zoom": 3,
+                "panX": 40,
+                "panY": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_moog-subsequent-37_7",
+          "controlId": "ctrl_1741874255052",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "zoom": 3,
+                "panX": -40,
+                "panY": 0
+              },
+              {
+                "at": 1,
+                "zoom": 3,
+                "panX": 40,
+                "panY": 0
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255054",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_7",
+      "name": "Filter resonance",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_8",
+          "controlId": "ctrl_1741874255052",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.1,
+                "opacity": 0.05
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1741874255056",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_moog-subsequent-37_8",
+      "name": "Note pulse",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": -1
+      },
+      "length": 1035,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_9",
+          "controlId": "ctrl_1741874255107",
+          "target": "Transform",
+          "start": 0,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.05,
+                "opacity": 1
+              },
+              {
+                "at": 0.86,
+                "x": 522,
+                "y": 0,
+                "opacity": 1
+              },
+              {
+                "at": 0.96,
+                "x": 522,
+                "y": -40,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_moog-subsequent-37_10",
+          "controlId": "ctrl_1741874255108",
+          "target": "Transform",
+          "start": 45,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.05,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.86,
+                "x": 522,
+                "y": 0,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.96,
+                "x": 522,
+                "y": -40,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_moog-subsequent-37_11",
+          "controlId": "ctrl_1741874255109",
+          "target": "Transform",
+          "start": 90,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.05,
+                "opacity": 0.45
+              },
+              {
+                "at": 0.86,
+                "x": 522,
+                "y": 0,
+                "opacity": 0.45
+              },
+              {
+                "at": 0.96,
+                "x": 522,
+                "y": -40,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_moog-subsequent-37_12",
+          "controlId": "ctrl_1741874255110",
+          "target": "Transform",
+          "start": 135,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.05,
+                "opacity": 0.25
+              },
+              {
+                "at": 0.86,
+                "x": 522,
+                "y": 0,
+                "opacity": 0.25
+              },
+              {
+                "at": 0.96,
+                "x": 522,
+                "y": -40,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "y": 0,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_moog-subsequent-37_9",
+      "name": "Note on",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": -1
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_13",
+          "controlId": "ctrl_1741874255097",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFB35C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFB35C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_moog-subsequent-37_10",
+      "name": "Note off",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": -1
+      },
+      "length": 260,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_moog-subsequent-37_14",
+          "controlId": "ctrl_1741874255097",
+          "target": "Transform",
+          "start": 0,
+          "length": 260,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFB35C"
+              },
+              {
+                "at": 1,
+                "fill": "FF3A2414"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

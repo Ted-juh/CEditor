@@ -701,6 +701,84 @@ public:
         return false;
     }
 
+    // SHORT PATHS — mirror of shortPathFits()/shortPathFor() in panelRuntime.js; the two must agree
+    // (docs/design/animation-designer.md, decided by the owner on 2026-11-24). A step that can only be
+    // one thing may be left out: "Text.colour" is "Text.Fill.colour", "bodyCap.scale" is
+    // "Parts.bodyCap.Layout.scale". Tried only where the path as written leads nowhere, so nothing
+    // that resolved before changes. The written steps must appear in order in one full path to a
+    // property: the first on its section (or, with the section left out, on the step after it) and
+    // the last on its last, capitals ignored. More than one fit resolves to nothing.
+    static void collectLeafPaths (const juce::var& node, const juce::StringArray& prefix,
+                                  std::vector<juce::StringArray>& out, int depth)
+    {
+        if (depth > 8) return;
+        auto* obj = node.getDynamicObject();
+        if (obj == nullptr) return;
+        if (auto* children = obj->getProperty ("_children").getDynamicObject())
+            for (const auto& p : children->getProperties())
+            {
+                auto next = prefix;
+                next.add (p.name.toString());
+                collectLeafPaths (p.value, next, out, depth + 1);
+            }
+        for (const auto& p : obj->getProperties())
+        {
+            const auto nm = p.name.toString();
+            if (nm == "_children" || nm == "_type") continue;
+            auto next = prefix;
+            next.add (nm);
+            if (p.value.getDynamicObject() != nullptr) collectLeafPaths (p.value, next, out, depth + 1);
+            else out.push_back (next);
+        }
+    }
+
+    static bool stepsFit (const juce::StringArray& written, const juce::StringArray& full, int offset)
+    {
+        if (written.size() < 2 || full.size() - offset < written.size()) return false;
+        if (! written[0].equalsIgnoreCase (full[offset])
+            || ! written[written.size() - 1].equalsIgnoreCase (full[full.size() - 1])) return false;
+        int at = offset + 1;
+        for (int i = 1; i < written.size() - 1; ++i)
+        {
+            while (at < full.size() - 1 && ! written[i].equalsIgnoreCase (full[at])) ++at;
+            if (at >= full.size() - 1) return false;
+            ++at;
+        }
+        return true;
+    }
+
+public:
+    // Every full property path a short path fits on this control, dotted.
+    static juce::StringArray shortPathFits (const juce::var& control, const juce::StringArray& segments)
+    {
+        juce::StringArray fits;
+        if (segments.size() < 2) return fits;
+        auto* obj = control.getDynamicObject();
+        auto* children = obj != nullptr ? obj->getProperty ("_children").getDynamicObject() : nullptr;
+        if (children == nullptr) return fits;
+        juce::String section;
+        for (const auto& p : children->getProperties())
+            if (p.name.toString().equalsIgnoreCase (segments[0])) { section = p.name.toString(); break; }
+        std::vector<juce::StringArray> leaves;
+        if (section.isNotEmpty())
+            collectLeafPaths (children->getProperty (juce::Identifier (section)), juce::StringArray (section), leaves, 1);
+        else
+            for (const auto& p : children->getProperties())
+                collectLeafPaths (p.value, juce::StringArray (p.name.toString()), leaves, 1);
+        const int offset = section.isNotEmpty() ? 0 : 1;
+        for (const auto& full : leaves)
+            if (stepsFit (segments, full, offset))
+                fits.addIfNotAlreadyThere (full.joinIntoString ("."));
+        return fits;
+    }
+
+    // The one path a short path names, or empty: none fits, or more than one does.
+    static juce::String shortPathFor (const juce::var& control, const juce::StringArray& segments)
+    {
+        const auto fits = shortPathFits (control, segments);
+        return fits.size() == 1 ? fits[0] : juce::String();
+    }
+
     // If the resolved path lands on a custom-component value channel object, address its currentValue.
     static juce::String channelizePath (const juce::var& control, const juce::String& path)
     {
@@ -729,6 +807,7 @@ public:
         else if (firstSegmentIsSection (control, first))
         {
             path = walkCaseInsensitive (control, segments);
+            if (path.isEmpty()) path = shortPathFor (control, segments);
             if (path.isEmpty()) path = segments.joinIntoString (".");
         }
         else
@@ -741,8 +820,9 @@ public:
                         const auto sub = walkCaseInsensitive (p.value, segments);
                         if (sub.isNotEmpty()) { found = p.name.toString() + "." + sub; break; }
                     }
-            if (found.isEmpty())
-                found = shorthand (first).isNotEmpty() ? shorthand (first) : segments.joinIntoString (".");
+            if (found.isEmpty()) found = shorthand (first);
+            if (found.isEmpty()) found = shortPathFor (control, segments);
+            if (found.isEmpty()) found = segments.joinIntoString (".");
             path = found;
         }
 

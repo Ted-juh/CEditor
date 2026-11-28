@@ -64,7 +64,7 @@ try {
     assert.equal(boxes.length, shown.controls, `${setId}: every control reaches the DOM`);
     assert.deepEqual(boxes.filter((b) => b.w < 1 || b.h < 1), [], `${setId}: every control has a size`);
     const filters = await page.evaluate(() => document.querySelectorAll('filter[id^="part-material"], filter[id^="surface-material"], filter[id^="panel-material"]').length);
-    const caps = await page.evaluate(() => document.querySelectorAll('mask[id$="bodyCapCircle"]').length);
+    const caps = await page.evaluate(() => document.querySelectorAll('clipPath[id$="bodyCapCircle"], mask[id$="bodyCapCircle"]').length);
     if (OUT_DIR) await page.screenshot({ path: join(OUT_DIR, `${setId}.png`), clip: { x: 0, y: 0, width: shown.width, height: shown.height } });
     console.log(`controlSetShot: ${setId} — ${shown.controls} controls, ${caps} knob caps, ${filters} material filters`);
   }

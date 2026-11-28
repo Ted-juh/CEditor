@@ -19,7 +19,8 @@
  * it. A condition the session cannot hold at all is reported (`exact: false`) and played as near as
  * it can be, because a near miss shown honestly beats a Play button that does nothing.
  */
-import { readTrigger, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
+import { resolveTimedButtonConfig } from './timedButtonPreview.js';
+import { readTrigger, stepsOfControl, STATE_RULE_VALUE_NAMES } from './interactionRuntime.js';
 import { getCustomValueChannels, customChannelDefaultValue, customConditionMatches } from './customComponentInteraction.js';
 import { controlStateNames, ANY_STATE, DEFAULT_STATE } from './animationModel.js';
 import { isSliderBehavior, getSliderMin, getSliderMax } from './sliderBehavior.js';
@@ -225,14 +226,16 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
   if (!control || !row) return { ok: false, reason: 'Nothing to play.' };
   const trigger = row.trigger ?? readTrigger(row.animation ?? row);
   const span = spanOf(row, timeScale);
-  const keyframes = row.kind === 'keyframes';
+  // A text effect plays as a keyframe animation does: requested, or by its state or value.
+  const keyframes = row.kind === 'keyframes' || row.kind === 'text';
 
   if (keyframes && trigger.type === 'always') {
     return { ok: false, reason: 'It plays all the time — it is already playing on the stage.' };
   }
-  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script')) {
+  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script' || trigger.type === 'event' || trigger.type === 'textChange')) {
     // Nothing on the stage makes a beat or a script call happen, so Play asks for the animation
-    // directly — exactly what ce.anim.play does.
+    // directly — exactly what ce.anim.play does. A gesture is the same request the surface makes
+    // when it recognises one; the stage's control answers the real gesture too.
     return { ok: true, request: true, steps: [], exact: true, note: '' };
   }
 
@@ -308,6 +311,44 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
         { label: 'low', session: { ...REST_SESSION, ...on, ...low }, hold: LEAD_MS },
         { label: 'high', session: { ...REST_SESSION, ...on, ...high }, hold: span + TAIL_MS },
         { label: 'low again', session: { ...REST_SESSION, ...on, ...low }, hold: span + TAIL_MS },
+      ],
+    };
+  }
+
+  if (trigger.type === 'valueStep') {
+    // Three steps up and two back down, each on a step of its own and held long enough to see what
+    // a step plays, and which way it turned (a push or an odometer goes the way the value went).
+    const steps = trigger.steps || stepsOfControl(control);
+    const first = Math.max(0, Math.min(steps - 3, Math.round(steps * 0.25)));
+    const slots = [first, first + 1, first + 2, first + 3, first + 2, first + 1];
+    const patches = slots.map((slot) => valuePatch(control, slot / steps));
+    if (patches.some((patch) => !patch)) return { ok: false, reason: 'Play cannot set this control\'s value. Turn it on the stage instead.' };
+    return {
+      ok: true,
+      exact: true,
+      note: '',
+      steps: slots.map((slot, i) => ({
+        label: i === 0 ? 'start' : slot > slots[i - 1] ? 'a step up' : 'a step down',
+        session: { ...REST_SESSION, ...patches[i] },
+        hold: i === 0 ? LEAD_MS : Math.max(320, Math.min(span, 900)),
+      })),
+    };
+  }
+
+  if (trigger.type === 'hold') {
+    // Held to confirm, for exactly as long as this button must be held (or waits for its next
+    // click), then let go confirmed: the hold's animation runs over it and the Executed state shows.
+    const config = resolveTimedButtonConfig(control?._children?.Behavior ?? {});
+    const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+    const holdMs = (config.subtype === 'double_click' ? config.clickWindow : config.holdDuration) * scale;
+    return {
+      ok: true,
+      exact: true,
+      note: '',
+      steps: [
+        { label: 'rest', session: { ...REST_SESSION }, hold: LEAD_MS },
+        { label: 'held', session: { ...REST_SESSION, hover: true, pressed: true, pending: true }, hold: holdMs },
+        { label: 'confirmed', session: { ...REST_SESSION, hover: true, executed: true }, hold: TAIL_MS + 600 },
       ],
     };
   }

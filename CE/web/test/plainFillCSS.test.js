@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fillShapeCSS, plainFillCSS, whyFillNotPlainCSS } from '../src/CE_Application/utils/plainFillCSS.js';
+import { colourUnderGradientCSS, fillShapeCSS, plainFillCSS, whyFillNotPlainCSS } from '../src/CE_Application/utils/plainFillCSS.js';
 
 const bg = (fill, corners = null, mode) => ({
   ...(mode === undefined ? {} : { mode }),
@@ -174,4 +174,41 @@ test('fillShapeCSS leaves overflowing radii to CSS, as the layered path does', (
 test('square corners produce no shape at all', () => {
   assert.equal(fillShapeCSS({ linked: true, radius: 0 }, 100, 60), '');
   assert.equal(fillShapeCSS(null, 100, 60), '');
+});
+
+/* --------------------------------------------- a colour under a gradient (SliderShapeFill) */
+
+
+const shaded = (over = {}) => bg({
+  colour: 'FF203040', solidEnabled: true, gradientEnabled: true, gradientOpacity: 100,
+  gradient: { type: 'linear', angle: 90, stops: [{ color: 'FFFFFF', position: 0 }, { color: '000000', position: 100 }] },
+  ...over,
+});
+
+test('a colour under a gradient is one background: the gradient its image, the colour beneath', () => {
+  const style = colourUnderGradientCSS(shaded(), 100, 60);
+  assert.match(style, /^background: [^;]*gradient\(/);
+  assert.equal(decl(style, 'background-color'), '#203040FF');
+  // After the shorthand, so the shorthand does not reset it.
+  assert.ok(style.indexOf('background-color') > style.indexOf('background:'));
+  assert.equal(decl(style, 'opacity'), null);
+  assert.equal(plainFillCSS(shaded(), 100, 60), null, 'the wrappers still take one layer only');
+});
+
+test('a faded gradient over the colour is its stops faded, which is the same paint', () => {
+  const faded = colourUnderGradientCSS(shaded({ gradientOpacity: 45, gradient: { type: 'linear', angle: 90, stops: [{ color: 'FFFFFF', position: 0 }, { color: '80000000', position: 100 }] } }), 100, 60);
+  // 255 × 0.45 = 115 (73); 128 × 0.45 = 58 (3A). The colours themselves are kept.
+  assert.match(faded, /#FFFFFF73/);
+  assert.match(faded, /#0000003A/);
+  assert.equal(decl(faded, 'opacity'), null);
+});
+
+test('a colour under a gradient is refused when it needs more than a background to say', () => {
+  assert.equal(colourUnderGradientCSS(shaded({ gradient: { type: 'linear', angle: 0, stops: [{ color: 'rgba(0,0,0,1)', position: 0 }] }, gradientOpacity: 60 }), 100, 60), null, 'a faded stop that is not hex');
+  assert.equal(colourUnderGradientCSS(shaded({ gradientBlend: 'multiply' }), 100, 60), null, 'a blend');
+  assert.equal(colourUnderGradientCSS(shaded({ layerOrder: ['gradient', 'solid', 'image', 'overlay'] }), 100, 60), null, 'the colour on top');
+  assert.equal(colourUnderGradientCSS(shaded({ gradientEnabled: false }), 100, 60), null, 'one layer: plainFillCSS says it');
+  assert.equal(colourUnderGradientCSS(shaded({ imageEnabled: true, imageSrc: 'data:image/png;base64,AA' }), 100, 60), null, 'three layers');
+  assert.equal(colourUnderGradientCSS(shaded({ gradientClipMode: 'none' }), 100, 60), null, 'clipped two ways');
+  assert.equal(colourUnderGradientCSS(shaded(), 0, 60), null);
 });

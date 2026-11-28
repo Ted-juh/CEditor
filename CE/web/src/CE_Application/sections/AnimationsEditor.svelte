@@ -39,7 +39,7 @@
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
-  let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+  let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames, { control }), 0));
   let unknown = $derived(rows.reduce((sum, row) => sum + unknownTriggerStates(row, stateNames).length, 0));
   let clashes = $derived(findClashes(rows, partNames).length);
 </script>
@@ -62,7 +62,7 @@
         <div class="row" class:off={!row.enabled || !allOn}>
           <span class="nm">{row.name}</span>
           <span class="ms">{row.duration}ms</span>
-          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : row.kind === 'sequence' ? 'sequence' : 'transition'} · {triggerSummary(row)}</span>
+          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : row.kind === 'sequence' ? 'sequence' : row.kind === 'value' ? 'value' : row.kind === 'text' ? 'text' : 'transition'} · {triggerSummary(row)}</span>
         </div>
       {/each}
       {#if !rows.length}<p class="none">No animations yet.</p>{/if}

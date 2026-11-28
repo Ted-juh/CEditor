@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6d1c5e8d",
+  "fingerprint": "9d2152d3",
   "set": {
     "id": "tessera",
     "name": "Tessera",
@@ -71,6 +71,7 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166",
+      "control.readout": "{control.cap}",
       "section.surface": "FFF0EDE5"
     },
     "lamp": {

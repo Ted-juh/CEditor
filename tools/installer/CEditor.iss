@@ -59,6 +59,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{#MySourceDir}\CE\profiles\*"; DestDir: "{app}\CE\profiles"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CE\sets\*"; DestDir: "{app}\CE\sets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CE\panels\Control set starters\*"; DestDir: "{app}\CE\panels\Control set starters"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The Animation Designer's showcases (CE/web/scripts/export-showcases.mjs), staged by the CMake install.
+Source: "{#MySourceDir}\CE\panels\Film Festival\*"; DestDir: "{app}\CE\panels\Film Festival"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Song Book\*"; DestDir: "{app}\CE\panels\Song Book"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Mechanisms\*"; DestDir: "{app}\CE\panels\Mechanisms"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Gallery\*"; DestDir: "{app}\CE\panels\Gallery"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Animated Synths\*"; DestDir: "{app}\CE\panels\Animated Synths"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Components\*"; DestDir: "{app}\CE\panels\Components"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginScanner.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginWorker.exe"; DestDir: "{app}"; Flags: ignoreversion

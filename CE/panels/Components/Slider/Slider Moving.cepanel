@@ -1,0 +1,922 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "4aa3dd43-c0b5-4e1a-9f3d-4aa3dd434aa3",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Moving",
+  "scriptId": "component_slider-moving",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1440,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF15171A",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Glide.value",
+      "label": "Glide",
+      "controlName": "Glide",
+      "path": "Glide.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Snap.value",
+      "label": "Snap",
+      "controlName": "Snap",
+      "path": "Snap.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Spring.value",
+      "label": "Spring",
+      "controlName": "Spring",
+      "path": "Spring.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Overload.value",
+      "label": "Overload",
+      "controlName": "Overload",
+      "path": "Overload.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Modulated.value",
+      "label": "Modulated",
+      "controlName": "Modulated",
+      "path": "Modulated.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Detent.value",
+      "label": "Detent",
+      "controlName": "Detent",
+      "path": "Detent.value",
+      "min": 0,
+      "max": 12,
+      "defaultValue": 6,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "frost"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1782252995000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Moving","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1782252995001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1380,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how the value travels. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glide","id":"ctrl_1782252995002","description":"Glide: eases into each new value.","controlType":"Slider"},
+        "Transform": {"x":113,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"pointerSlide":{"duration":320,"preset":{"id":"ce:slider:glide","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":320,"preset":{"id":"ce:slider:glide","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideCaption","id":"ctrl_1782252995003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Glide","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideHow","id":"ctrl_1782252995004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideWhat","id":"ctrl_1782252995005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"eases into each new value","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Snap","id":"ctrl_1782252995006","description":"Snap: no easing: lands at once.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"pointerSlide":{"duration":0,"easing":"linear","preset":{"id":"ce:slider:snap","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":0,"easing":"linear","preset":{"id":"ce:slider:snap","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapCaption","id":"ctrl_1782252995007","controlType":"Label"},
+        "Transform": {"x":268,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Snap","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapHow","id":"ctrl_1782252995008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapWhat","id":"ctrl_1782252995009","controlType":"Label"},
+        "Transform": {"x":270,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"no easing: lands at once","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spring","id":"ctrl_1782252995010","description":"Spring: overshoots, then settles.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"pointerSlide":{"duration":420,"easing":"outBack","preset":{"id":"ce:slider:spring","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":420,"easing":"outBack","preset":{"id":"ce:slider:spring","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringCaption","id":"ctrl_1782252995011","controlType":"Label"},
+        "Transform": {"x":498,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Spring","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringHow","id":"ctrl_1782252995012","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MOVE","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringWhat","id":"ctrl_1782252995013","controlType":"Label"},
+        "Transform": {"x":500,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"overshoots, then settles","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Overload","id":"ctrl_1782252995014","description":"Overload: the fill turns red: a state with a rule.","controlType":"Slider"},
+        "Transform": {"x":803,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","defaultCurrentValue":0.8},
+        "States": {"_children":{"Overload":{"_type":"State","name":"Overload","group":"interaction","description":"Overload (animation preset).","enabled":true,"when":{},"rule":"valueNormalized > 0.9","patches":{"component":{},"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFF3B30"}}}}}},
+        "Animations": {"_children":{"overload":{"_type":"Animation","name":"overload","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["overload"],"reverse":true},"targets":[{"path":"Parts.bodyTrackFill.Background.Fill.colour","properties":["colour"]}],"duration":220,"delay":0,"easing":"outQuad","preset":{"id":"ce:slider:overload","revision":1,"from":"overload"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadCaption","id":"ctrl_1782252995015","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Overload","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadHow","id":"ctrl_1782252995016","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ABOVE 90%","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadWhat","id":"ctrl_1782252995017","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the fill turns red: a state with a rule","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Modulated","id":"ctrl_1782252995018","description":"Modulated: the drawing wobbles round the value, as if an LFO were on it.","controlType":"Slider"},
+        "Transform": {"x":1033,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"modulated":{"_type":"Animation","name":"modulated","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"by":0},{"at":0.25,"by":0.06},{"at":0.75,"by":-0.06},{"at":1,"by":0}],"duration":1800,"delay":0,"easing":"inOutSine","iterations":"infinite","preset":{"id":"ce:slider:modulated","revision":1,"from":"modulated"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedCaption","id":"ctrl_1782252995019","controlType":"Label"},
+        "Transform": {"x":958,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Modulated","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedHow","id":"ctrl_1782252995020","controlType":"Label"},
+        "Transform": {"x":958,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedWhat","id":"ctrl_1782252995021","controlType":"Label"},
+        "Transform": {"x":960,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the drawing wobbles round the value, as if an LFO were on it","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Detent","id":"ctrl_1782252995022","description":"Detent: the cap pulses once a step, as a notch is felt.","controlType":"Slider"},
+        "Transform": {"x":1263,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical","max":12,"step":1,"defaultCurrentValue":6,"precision":0},
+        "Animations": {"_children":{"detent":{"_type":"Animation","name":"detent","enabled":true,"kind":"keyframes","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.pointerCurrent"}],"frames":[{"at":0,"scale":1},{"at":0.3,"scale":1.25},{"at":1,"scale":1}],"duration":160,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:detent","revision":1,"from":"detent"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentCaption","id":"ctrl_1782252995023","controlType":"Label"},
+        "Transform": {"x":1188,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Detent","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentHow","id":"ctrl_1782252995024","controlType":"Label"},
+        "Transform": {"x":1188,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FFFFD166"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentWhat","id":"ctrl_1782252995025","controlType":"Label"},
+        "Transform": {"x":1190,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap pulses once a step, as a notch is felt","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:glide",
+      "name": "Glide",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "move"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outCubic"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:snap",
+      "name": "Snap",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "move"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 0,
+          "delay": 0,
+          "easing": "linear"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 0,
+          "delay": 0,
+          "easing": "linear"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:spring",
+      "name": "Spring",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "move"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outBack"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outBack"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:overload",
+      "name": "Overload",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "above 90%"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "overload": {
+          "_type": "Animation",
+          "name": "overload",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "overload"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            }
+          ],
+          "duration": 220,
+          "delay": 0,
+          "easing": "outQuad"
+        }
+      },
+      "states": {
+        "Overload": {
+          "when": {},
+          "rule": "valueNormalized > 0.9",
+          "patches": {
+            "component": {},
+            "parts": {
+              "bodyTrackFill": {
+                "Background.Fill.colour": "FFFF3B30"
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:modulated",
+      "name": "Modulated",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "modulated": {
+          "_type": "Animation",
+          "name": "modulated",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "by": 0
+            },
+            {
+              "at": 0.25,
+              "by": 0.06
+            },
+            {
+              "at": 0.75,
+              "by": -0.06
+            },
+            {
+              "at": 1,
+              "by": 0
+            }
+          ],
+          "duration": 1800,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:detent",
+      "name": "Detent",
+      "category": "Slider",
+      "tags": [
+        "Moving",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "detent": {
+          "_type": "Animation",
+          "name": "detent",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.3,
+              "scale": 1.25
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

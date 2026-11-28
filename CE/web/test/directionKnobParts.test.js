@@ -74,7 +74,9 @@ test('the renderer draws a plate in perspective by a transform of its outline, a
   const renderer = source('editor/SliderFamilyRenderer.svelte');
   assert.match(renderer, /rotate\(\$\{turnDegrees\.toFixed\(2\)\} \$\{cx\.toFixed\(2\)\} \$\{cy\.toFixed\(2\)\}\) `\s*\+ `translate\(\$\{cx\.toFixed\(2\)\} \$\{cy\.toFixed\(2\)\}\) scale\(1 \$\{aspect\.toFixed\(4\)\}\)/, 'squashed, then turned, then moved');
   assert.match(renderer, /shaded: pointerCurrentPart\?\._children\?\.Background\?\._children\?\.Fill\?\.gradientEnabled === true/);
-  assert.match(source('editor/SliderShapeFill.svelte'), /fill-rule="evenodd" transform=\{shape\.transform\}/);
+  // Its fill is cut by a clip that keeps the outline's transform (utils/shapeClip.js).
+  assert.match(source('editor/SliderShapeFill.svelte'), /clip-rule=\{clip\.rule\} transform=\{clip\.transform\}/);
+  assert.match(source('utils/shapeClip.js'), /rule: 'evenodd', transform: shape\.transform/);
   // Every knob that exists keeps its look: no part is an oval or moved unless it says so.
   const knob = createControl('Knob');
   for (const name of ['bodyHousing', 'bodySkirt', 'bodyCap', 'bodyInsert']) {

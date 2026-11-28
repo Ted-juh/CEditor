@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e48b0404",
+  "fingerprint": "56ac53cc",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -71,6 +71,7 @@
       "display.screen": "FFF3E9C8",
       "display.backlight": "FFF4ECCF",
       "panel.surface": "FFA9ADB2",
+      "control.readout": "{text.label}",
       "section.surface": "FFC7CACD"
     },
     "lamp": {

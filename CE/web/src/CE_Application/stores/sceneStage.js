@@ -1,0 +1,102 @@
+/**
+ * sceneStage.js — how a surface tells the controls on it which scenes to draw, and where. It is a
+ * Svelte context, not a global store, so only the controls inside that surface draw them: the panel's
+ * design canvas never does (the owner: it moves only under a playhead).
+ *
+ * Two surfaces provide one:
+ *
+ *   - the Animation Designer's stage (step 5a): a store of `{ scene, at, playing, phase }` — `at`
+ *     (ms) poses every clip at the playhead, paused; `playing` lets them run from the moment it
+ *     turned true; `phase` flips to start a played scene again (keyframeAnimation.js);
+ *   - a live surface, Preview and the plug-in (step 5b): `createSceneRunStore`, a store of
+ *     `{ plays: [{ scene, phase, at }], listeners }` with the runtime's `fire`, `open` and `beat`
+ *     beside it (utils/sceneRuntime.js). A control that some scene waits on (`listeners.state`)
+ *     reports its states as it enters them, and one whose value drives a scene (`listeners.value`)
+ *     reports its value, through `input` (utils/sceneClock.js).
+ *
+ * A surface inside another's stage provides none of its own: the Designer's stage is a live surface
+ * too, and there nothing plays by itself.
+ */
+import { writable } from 'svelte/store';
+import { createSceneRuntime, sceneListeners, clockParts } from '../utils/sceneRuntime.js';
+import { createMidiTriggerReader } from '../utils/sceneMidi.js';
+
+export const SCENE_STAGE = 'ce.sceneStage';
+
+/**
+ * `onMarker(action, { scene, marker })` is what a scene's marker calls as a play passes it
+ * (sceneRuntime.js): the live surface hands it to the script runtime's actions.
+ */
+export function createSceneRunStore({ timers, frames, onMarker } = {}) {
+  let listeners = sceneListeners([]);
+  let runtime = null;
+  const store = writable({ plays: [], listeners });
+  const publish = () => store.set({ plays: runtime.plays(), listeners });
+  runtime = createSceneRuntime({ onChange: publish, ...(onMarker ? { onMarker } : {}), ...(timers ? { timers } : {}), ...(frames ? { frames } : {}) });
+  let scenesKey = '';
+  let current = [];
+  let beatWanted = false;
+  let midiWanted = false;
+  const midiReader = createMidiTriggerReader();
+  return {
+    subscribe: store.subscribe,
+    /** The panel's scenes. Unchanged ones are not published again, so the controls do not redraw. */
+    setScenes(list) {
+      const scenes = Array.isArray(list) ? list : [];
+      const key = JSON.stringify(scenes);
+      if (key === scenesKey) return;
+      scenesKey = key;
+      current = scenes;
+      runtime.setScenes(scenes);
+      listeners = sceneListeners(scenes);
+      beatWanted = scenes.some((scene) => scene?.trigger?.type === 'beat');
+      midiWanted = scenes.some((scene) => scene?.trigger?.type === 'midi' && !scene?.clock);
+      publish();
+    },
+    setReducedMotion: (flag) => runtime.setReducedMotion(flag),
+    open: () => runtime.open(),
+    fire: (trigger) => runtime.fire(trigger),
+    beat: (beats) => runtime.beat(beats),
+    start: (idOrName, options) => runtime.start(idOrName, options),
+    seek: (idOrName, position) => runtime.seek(idOrName, position),
+    effect: (key, scene, options) => runtime.effect(key, scene, options),
+    find: (idOrName) => runtime.find(idOrName),
+    /** A gesture on a control, for the scenes it drives (sceneClock.js). */
+    input: (controlId, kind, payload) => runtime.input(controlId, kind, payload),
+    /** Whether some scene hears this kind of input from this control: 'value', 'pointer', 'drag', 'wheel'. */
+    listens: (kind, controlId) => !!listeners[kind]?.has?.(controlId),
+    /** The parts of a control the clocks of that kind listen on: '' for the whole control. */
+    clockParts: (kind, controlId) => clockParts(current, kind, controlId),
+    /**
+     * MIDI in (utils/sceneMidi.js): each message the surface heard, as hex. Read only while some
+     * scene waits on MIDI; a controller's history is kept regardless of which scene wants it.
+     */
+    midi(hex) {
+      if (!midiWanted || !hex) return;
+      for (const event of midiReader.read(hex)) runtime.fire({ type: 'midi', event });
+    },
+    wantsMidi: () => midiWanted,
+    /** Whether any scene waits on the beat: only then is the transport listened to. */
+    wantsBeat: () => beatWanted,
+    destroy: () => runtime.destroy(),
+  };
+}
+
+/**
+ * The live surfaces' runtimes by the panel they draw, for the scripts (scripting/panelRuntime.js:
+ * ce.anim.play(scene), seek, effect, swap): a script knows its panel, not the surface showing it.
+ * Preview and the plug-in each register theirs; the last one registered for a panel is the one
+ * that answers, and it leaves when its surface does.
+ */
+const runsByPanel = new Map();
+
+export function registerSceneRun(panelId, run) {
+  if (panelId == null || !run) return () => {};
+  const key = String(panelId);
+  runsByPanel.set(key, run);
+  return () => { if (runsByPanel.get(key) === run) runsByPanel.delete(key); };
+}
+
+export function sceneRunFor(panelId) {
+  return panelId == null ? null : runsByPanel.get(String(panelId)) ?? null;
+}

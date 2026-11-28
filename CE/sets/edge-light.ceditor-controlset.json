@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4991c403",
+  "fingerprint": "1f4e935d",
   "set": {
     "id": "edge-light",
     "name": "Edge Light",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF202A34",
+      "control.readout": "{text.label}",
       "section.surface": "FF192129"
     },
     "lamp": {

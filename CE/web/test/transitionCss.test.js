@@ -16,12 +16,16 @@ import {
   rootTransitionDeclaration,
   colourTransitionVar,
 } from '../src/CE_Application/utils/transitionCss.js';
+import { GRADIENT_EASED_PROPERTIES } from '../src/CE_Application/utils/gradientPaint.js';
 
 const T = '120ms linear 0ms';
 
 test('each bucket lists its properties with the bucket\'s timing, in a fixed order', () => {
   const css = transitionDeclaration({ colour: 'c', transform: 't', opacity: null, size: 's' });
-  assert.equal(css, 'transition:transform t, translate t, rotate t, scale t, left t, top t, width s, height s, background-color c, color c, border-color c, fill c, stroke c;');
+  // The colour list ends with a fill gradient's registered properties (gradientPaint.js), so a
+  // gradient eases with the colours beside it.
+  const gradient = GRADIENT_EASED_PROPERTIES.map((name) => `${name} c`).join(', ');
+  assert.equal(css, `transition:transform t, translate t, rotate t, scale t, left t, top t, width s, height s, background-color c, color c, border-color c, fill c, stroke c, ${gradient};`);
   assert.equal(transitionDeclaration({ transform: null, opacity: null, size: null, colour: null }), '');
   assert.equal(transitionDeclaration(null), '');
 });
@@ -68,9 +72,10 @@ test('showing and hiding a part eases opacity and visibility together', () => {
 });
 
 test('the colour timing travels as an inherited custom property, and is always set', () => {
-  assert.equal(colourTransitionVar(null), '--ce-colour-transition:none;',
+  assert.equal(colourTransitionVar(null), '--ce-colour-transition:none;--ce-colour-timing:0s;',
     'a part with no colour timing must not borrow its control\'s');
-  assert.equal(colourTransitionVar(T), `--ce-colour-transition:${BUCKET_PROPERTIES.part.colour.map((p) => `${p} ${T}`).join(', ')};`);
+  assert.equal(colourTransitionVar(T), `--ce-colour-transition:${BUCKET_PROPERTIES.part.colour.map((p) => `${p} ${T}`).join(', ')};--ce-colour-timing:${T};`,
+    'and the timing alone, for a pattern\'s opacity, size and speed');
   assert.match(colourTransitionVar(T, { svg: true }), /stop-color 120ms/);
 });
 

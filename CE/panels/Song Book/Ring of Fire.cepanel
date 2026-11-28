@@ -1,0 +1,1128 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "499ab466-50e9-4b00-8c5d-499ab466499a",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Ring of Fire",
+  "scriptId": "song_ringoffire",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF0A0503",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Heart.value",
+      "label": "Heart",
+      "controlName": "Heart",
+      "path": "Heart.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Embers","id":"ctrl_1764875494000","controlType":"Label"},
+        "Transform": {"x":110,"y":-50,"width":500,"height":500},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#55FF5A1A"},{"position":60,"color":"#22FF3D00"},{"position":100,"color":"#00FF3D00"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame1","id":"ctrl_1764875494001","controlType":"Label"},
+        "Transform": {"x":344,"y":16,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame2","id":"ctrl_1764875494002","controlType":"Label"},
+        "Transform": {"x":383,"y":22,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame3","id":"ctrl_1764875494003","controlType":"Label"},
+        "Transform": {"x":420,"y":38,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame4","id":"ctrl_1764875494004","controlType":"Label"},
+        "Transform": {"x":450,"y":64,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame5","id":"ctrl_1764875494005","controlType":"Label"},
+        "Transform": {"x":471,"y":98,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame6","id":"ctrl_1764875494006","controlType":"Label"},
+        "Transform": {"x":483,"y":136,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame7","id":"ctrl_1764875494007","controlType":"Label"},
+        "Transform": {"x":483,"y":176,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame8","id":"ctrl_1764875494008","controlType":"Label"},
+        "Transform": {"x":471,"y":214,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame9","id":"ctrl_1764875494009","controlType":"Label"},
+        "Transform": {"x":450,"y":248,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame10","id":"ctrl_1764875494010","controlType":"Label"},
+        "Transform": {"x":420,"y":274,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame11","id":"ctrl_1764875494011","controlType":"Label"},
+        "Transform": {"x":383,"y":290,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame12","id":"ctrl_1764875494012","controlType":"Label"},
+        "Transform": {"x":344,"y":296,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame13","id":"ctrl_1764875494013","controlType":"Label"},
+        "Transform": {"x":305,"y":290,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame14","id":"ctrl_1764875494014","controlType":"Label"},
+        "Transform": {"x":268,"y":274,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame15","id":"ctrl_1764875494015","controlType":"Label"},
+        "Transform": {"x":238,"y":248,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame16","id":"ctrl_1764875494016","controlType":"Label"},
+        "Transform": {"x":217,"y":214,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame17","id":"ctrl_1764875494017","controlType":"Label"},
+        "Transform": {"x":205,"y":176,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame18","id":"ctrl_1764875494018","controlType":"Label"},
+        "Transform": {"x":205,"y":136,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame19","id":"ctrl_1764875494019","controlType":"Label"},
+        "Transform": {"x":217,"y":98,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame20","id":"ctrl_1764875494020","controlType":"Label"},
+        "Transform": {"x":238,"y":64,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame21","id":"ctrl_1764875494021","controlType":"Label"},
+        "Transform": {"x":268,"y":38,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Flame22","id":"ctrl_1764875494022","controlType":"Label"},
+        "Transform": {"x":305,"y":22,"width":32,"height":48},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2260%22%20viewBox%3D%220%200%2040%2060%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22f%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff3d00%22%2F%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23ff9800%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffe082%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2058%20C%204%2050%202%2034%2012%2022%20C%2014%2030%2018%2032%2020%2030%20C%2016%2018%2022%208%2028%202%20C%2028%2014%2038%2022%2038%2036%20C%2038%2050%2030%2058%2020%2058%20Z%22%20fill%3D%22url(%23f)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Heart","id":"ctrl_1764875494023","controlType":"Knob"},
+        "Transform": {"x":300,"y":120,"width":120,"height":120},
+        "Behavior": {"defaultValue":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1764875494024","controlType":"Label"},
+        "Transform": {"y":340,"width":720,"height":50},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RING OF FIRE","_children":{"Fill":{"colour":"FFFFB347"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":32,"letterSpacing":10}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":14,"spread":1,"colour":"FFFF5A1A"}]}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_ringoffire",
+      "name": "Burning",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 5600,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_ringoffire_1",
+          "controlId": "ctrl_1764875494001",
+          "target": "Transform",
+          "start": 0,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_2",
+          "controlId": "ctrl_1764875494002",
+          "target": "Transform",
+          "start": 60,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_3",
+          "controlId": "ctrl_1764875494003",
+          "target": "Transform",
+          "start": 120,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_4",
+          "controlId": "ctrl_1764875494004",
+          "target": "Transform",
+          "start": 180,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_5",
+          "controlId": "ctrl_1764875494005",
+          "target": "Transform",
+          "start": 240,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_6",
+          "controlId": "ctrl_1764875494006",
+          "target": "Transform",
+          "start": 300,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_7",
+          "controlId": "ctrl_1764875494007",
+          "target": "Transform",
+          "start": 360,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_8",
+          "controlId": "ctrl_1764875494008",
+          "target": "Transform",
+          "start": 420,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_9",
+          "controlId": "ctrl_1764875494009",
+          "target": "Transform",
+          "start": 480,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_10",
+          "controlId": "ctrl_1764875494010",
+          "target": "Transform",
+          "start": 540,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_11",
+          "controlId": "ctrl_1764875494011",
+          "target": "Transform",
+          "start": 600,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_12",
+          "controlId": "ctrl_1764875494012",
+          "target": "Transform",
+          "start": 660,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_13",
+          "controlId": "ctrl_1764875494013",
+          "target": "Transform",
+          "start": 720,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_14",
+          "controlId": "ctrl_1764875494014",
+          "target": "Transform",
+          "start": 780,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_15",
+          "controlId": "ctrl_1764875494015",
+          "target": "Transform",
+          "start": 840,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_16",
+          "controlId": "ctrl_1764875494016",
+          "target": "Transform",
+          "start": 900,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_17",
+          "controlId": "ctrl_1764875494017",
+          "target": "Transform",
+          "start": 960,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_18",
+          "controlId": "ctrl_1764875494018",
+          "target": "Transform",
+          "start": 1020,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_19",
+          "controlId": "ctrl_1764875494019",
+          "target": "Transform",
+          "start": 1080,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_20",
+          "controlId": "ctrl_1764875494020",
+          "target": "Transform",
+          "start": 1140,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_21",
+          "controlId": "ctrl_1764875494021",
+          "target": "Transform",
+          "start": 1200,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_22",
+          "controlId": "ctrl_1764875494022",
+          "target": "Transform",
+          "start": 1260,
+          "length": 1320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 4,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.45,
+                "opacity": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.85,
+                "opacity": 0.75
+              },
+              {
+                "at": 1,
+                "scale": 0.85,
+                "opacity": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_23",
+          "controlId": "ctrl_1764875494023",
+          "target": "Value",
+          "start": 0,
+          "length": 2640,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1,
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_24",
+          "controlId": "ctrl_1764875494023",
+          "target": "Value",
+          "start": 2640,
+          "length": 2640,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1,
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_ringoffire_25",
+          "controlId": "ctrl_1764875494024",
+          "target": "Text",
+          "start": 400,
+          "length": 1300,
+          "effect": {
+            "kind": "text",
+            "effect": "shimmer",
+            "way": "in",
+            "iterations": 1,
+            "colour": "FFFFFFFF",
+            "stagger": 60,
+            "duration": 600
+          }
+        }
+      ]
+    }
+  ]
+}

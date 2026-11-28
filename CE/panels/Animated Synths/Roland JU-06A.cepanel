@@ -1,0 +1,3969 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "70cd480a-5e17-4a0c-b6d2-70cd480a70cd",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Roland JU-06A",
+  "scriptId": "synth_roland-ju-06a",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1200,
+  "height": 600,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF2A2C2F",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [
+    {
+      "role": "Roland JU-06A",
+      "profileId": "roland-ju-06a",
+      "version": "*"
+    }
+  ],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "LfoRate.value",
+      "label": "LfoRate",
+      "controlName": "LfoRate",
+      "path": "LfoRate.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 70,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "lfo.rate"
+    },
+    {
+      "id": "LfoDelay.value",
+      "label": "LfoDelay",
+      "controlName": "LfoDelay",
+      "path": "LfoDelay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 38,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "lfo.delay"
+    },
+    {
+      "id": "DcoLfo.value",
+      "label": "DcoLfo",
+      "controlName": "DcoLfo",
+      "path": "DcoLfo.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 24,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "dco.lfo"
+    },
+    {
+      "id": "DcoPwm.value",
+      "label": "DcoPwm",
+      "controlName": "DcoPwm",
+      "path": "DcoPwm.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 52,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "dco.pwm"
+    },
+    {
+      "id": "DcoSub.value",
+      "label": "DcoSub",
+      "controlName": "DcoSub",
+      "path": "DcoSub.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 76,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "dco.sub"
+    },
+    {
+      "id": "DcoNoise.value",
+      "label": "DcoNoise",
+      "controlName": "DcoNoise",
+      "path": "DcoNoise.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 12,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "dco.noise"
+    },
+    {
+      "id": "HpfFreq.value",
+      "label": "HpfFreq",
+      "controlName": "HpfFreq",
+      "path": "HpfFreq.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 20,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "hpf.freq"
+    },
+    {
+      "id": "VcfFreq.value",
+      "label": "VcfFreq",
+      "controlName": "VcfFreq",
+      "path": "VcfFreq.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 72,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vcf.freq"
+    },
+    {
+      "id": "VcfRes.value",
+      "label": "VcfRes",
+      "controlName": "VcfRes",
+      "path": "VcfRes.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 44,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vcf.res"
+    },
+    {
+      "id": "VcfEnv.value",
+      "label": "VcfEnv",
+      "controlName": "VcfEnv",
+      "path": "VcfEnv.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vcf.env"
+    },
+    {
+      "id": "VcfLfo.value",
+      "label": "VcfLfo",
+      "controlName": "VcfLfo",
+      "path": "VcfLfo.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 14,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vcf.lfo"
+    },
+    {
+      "id": "VcfKybd.value",
+      "label": "VcfKybd",
+      "controlName": "VcfKybd",
+      "path": "VcfKybd.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 76,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vcf.kybd"
+    },
+    {
+      "id": "VcaLevel.value",
+      "label": "VcaLevel",
+      "controlName": "VcaLevel",
+      "path": "VcaLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 90,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "vca.level"
+    },
+    {
+      "id": "EnvA.value",
+      "label": "EnvA",
+      "controlName": "EnvA",
+      "path": "EnvA.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 12,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "env.a"
+    },
+    {
+      "id": "EnvD.value",
+      "label": "EnvD",
+      "controlName": "EnvD",
+      "path": "EnvD.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 58,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "env.d"
+    },
+    {
+      "id": "EnvS.value",
+      "label": "EnvS",
+      "controlName": "EnvS",
+      "path": "EnvS.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 76,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "env.s"
+    },
+    {
+      "id": "EnvR.value",
+      "label": "EnvR",
+      "controlName": "EnvR",
+      "path": "EnvR.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 44,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "env.r"
+    },
+    {
+      "id": "Portamento.value",
+      "label": "Portamento",
+      "controlName": "Portamento",
+      "path": "Portamento.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "performance.portamentoTime"
+    },
+    {
+      "id": "Modulation.value",
+      "label": "Modulation",
+      "controlName": "Modulation",
+      "path": "Modulation.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "performance.modulation"
+    },
+    {
+      "id": "Chorus.value",
+      "label": "Chorus",
+      "controlName": "Chorus",
+      "path": "Chorus.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "chorus.offIIiIIi"
+    },
+    {
+      "id": "DelayTime.value",
+      "label": "DelayTime",
+      "controlName": "DelayTime",
+      "path": "DelayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 52,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "delay.time"
+    },
+    {
+      "id": "DelayFeedback.value",
+      "label": "DelayFeedback",
+      "controlName": "DelayFeedback",
+      "path": "DelayFeedback.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 70,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "delay.feedback"
+    },
+    {
+      "id": "DelayLevel.value",
+      "label": "DelayLevel",
+      "controlName": "DelayLevel",
+      "path": "DelayLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 88,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland JU-06A",
+      "deviceParameterId": "delay.level"
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "bakelite"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Stripe","id":"ctrl_1702501514000","controlType":"Label"},
+        "Transform": {"width":1200,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FFE8762B"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Model","id":"ctrl_1702501514001","controlType":"Label"},
+        "Transform": {"x":40,"y":22,"width":200,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"JU-06A","_children":{"Fill":{"colour":"FFF2F0EA"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":800,"size":20,"letterSpacing":3},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kind","id":"ctrl_1702501514002","controlType":"Label"},
+        "Transform": {"x":880,"y":27,"width":280,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SOUND MODULE","_children":{"Fill":{"colour":"FF9A9EA4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":11,"letterSpacing":2},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoFrame","id":"ctrl_1702501514003","controlType":"Label"},
+        "Transform": {"x":30,"y":66,"width":110,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22110%22%20height%3D%22230%22%20viewBox%3D%220%200%20110%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22109%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoTitle","id":"ctrl_1702501514004","controlType":"Label"},
+        "Transform": {"x":40,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoRate","id":"ctrl_1702501514005","description":"LFO RATE — cc3","controlType":"Slider"},
+        "Transform": {"x":50,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":70,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"lfo.rate","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoRateName","id":"ctrl_1702501514006","attachedTo":"ctrl_1702501514005","controlType":"Label"},
+        "Transform": {"x":34,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RATE","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoDelay","id":"ctrl_1702501514007","description":"LFO DELAY — cc9","controlType":"Slider"},
+        "Transform": {"x":92,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":38,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"lfo.delay","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LfoDelayName","id":"ctrl_1702501514008","attachedTo":"ctrl_1702501514007","controlType":"Label"},
+        "Transform": {"x":76,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DELAY","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoFrame","id":"ctrl_1702501514009","controlType":"Label"},
+        "Transform": {"x":154,"y":66,"width":196,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22196%22%20height%3D%22230%22%20viewBox%3D%220%200%20196%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22195%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoTitle","id":"ctrl_1702501514010","controlType":"Label"},
+        "Transform": {"x":164,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"DCO","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoLfo","id":"ctrl_1702501514011","description":"DCO LFO — cc13","controlType":"Slider"},
+        "Transform": {"x":172,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":24,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"dco.lfo","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoLfoName","id":"ctrl_1702501514012","attachedTo":"ctrl_1702501514011","controlType":"Label"},
+        "Transform": {"x":156,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoPwm","id":"ctrl_1702501514013","description":"DCO PWM — cc14","controlType":"Slider"},
+        "Transform": {"x":214,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":52,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"dco.pwm","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoPwmName","id":"ctrl_1702501514014","attachedTo":"ctrl_1702501514013","controlType":"Label"},
+        "Transform": {"x":198,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PWM","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoSub","id":"ctrl_1702501514015","description":"DCO SUB — cc18","controlType":"Slider"},
+        "Transform": {"x":256,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":76,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"dco.sub","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoSubName","id":"ctrl_1702501514016","attachedTo":"ctrl_1702501514015","controlType":"Label"},
+        "Transform": {"x":240,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SUB","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoNoise","id":"ctrl_1702501514017","description":"DCO NOISE — cc19","controlType":"Slider"},
+        "Transform": {"x":298,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":12,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"dco.noise","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DcoNoiseName","id":"ctrl_1702501514018","attachedTo":"ctrl_1702501514017","controlType":"Label"},
+        "Transform": {"x":282,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"NOISE","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HpfFrame","id":"ctrl_1702501514019","controlType":"Label"},
+        "Transform": {"x":364,"y":66,"width":70,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2270%22%20height%3D%22230%22%20viewBox%3D%220%200%2070%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%2269%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HpfTitle","id":"ctrl_1702501514020","controlType":"Label"},
+        "Transform": {"x":374,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"HPF","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HpfFreq","id":"ctrl_1702501514021","description":"HPF FREQ — cc20","controlType":"Slider"},
+        "Transform": {"x":385,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":20,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"hpf.freq","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HpfFreqName","id":"ctrl_1702501514022","attachedTo":"ctrl_1702501514021","controlType":"Label"},
+        "Transform": {"x":369,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FREQ","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfFrame","id":"ctrl_1702501514023","controlType":"Label"},
+        "Transform": {"x":448,"y":66,"width":250,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22250%22%20height%3D%22230%22%20viewBox%3D%220%200%20250%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22249%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfTitle","id":"ctrl_1702501514024","controlType":"Label"},
+        "Transform": {"x":458,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCF","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfFreq","id":"ctrl_1702501514025","description":"VCF FREQ — cc74","controlType":"Slider"},
+        "Transform": {"x":466,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":72,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vcf.freq","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfFreqName","id":"ctrl_1702501514026","attachedTo":"ctrl_1702501514025","controlType":"Label"},
+        "Transform": {"x":450,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FREQ","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfRes","id":"ctrl_1702501514027","description":"VCF RES — cc71","controlType":"Slider"},
+        "Transform": {"x":512,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":44,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vcf.res","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfResName","id":"ctrl_1702501514028","attachedTo":"ctrl_1702501514027","controlType":"Label"},
+        "Transform": {"x":496,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"RES","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfEnv","id":"ctrl_1702501514029","description":"VCF ENV — cc22","controlType":"Slider"},
+        "Transform": {"x":558,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":64,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vcf.env","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfEnvName","id":"ctrl_1702501514030","attachedTo":"ctrl_1702501514029","controlType":"Label"},
+        "Transform": {"x":542,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ENV","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfLfo","id":"ctrl_1702501514031","description":"VCF LFO — cc23","controlType":"Slider"},
+        "Transform": {"x":604,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":14,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vcf.lfo","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfLfoName","id":"ctrl_1702501514032","attachedTo":"ctrl_1702501514031","controlType":"Label"},
+        "Transform": {"x":588,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LFO","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfKybd","id":"ctrl_1702501514033","description":"VCF KYBD — cc24","controlType":"Slider"},
+        "Transform": {"x":650,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":76,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vcf.kybd","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcfKybdName","id":"ctrl_1702501514034","attachedTo":"ctrl_1702501514033","controlType":"Label"},
+        "Transform": {"x":634,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KYBD","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcaFrame","id":"ctrl_1702501514035","controlType":"Label"},
+        "Transform": {"x":712,"y":66,"width":80,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%22230%22%20viewBox%3D%220%200%2080%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%2279%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcaTitle","id":"ctrl_1702501514036","controlType":"Label"},
+        "Transform": {"x":722,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"VCA","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcaLevel","id":"ctrl_1702501514037","description":"VCA LEVEL — cc26","controlType":"Slider"},
+        "Transform": {"x":738,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":90,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"vca.level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VcaLevelName","id":"ctrl_1702501514038","attachedTo":"ctrl_1702501514037","controlType":"Label"},
+        "Transform": {"x":722,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVEL","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvFrame","id":"ctrl_1702501514039","controlType":"Label"},
+        "Transform": {"x":806,"y":66,"width":230,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22230%22%20height%3D%22230%22%20viewBox%3D%220%200%20230%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22229%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvTitle","id":"ctrl_1702501514040","controlType":"Label"},
+        "Transform": {"x":816,"y":57,"width":48,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"ENV","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvA","id":"ctrl_1702501514041","description":"ENV A — cc73","controlType":"Slider"},
+        "Transform": {"x":832,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":12,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"env.a","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvAName","id":"ctrl_1702501514042","attachedTo":"ctrl_1702501514041","controlType":"Label"},
+        "Transform": {"x":816,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvD","id":"ctrl_1702501514043","description":"ENV D — cc75","controlType":"Slider"},
+        "Transform": {"x":882,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":58,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"env.d","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvDName","id":"ctrl_1702501514044","attachedTo":"ctrl_1702501514043","controlType":"Label"},
+        "Transform": {"x":866,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvS","id":"ctrl_1702501514045","description":"ENV S — cc27","controlType":"Slider"},
+        "Transform": {"x":932,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":76,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"env.s","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvSName","id":"ctrl_1702501514046","attachedTo":"ctrl_1702501514045","controlType":"Label"},
+        "Transform": {"x":916,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"S","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvR","id":"ctrl_1702501514047","description":"ENV R — cc72","controlType":"Slider"},
+        "Transform": {"x":982,"y":92,"width":28,"height":130},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"btt","max":127,"defaultCurrentValue":44,"showTicks":false,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"env.r","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"EnvRName","id":"ctrl_1702501514048","attachedTo":"ctrl_1702501514047","controlType":"Label"},
+        "Transform": {"x":966,"y":226,"width":60,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"R","_children":{"Fill":{"colour":"FFD6D6D2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PerfFrame","id":"ctrl_1702501514049","controlType":"Label"},
+        "Transform": {"x":1050,"y":66,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22230%22%20viewBox%3D%220%200%20120%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22119%22%20height%3D%22229%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PerfTitle","id":"ctrl_1702501514050","controlType":"Label"},
+        "Transform": {"x":1060,"y":57,"width":127,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Portamento","id":"ctrl_1702501514051","description":"PORTAMENTO TIME — cc5","controlType":"Knob"},
+        "Transform": {"x":1090,"y":110,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"performance.portamentoTime","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PortamentoName","id":"ctrl_1702501514052","attachedTo":"ctrl_1702501514051","controlType":"Label"},
+        "Transform": {"x":1062,"y":154,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PORTA TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Modulation","id":"ctrl_1702501514053","description":"MODULATION — cc1","controlType":"Knob"},
+        "Transform": {"x":1090,"y":210,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"performance.modulation","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulationName","id":"ctrl_1702501514054","attachedTo":"ctrl_1702501514053","controlType":"Label"},
+        "Transform": {"x":1062,"y":254,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MODULATION","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChorusFrame","id":"ctrl_1702501514055","controlType":"Label"},
+        "Transform": {"x":30,"y":318,"width":330,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22330%22%20height%3D%2296%22%20viewBox%3D%220%200%20330%2096%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22329%22%20height%3D%2295%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChorusTitle","id":"ctrl_1702501514056","controlType":"Label"},
+        "Transform": {"x":40,"y":309,"width":78,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHORUS","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BandSlow","id":"ctrl_1702501514057","controlType":"Label"},
+        "Transform": {"x":44,"y":334,"width":220,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":4},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FF7FC8FF","opacity":75,"blend":"normal","scale":1.4,"repeat":"x","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":14,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BandFast","id":"ctrl_1702501514058","controlType":"Label"},
+        "Transform": {"x":44,"y":364,"width":220,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Corners":{"radius":4},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FFC79BFF","opacity":65,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":44,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chorus","id":"ctrl_1702501514059","description":"CHORUS OFF / I / II / I+II — cc93","controlType":"Knob"},
+        "Transform": {"x":290,"y":340,"width":40,"height":40},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"chorus.offIIiIIi","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChorusName","id":"ctrl_1702501514060","attachedTo":"ctrl_1702501514059","controlType":"Label"},
+        "Transform": {"x":262,"y":384,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHORUS","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayFrame","id":"ctrl_1702501514061","controlType":"Label"},
+        "Transform": {"x":374,"y":318,"width":400,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%2296%22%20viewBox%3D%220%200%20400%2096%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22399%22%20height%3D%2295%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayTitle","id":"ctrl_1702501514062","controlType":"Label"},
+        "Transform": {"x":384,"y":309,"width":68,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"DELAY","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Echo1","id":"ctrl_1702501514063","controlType":"Label"},
+        "Transform": {"x":392,"y":342,"width":16,"height":44},
+        "Background": {"_children":{"Fill":{"colour":"FF7A5A38"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Echo2","id":"ctrl_1702501514064","controlType":"Label"},
+        "Transform": {"x":392,"y":348,"width":16,"height":38},
+        "Background": {"_children":{"Fill":{"colour":"FF7A5A38"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Echo3","id":"ctrl_1702501514065","controlType":"Label"},
+        "Transform": {"x":392,"y":354,"width":16},
+        "Background": {"_children":{"Fill":{"colour":"FF7A5A38"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Echo4","id":"ctrl_1702501514066","controlType":"Label"},
+        "Transform": {"x":392,"y":360,"width":16,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF7A5A38"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Echo5","id":"ctrl_1702501514067","controlType":"Label"},
+        "Transform": {"x":392,"y":366,"width":16,"height":20},
+        "Background": {"_children":{"Fill":{"colour":"FF7A5A38"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayVeil","id":"ctrl_1702501514068","controlType":"Label"},
+        "Transform": {"x":386,"y":330,"width":210,"height":70},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayNote","id":"ctrl_1702501514069","controlType":"Label"},
+        "Transform": {"x":392,"y":390,"width":190,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ECHOES OF EACH NOTE","_children":{"Fill":{"colour":"FF9A9EA4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayTime","id":"ctrl_1702501514070","description":"DELAY TIME — cc82","controlType":"Knob"},
+        "Transform": {"x":610,"y":342,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":52,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"delay.time","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayTimeName","id":"ctrl_1702501514071","attachedTo":"ctrl_1702501514070","controlType":"Label"},
+        "Transform": {"x":580,"y":382,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TIME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayFeedback","id":"ctrl_1702501514072","description":"DELAY FEEDBACK — cc83","controlType":"Knob"},
+        "Transform": {"x":664,"y":342,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":70,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"delay.feedback","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayFeedbackName","id":"ctrl_1702501514073","attachedTo":"ctrl_1702501514072","controlType":"Label"},
+        "Transform": {"x":634,"y":382,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FEEDBACK","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayLevel","id":"ctrl_1702501514074","description":"DELAY LEVEL — cc91","controlType":"Knob"},
+        "Transform": {"x":718,"y":342,"width":36,"height":36},
+        "Behavior": {"valueType":"int","max":127,"defaultCurrentValue":88,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Roland JU-06A","parameterId":"delay.level","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DelayLevelName","id":"ctrl_1702501514075","attachedTo":"ctrl_1702501514074","controlType":"Label"},
+        "Transform": {"x":688,"y":382,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVEL","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TempoFrame","id":"ctrl_1702501514076","controlType":"Label"},
+        "Transform": {"x":788,"y":318,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2296%22%20viewBox%3D%220%200%20120%2096%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22119%22%20height%3D%2295%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TempoTitle","id":"ctrl_1702501514077","controlType":"Label"},
+        "Transform": {"x":798,"y":309,"width":68,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"TEMPO","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TempoRing","id":"ctrl_1702501514078","controlType":"Label"},
+        "Transform": {"x":830,"y":338,"width":36,"height":36,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2236%22%20height%3D%2236%22%20viewBox%3D%220%200%2036%2036%22%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2218%22%20r%3D%2217%22%20fill%3D%22none%22%20stroke%3D%22%23FF5A3C%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TempoLamp","id":"ctrl_1702501514079","controlType":"Label"},
+        "Transform": {"x":840,"y":348,"width":16,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"FF4A1E16"},"Border":{"enabled":false},"Corners":{"radius":8}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TempoName","id":"ctrl_1702501514080","controlType":"Label"},
+        "Transform": {"x":800,"y":386,"width":96,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ON THE BEAT","_children":{"Fill":{"colour":"FF9A9EA4"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotesFrame","id":"ctrl_1702501514081","controlType":"Label"},
+        "Transform": {"x":922,"y":318,"width":248,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22248%22%20height%3D%2296%22%20viewBox%3D%220%200%20248%2096%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22247%22%20height%3D%2295%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotesTitle","id":"ctrl_1702501514082","controlType":"Label"},
+        "Transform": {"x":932,"y":309,"width":97,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF2A2C2F"},"Border":{"enabled":false}}},
+        "Text": {"content":"NOTES IN","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NotesSay","id":"ctrl_1702501514083","controlType":"Label"},
+        "Transform": {"x":934,"y":338,"width":224,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"play the JU-06A, a keyboard or the DAW: each key lights while it is held","_children":{"Fill":{"colour":"FFB4B8BE"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":500,"size":10},"Multiline":{"lineHeight":1.35}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC3","id":"ctrl_1702501514084","controlType":"Label"},
+        "Transform": {"x":31,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC3Name","id":"ctrl_1702501514085","controlType":"Label"},
+        "Transform": {"x":31,"y":556,"width":74,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"C3","_children":{"Fill":{"colour":"FF77777A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD3","id":"ctrl_1702501514086","controlType":"Label"},
+        "Transform": {"x":107,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE3","id":"ctrl_1702501514087","controlType":"Label"},
+        "Transform": {"x":183,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF3","id":"ctrl_1702501514088","controlType":"Label"},
+        "Transform": {"x":259,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG3","id":"ctrl_1702501514089","controlType":"Label"},
+        "Transform": {"x":335,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA3","id":"ctrl_1702501514090","controlType":"Label"},
+        "Transform": {"x":411,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB3","id":"ctrl_1702501514091","controlType":"Label"},
+        "Transform": {"x":487,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC4","id":"ctrl_1702501514092","controlType":"Label"},
+        "Transform": {"x":563,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC4Name","id":"ctrl_1702501514093","controlType":"Label"},
+        "Transform": {"x":563,"y":556,"width":74,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"C4","_children":{"Fill":{"colour":"FF77777A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD4","id":"ctrl_1702501514094","controlType":"Label"},
+        "Transform": {"x":639,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE4","id":"ctrl_1702501514095","controlType":"Label"},
+        "Transform": {"x":715,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF4","id":"ctrl_1702501514096","controlType":"Label"},
+        "Transform": {"x":791,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG4","id":"ctrl_1702501514097","controlType":"Label"},
+        "Transform": {"x":867,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA4","id":"ctrl_1702501514098","controlType":"Label"},
+        "Transform": {"x":943,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB4","id":"ctrl_1702501514099","controlType":"Label"},
+        "Transform": {"x":1019,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC5","id":"ctrl_1702501514100","controlType":"Label"},
+        "Transform": {"x":1095,"y":440,"width":74,"height":140},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC5Name","id":"ctrl_1702501514101","controlType":"Label"},
+        "Transform": {"x":1095,"y":556,"width":74,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"C5","_children":{"Fill":{"colour":"FF77777A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#3","id":"ctrl_1702501514102","controlType":"Label"},
+        "Transform": {"x":82,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#3","id":"ctrl_1702501514103","controlType":"Label"},
+        "Transform": {"x":158,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#3","id":"ctrl_1702501514104","controlType":"Label"},
+        "Transform": {"x":310,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#3","id":"ctrl_1702501514105","controlType":"Label"},
+        "Transform": {"x":386,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#3","id":"ctrl_1702501514106","controlType":"Label"},
+        "Transform": {"x":462,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#4","id":"ctrl_1702501514107","controlType":"Label"},
+        "Transform": {"x":614,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#4","id":"ctrl_1702501514108","controlType":"Label"},
+        "Transform": {"x":690,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#4","id":"ctrl_1702501514109","controlType":"Label"},
+        "Transform": {"x":842,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#4","id":"ctrl_1702501514110","controlType":"Label"},
+        "Transform": {"x":918,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#4","id":"ctrl_1702501514111","controlType":"Label"},
+        "Transform": {"x":994,"y":440,"width":49,"height":86},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_roland-ju-06a",
+      "name": "Chorus",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_1",
+          "controlId": "ctrl_1702501514057",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_2",
+          "controlId": "ctrl_1702501514058",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1702501514059",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_roland-ju-06a_2",
+      "name": "Delay time",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_3",
+          "controlId": "ctrl_1702501514063",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0
+              },
+              {
+                "at": 1,
+                "x": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_4",
+          "controlId": "ctrl_1702501514064",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 12
+              },
+              {
+                "at": 1,
+                "x": 38
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_5",
+          "controlId": "ctrl_1702501514065",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 24
+              },
+              {
+                "at": 1,
+                "x": 76
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_6",
+          "controlId": "ctrl_1702501514066",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 36
+              },
+              {
+                "at": 1,
+                "x": 114
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_7",
+          "controlId": "ctrl_1702501514067",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 48
+              },
+              {
+                "at": 1,
+                "x": 152
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1702501514070",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_roland-ju-06a_3",
+      "name": "Delay feedback",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_8",
+          "controlId": "ctrl_1702501514063",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_9",
+          "controlId": "ctrl_1702501514064",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.08,
+                "opacity": 0
+              },
+              {
+                "at": 0.2,
+                "opacity": 0.84
+              },
+              {
+                "at": 1,
+                "opacity": 0.84
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_10",
+          "controlId": "ctrl_1702501514065",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.27999999999999997,
+                "opacity": 0
+              },
+              {
+                "at": 0.4,
+                "opacity": 0.68
+              },
+              {
+                "at": 1,
+                "opacity": 0.68
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_11",
+          "controlId": "ctrl_1702501514066",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.48,
+                "opacity": 0
+              },
+              {
+                "at": 0.6,
+                "opacity": 0.52
+              },
+              {
+                "at": 1,
+                "opacity": 0.52
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_12",
+          "controlId": "ctrl_1702501514067",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.6799999999999999,
+                "opacity": 0
+              },
+              {
+                "at": 0.8,
+                "opacity": 0.36
+              },
+              {
+                "at": 1,
+                "opacity": 0.36
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1702501514072",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_roland-ju-06a_4",
+      "name": "Delay level",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_13",
+          "controlId": "ctrl_1702501514068",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0.94
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1702501514074",
+        "span": 130,
+        "direction": "up",
+        "follow": "smooth",
+        "release": "stay"
+      }
+    },
+    {
+      "id": "sc_roland-ju-06a_5",
+      "name": "Echoes",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": -1
+      },
+      "length": 1020,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_14",
+          "controlId": "ctrl_1702501514063",
+          "target": "Transform",
+          "start": 0,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              },
+              {
+                "at": 0.12,
+                "scale": 1.25,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_15",
+          "controlId": "ctrl_1702501514064",
+          "target": "Transform",
+          "start": 150,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              },
+              {
+                "at": 0.12,
+                "scale": 1.25,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_16",
+          "controlId": "ctrl_1702501514065",
+          "target": "Transform",
+          "start": 300,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              },
+              {
+                "at": 0.12,
+                "scale": 1.25,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_17",
+          "controlId": "ctrl_1702501514066",
+          "target": "Transform",
+          "start": 450,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              },
+              {
+                "at": 0.12,
+                "scale": 1.25,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_18",
+          "controlId": "ctrl_1702501514067",
+          "target": "Transform",
+          "start": 600,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              },
+              {
+                "at": 0.12,
+                "scale": 1.25,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "fill": "FF7A5A38"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_6",
+      "name": "Beat",
+      "trigger": {
+        "type": "beat",
+        "every": 1
+      },
+      "length": 420,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_19",
+          "controlId": "ctrl_1702501514079",
+          "target": "Transform",
+          "start": 0,
+          "length": 320,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF5A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF4A1E16"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_roland-ju-06a_20",
+          "controlId": "ctrl_1702501514078",
+          "target": "Transform",
+          "start": 0,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.5,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1.3,
+                "opacity": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_7",
+      "name": "Key C3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 48
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_21",
+          "controlId": "ctrl_1702501514084",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_8",
+      "name": "Key C3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 48
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_22",
+          "controlId": "ctrl_1702501514084",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_9",
+      "name": "Key C#3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 49
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_23",
+          "controlId": "ctrl_1702501514102",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_10",
+      "name": "Key C#3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 49
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_24",
+          "controlId": "ctrl_1702501514102",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_11",
+      "name": "Key D3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 50
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_25",
+          "controlId": "ctrl_1702501514086",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_12",
+      "name": "Key D3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 50
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_26",
+          "controlId": "ctrl_1702501514086",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_13",
+      "name": "Key D#3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 51
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_27",
+          "controlId": "ctrl_1702501514103",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_14",
+      "name": "Key D#3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 51
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_28",
+          "controlId": "ctrl_1702501514103",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_15",
+      "name": "Key E3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 52
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_29",
+          "controlId": "ctrl_1702501514087",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_16",
+      "name": "Key E3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 52
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_30",
+          "controlId": "ctrl_1702501514087",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_17",
+      "name": "Key F3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 53
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_31",
+          "controlId": "ctrl_1702501514088",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_18",
+      "name": "Key F3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 53
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_32",
+          "controlId": "ctrl_1702501514088",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_19",
+      "name": "Key F#3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 54
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_33",
+          "controlId": "ctrl_1702501514104",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_20",
+      "name": "Key F#3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 54
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_34",
+          "controlId": "ctrl_1702501514104",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_21",
+      "name": "Key G3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 55
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_35",
+          "controlId": "ctrl_1702501514089",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_22",
+      "name": "Key G3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 55
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_36",
+          "controlId": "ctrl_1702501514089",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_23",
+      "name": "Key G#3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 56
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_37",
+          "controlId": "ctrl_1702501514105",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_24",
+      "name": "Key G#3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 56
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_38",
+          "controlId": "ctrl_1702501514105",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_25",
+      "name": "Key A3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 57
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_39",
+          "controlId": "ctrl_1702501514090",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_26",
+      "name": "Key A3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 57
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_40",
+          "controlId": "ctrl_1702501514090",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_27",
+      "name": "Key A#3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 58
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_41",
+          "controlId": "ctrl_1702501514106",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_28",
+      "name": "Key A#3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 58
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_42",
+          "controlId": "ctrl_1702501514106",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_29",
+      "name": "Key B3",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 59
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_43",
+          "controlId": "ctrl_1702501514091",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_30",
+      "name": "Key B3 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 59
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_44",
+          "controlId": "ctrl_1702501514091",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_31",
+      "name": "Key C4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 60
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_45",
+          "controlId": "ctrl_1702501514092",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_32",
+      "name": "Key C4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 60
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_46",
+          "controlId": "ctrl_1702501514092",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_33",
+      "name": "Key C#4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 61
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_47",
+          "controlId": "ctrl_1702501514107",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_34",
+      "name": "Key C#4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 61
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_48",
+          "controlId": "ctrl_1702501514107",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_35",
+      "name": "Key D4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 62
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_49",
+          "controlId": "ctrl_1702501514094",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_36",
+      "name": "Key D4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 62
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_50",
+          "controlId": "ctrl_1702501514094",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_37",
+      "name": "Key D#4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 63
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_51",
+          "controlId": "ctrl_1702501514108",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_38",
+      "name": "Key D#4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 63
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_52",
+          "controlId": "ctrl_1702501514108",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_39",
+      "name": "Key E4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 64
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_53",
+          "controlId": "ctrl_1702501514095",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_40",
+      "name": "Key E4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 64
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_54",
+          "controlId": "ctrl_1702501514095",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_41",
+      "name": "Key F4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 65
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_55",
+          "controlId": "ctrl_1702501514096",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_42",
+      "name": "Key F4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 65
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_56",
+          "controlId": "ctrl_1702501514096",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_43",
+      "name": "Key F#4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 66
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_57",
+          "controlId": "ctrl_1702501514109",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_44",
+      "name": "Key F#4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 66
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_58",
+          "controlId": "ctrl_1702501514109",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_45",
+      "name": "Key G4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 67
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_59",
+          "controlId": "ctrl_1702501514097",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_46",
+      "name": "Key G4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 67
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_60",
+          "controlId": "ctrl_1702501514097",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_47",
+      "name": "Key G#4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 68
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_61",
+          "controlId": "ctrl_1702501514110",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_48",
+      "name": "Key G#4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 68
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_62",
+          "controlId": "ctrl_1702501514110",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_49",
+      "name": "Key A4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 69
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_63",
+          "controlId": "ctrl_1702501514098",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_50",
+      "name": "Key A4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 69
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_64",
+          "controlId": "ctrl_1702501514098",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_51",
+      "name": "Key A#4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 70
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_65",
+          "controlId": "ctrl_1702501514111",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FFFF9A3C"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_52",
+      "name": "Key A#4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 70
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_66",
+          "controlId": "ctrl_1702501514111",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFF9A3C"
+              },
+              {
+                "at": 1,
+                "fill": "FF1B1C1E"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_53",
+      "name": "Key B4",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 71
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_67",
+          "controlId": "ctrl_1702501514099",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_54",
+      "name": "Key B4 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 71
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_68",
+          "controlId": "ctrl_1702501514099",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_55",
+      "name": "Key C5",
+      "trigger": {
+        "type": "midi",
+        "message": "note",
+        "channel": 0,
+        "note": 72
+      },
+      "length": 100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_69",
+          "controlId": "ctrl_1702501514100",
+          "target": "Transform",
+          "start": 0,
+          "length": 40,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFFFC98A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_roland-ju-06a_56",
+      "name": "Key C5 let go",
+      "trigger": {
+        "type": "midi",
+        "message": "noteOff",
+        "channel": 0,
+        "note": 72
+      },
+      "length": 220,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_roland-ju-06a_70",
+          "controlId": "ctrl_1702501514100",
+          "target": "Transform",
+          "start": 0,
+          "length": 220,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFC98A"
+              },
+              {
+                "at": 1,
+                "fill": "FFE9E7E2"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

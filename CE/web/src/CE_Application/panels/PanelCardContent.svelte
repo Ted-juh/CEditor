@@ -10,6 +10,8 @@
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import { panelLoopSummary, panelLoopLines, showNextLoop } from '../stores/loopBudgetStore.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import LayerEffectsSection from './LayerEffectsSection.svelte';
@@ -1125,6 +1127,30 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- What the panel keeps moving (utils/loopBudget.js), said here because it is the plug-in that pays
+         for it, in every window that is open. The owner's budget is ten; above it this says so and the
+         plug-in still builds. And the one setting that makes moving patterns lighter. -->
+    <PropertySection title="Animation" icon={Repeat}>
+      <PropertyCell label="Patterns at 30 fps" span={4}
+                    hint="Moving patterns step 30 times a second in the plug-in instead of every frame the screen draws: about 40% less processor time, and most look the same. The editor's Preview always moves them every frame.">
+        <PropertyToggle value={Number(exportSettings.patternFps) === 30}
+                        ariaLabel="Moving patterns at 30 frames a second"
+                        onchange={() => setExportSetting('patternFps', Number(exportSettings.patternFps) === 30 ? 0 : 30)} />
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note" class:loop-over={$panelLoopSummary.over} data-loop-note title={$panelLoopLines.join('\n')}>
+          {#if $panelLoopSummary.over}
+            ⚠ This panel keeps {$panelLoopSummary.count} things moving; {$panelLoopSummary.budget} is the budget. Each open plug-in window uses more processor time than {$panelLoopSummary.budget} would. The plug-in still builds.
+            <button type="button" class="loop-go" onclick={showNextLoop}>Go to them</button>
+          {:else if $panelLoopSummary.count > 0}
+            This panel keeps {$panelLoopSummary.count} {$panelLoopSummary.count === 1 ? 'thing' : 'things'} moving, within the budget of {$panelLoopSummary.budget}.
+          {:else}
+            Nothing on this panel loops.
+          {/if}
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Formats" icon={Package}>
       <PropertyCell label="VST3" span={2} hint="Always built — the primary format." disabled>
         <PropertyToggle value={true} />
@@ -1217,6 +1243,9 @@
 {/if}
 
 <style>
+  .export-build-note.loop-over { color: #F6D58A; }
+  .loop-go { margin-left: 6px; height: 22px; padding: 0 8px; border: 1px solid #7A5C16; border-radius: 4px; background: #2A2312; color: #F6D58A; font: inherit; font-size: 11px; cursor: pointer; }
+  .loop-go:hover { border-color: #E5A029; }
   .identity-fork { display: flex; flex-direction: column; gap: 6px; }
   .identity-why { color: #F2C94C; font-size: 11px; line-height: 1.45; margin: 0; }
   .export-action.primary { background: #3A5A80; border-color: #4A72A0; color: #FFF; }

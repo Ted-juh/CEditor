@@ -1,0 +1,831 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "b4d4d832-c0b5-4e1a-9f3d-b4d4d832b4d4",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Attention",
+  "scriptId": "component_button-attention",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1100,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFF6D96B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [
+    {
+      "id": "component_button-attention_1",
+      "name": "Look here",
+      "language": "javascript",
+      "source": "// Plays the Look here button's own animation every four seconds, as a panel would to draw the\n// eye to one control: ce.anim.play(control, animation).\nfunction lookHere() {\n  ce.anim.play('LookHere', 'lookHere');\n  after(4000, lookHere);\n}\nafter(1500, lookHere);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "pop"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1763847858000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Attention","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1763847858001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1040,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"motion that calls the eye to it. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse","id":"ctrl_1763847858002","description":"Pulse: swells and settles, again and again: \"press me\".","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Start"},
+        "Animations": {"_children":{"pulse":{"_type":"Animation","name":"pulse","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.5,"scale":1.05},{"at":1,"scale":1}],"duration":1600,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:pulse","revision":1,"from":"pulse"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseCaption","id":"ctrl_1763847858003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pulse","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseHow","id":"ctrl_1763847858004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseWhat","id":"ctrl_1763847858005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"swells and settles, again and again: \"press me\"","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Breathe","id":"ctrl_1763847858006","description":"Breathe: fades a little and back, slowly.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Sleep"},
+        "Animations": {"_children":{"breathe":{"_type":"Animation","name":"breathe","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.55},{"at":1,"opacity":1}],"duration":2400,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:breathe","revision":1,"from":"breathe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheCaption","id":"ctrl_1763847858007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Breathe","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheHow","id":"ctrl_1763847858008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhat","id":"ctrl_1763847858009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"fades a little and back, slowly","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wiggle","id":"ctrl_1763847858010","description":"Wiggle: a small wiggle as the pointer arrives.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Help"},
+        "Animations": {"_children":{"wiggle":{"_type":"Animation","name":"wiggle","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"rotate":0},{"at":0.2,"rotate":-6},{"at":0.45,"rotate":5},{"at":0.7,"rotate":-3},{"at":1,"rotate":0}],"duration":460,"delay":0,"easing":"inOutSine","iterations":1,"direction":"normal","preset":{"id":"ce:button:wiggle","revision":1,"from":"wiggle"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleCaption","id":"ctrl_1763847858011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wiggle","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleHow","id":"ctrl_1763847858012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleWhat","id":"ctrl_1763847858013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small wiggle as the pointer arrives","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulse","id":"ctrl_1763847858014","description":"Beat pulse: pulses on each beat while the transport plays.","controlType":"MomentaryButton"},
+        "Transform": {"x":840,"y":96,"width":200,"height":100},
+        "Text": {"content":"Tempo"},
+        "Animations": {"_children":{"beatPulse":{"_type":"Animation","name":"beatPulse","enabled":true,"kind":"keyframes","trigger":{"type":"beat","every":1},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.2,"scale":1.07},{"at":1,"scale":1}],"duration":280,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:beat-pulse","revision":1,"from":"beatPulse"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseCaption","id":"ctrl_1763847858015","controlType":"Label"},
+        "Transform": {"x":820,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat pulse","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseHow","id":"ctrl_1763847858016","controlType":"Label"},
+        "Transform": {"x":820,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseWhat","id":"ctrl_1763847858017","controlType":"Label"},
+        "Transform": {"x":824,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"pulses on each beat while the transport plays","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHere","id":"ctrl_1763847858018","description":"Look here: jumps, as a panel says \"look here\".","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Look"},
+        "Animations": {"_children":{"lookHere":{"_type":"Animation","name":"lookHere","enabled":true,"kind":"keyframes","trigger":{"type":"script","from":["*"],"to":[]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"y":0},{"at":0.3,"y":-12},{"at":0.55,"y":0},{"at":0.75,"y":-4},{"at":1,"y":0}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:look-here","revision":1,"from":"lookHere"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereCaption","id":"ctrl_1763847858019","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Look here","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereHow","id":"ctrl_1763847858020","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A SCRIPT PLAYS IT","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereWhat","id":"ctrl_1763847858021","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"jumps, as a panel says \"look here\"","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Alarm","id":"ctrl_1763847858022","description":"Alarm: shakes every two seconds, an alarm's call.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Alarm"},
+        "Animations": {"_children":{"alarm":{"_type":"Animation","name":"alarm","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0},{"at":0.04,"x":-5},{"at":0.08,"x":5},{"at":0.12,"x":-4},{"at":0.16,"x":3},{"at":0.2,"x":0},{"at":1,"x":0}],"duration":2000,"delay":0,"easing":"linear","iterations":"infinite","direction":"normal","preset":{"id":"ce:button:alarm","revision":1,"from":"alarm"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlarmCaption","id":"ctrl_1763847858023","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Alarm","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlarmHow","id":"ctrl_1763847858024","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"AlarmWhat","id":"ctrl_1763847858025","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"shakes every two seconds, an alarm's call","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn","id":"ctrl_1763847858026","description":"Pop in: grows in from nothing as the panel opens.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"New"},
+        "Animations": {"_children":{"popIn":{"_type":"Animation","name":"popIn","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":0.2,"opacity":0},{"at":0.6,"scale":1.1,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":560,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:pop-in","revision":1,"from":"popIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInCaption","id":"ctrl_1763847858027","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop in","_children":{"Fill":{"colour":"FF1B1B1B"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInHow","id":"ctrl_1763847858028","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF9C1F12"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInWhat","id":"ctrl_1763847858029","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"grows in from nothing as the panel opens","_children":{"Fill":{"colour":"FF5A4A1E"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:pulse",
+      "name": "Pulse",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pulse": {
+          "_type": "Animation",
+          "name": "pulse",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.5,
+              "scale": 1.05
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 1600,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:breathe",
+      "name": "Breathe",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "breathe": {
+          "_type": "Animation",
+          "name": "breathe",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.55
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 2400,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:wiggle",
+      "name": "Wiggle",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "wiggle": {
+          "_type": "Animation",
+          "name": "wiggle",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "rotate": 0
+            },
+            {
+              "at": 0.2,
+              "rotate": -6
+            },
+            {
+              "at": 0.45,
+              "rotate": 5
+            },
+            {
+              "at": 0.7,
+              "rotate": -3
+            },
+            {
+              "at": 1,
+              "rotate": 0
+            }
+          ],
+          "duration": 460,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:beat-pulse",
+      "name": "Beat pulse",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "transport beat"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "beatPulse": {
+          "_type": "Animation",
+          "name": "beatPulse",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "beat",
+            "every": 1
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "scale": 1.07
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 280,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:look-here",
+      "name": "Look here",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "a script plays it"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lookHere": {
+          "_type": "Animation",
+          "name": "lookHere",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "script",
+            "from": [
+              "*"
+            ],
+            "to": []
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0
+            },
+            {
+              "at": 0.3,
+              "y": -12
+            },
+            {
+              "at": 0.55,
+              "y": 0
+            },
+            {
+              "at": 0.75,
+              "y": -4
+            },
+            {
+              "at": 1,
+              "y": 0
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:alarm",
+      "name": "Alarm",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "alarm": {
+          "_type": "Animation",
+          "name": "alarm",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0
+            },
+            {
+              "at": 0.04,
+              "x": -5
+            },
+            {
+              "at": 0.08,
+              "x": 5
+            },
+            {
+              "at": 0.12,
+              "x": -4
+            },
+            {
+              "at": 0.16,
+              "x": 3
+            },
+            {
+              "at": 0.2,
+              "x": 0
+            },
+            {
+              "at": 1,
+              "x": 0
+            }
+          ],
+          "duration": 2000,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:pop-in",
+      "name": "Pop in",
+      "category": "Button",
+      "tags": [
+        "Attention",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "popIn": {
+          "_type": "Animation",
+          "name": "popIn",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.2,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 1.1,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 560,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

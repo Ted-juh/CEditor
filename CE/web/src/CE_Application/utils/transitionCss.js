@@ -10,7 +10,13 @@
  *
  * Now each bucket lists the CSS properties it covers, once, for each kind of element: a part, the
  * control's own box, and an SVG shape (coloured with fill and stroke, not background and color).
+ *
+ * A box's colour includes its gradient (utils/gradientPaint.js): the registered properties a fill's
+ * gradient is written with, so a state that turns the angle or changes a stop eases it with the
+ * colours beside it instead of swapping the picture at the end. An element that paints no gradient
+ * sets none of them, and a transition on a property that does not change does nothing.
  */
+import { GRADIENT_EASED_PROPERTIES } from './gradientPaint.js';
 
 export const BUCKET_PROPERTIES = {
   // A part is placed with left/top, so its x, y and offsets — which the editor has always listed
@@ -20,7 +26,7 @@ export const BUCKET_PROPERTIES = {
     transform: ['transform', 'translate', 'rotate', 'scale', 'left', 'top'],
     opacity: ['opacity'],
     size: ['width', 'height'],
-    colour: ['background-color', 'color', 'border-color', 'fill', 'stroke'],
+    colour: ['background-color', 'color', 'border-color', 'fill', 'stroke', ...GRADIENT_EASED_PROPERTIES],
     // Showing and hiding: opacity eases, and `visibility` — which interpolates as "visible" whenever
     // either end is — keeps the part visible for the whole fade out and makes it visible at the start
     // of a fade in. Listed after opacity, so a part with both buckets fades on this one's timing.
@@ -85,7 +91,9 @@ export function rootTransitionDeclaration(rootTransitions) {
  * timing — so a part never borrows its parent's.
  */
 export function colourTransitionVar(timing, { svg = false } = {}) {
-  if (!timing) return '--ce-colour-transition:none;';
+  // `--ce-colour-timing` is the timing alone, for what eases on it without being a colour: a
+  // pattern's opacity, size and speed (PatternLayers.svelte).
+  if (!timing) return '--ce-colour-transition:none;--ce-colour-timing:0s;';
   const properties = svg ? BUCKET_PROPERTIES.svg.colour : BUCKET_PROPERTIES.part.colour;
-  return `--ce-colour-transition:${properties.map((property) => `${property} ${timing}`).join(', ')};`;
+  return `--ce-colour-transition:${properties.map((property) => `${property} ${timing}`).join(', ')};--ce-colour-timing:${timing};`;
 }

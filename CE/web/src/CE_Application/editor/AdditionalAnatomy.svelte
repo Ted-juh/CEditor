@@ -1,5 +1,12 @@
 <script>
-  let { design, knob, meter, toggle, p, active, face, ink, accent, housing, legend, depth, size, detail, readout, label, showValue, caption = true } = $props();
+  import { markClipBox } from '../utils/anatomyWords.js';
+  let { design, knob, meter, toggle, p, active, face, ink, accent, housing, legend, depth, size, detail, readout, label, showValue, caption = true, readoutFx = '', readoutClip = false } = $props();
+  // A text effect on the knob's readout (utils/anatomyWords.js): the words played whole, in the
+  // readout's colour through currentColor, so the effect's colour frames reach SVG text.
+  // A roll or a push on the readout moves it through a box about itself, as a Label's box clips its
+  // words: a clip on a group that stays still, the text moving inside it (utils/anatomyWords.js).
+  const readoutBox = (x, y, size) => markClipBox({ text: readout, x, y: y - size * 0.35, size });
+  const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
   const uid=$props.id();
   let angle=$derived(-135+p*270);
   const pt=(a,r,x=80,y=76)=>[x+Math.sin(a*Math.PI/180)*r,y-Math.cos(a*Math.PI/180)*r];
@@ -54,7 +61,7 @@
     {/if}
     {#if ['atlas','spool','iris','crown'].includes(design)}{#each Array.from({length:detail}) as _,i}{@const q=pt(i*360/detail,72)}<circle cx={q[0]} cy={q[1]} r="1" fill={legend}/>{/each}{/if}
   </g>
-  {#if showValue}<text x="80" y="165" text-anchor="middle" fill={legend} font-size="11" font-family="monospace">{readout}</text>{/if}
+  {#if showValue}{#if readoutClip}{@const rb = readoutBox(80, 165, 11)}<g clip-path={`url(#${uid}-ro165)`}><clipPath id={`${uid}-ro165`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="165" text-anchor="middle" {...readoutAttrs(legend)} font-size="11" font-family="monospace">{readout}</text></g>{:else}<text x="80" y="165" text-anchor="middle" {...readoutAttrs(legend)} font-size="11" font-family="monospace">{readout}</text>{/if}{/if}
 {:else if meter}
   {#if design==='atlas'}
     <path d="M9 72Q25 62 40 72T72 72T104 72T151 72" fill="none" stroke={legend}/><path d={`M${14+p*123} 65v-42l-12 12h24l-12-12`} fill={accent} stroke={accent} stroke-width="3"/>
@@ -81,7 +88,7 @@
   {:else if design==='crown'}
     {#each Array.from({length:10}) as _,i}<path d={`M${9+i*14} 62V36h3v-9h6v9h3v26Z`} fill={i/10<p?accent:face} stroke={ink}/>{/each}
   {/if}
-  {#if showValue}<text x="80" y="96" fill={legend} font-size="10" text-anchor="middle">{readout}</text>{/if}
+  {#if showValue}<text x="80" y="96" {...readoutAttrs(legend)} font-size="10" text-anchor="middle">{readout}</text>{/if}
 {:else}
   <g transform={`translate(0 ${!toggle&&active?4*depth:0})`}>
     {#if design==='atlas'}

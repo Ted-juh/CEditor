@@ -1,0 +1,688 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "ed4e4219-c0b5-4e1a-9f3d-ed4e4219ed4e",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Words",
+  "scriptId": "component_button-words",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF0E1116",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "OIRoll.value",
+      "label": "OIRoll",
+      "controlName": "OIRoll",
+      "path": "OIRoll.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "neon"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1721328921000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Words","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1721328921001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption and the legend. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollIn","id":"ctrl_1721328921002","description":"Roll in: the caption rolls up into place.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Start"},
+        "Animations": {"_children":{"rollIn":{"_type":"Animation","name":"rollIn","enabled":true,"kind":"text","effect":"roll","way":"in","delay":300,"easing":"outQuad","iterations":1,"duration":700,"direction":"up","trigger":{"type":"always"},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:roll-in","revision":1,"from":"rollIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollInCaption","id":"ctrl_1721328921003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Roll in","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollInHow","id":"ctrl_1721328921004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RollInWhat","id":"ctrl_1721328921005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption rolls up into place","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushOnPress","id":"ctrl_1721328921006","description":"Push on press: the caption is pushed in afresh each press.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Next"},
+        "Animations": {"_children":{"push":{"_type":"Animation","name":"push","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":320,"direction":"right","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:push-on-press","revision":1,"from":"push"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushOnPressCaption","id":"ctrl_1721328921007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Push on press","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushOnPressHow","id":"ctrl_1721328921008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PushOnPressWhat","id":"ctrl_1721328921009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption is pushed in afresh each press","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OIRoll","id":"ctrl_1721328921010","description":"O / I roll: the legend's O and I roll up as it goes on, down as it goes off.","controlType":"ToggleButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Power"},
+        "Animations": {"_children":{"rollOn":{"_type":"Animation","name":"rollOn","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":300,"direction":"up","trigger":{"type":"stateChange","from":["*"],"to":["selected"]},"targets":[{"path":"Parts.legend"}],"preset":{"id":"ce:button:o-i-roll","revision":1,"from":"rollOn"}},"rollOff":{"_type":"Animation","name":"rollOff","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":300,"direction":"down","trigger":{"type":"stateChange","from":["selected"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.legend"}],"preset":{"id":"ce:button:o-i-roll","revision":1,"from":"rollOff"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OIRollCaption","id":"ctrl_1721328921011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"O / I roll","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OIRollHow","id":"ctrl_1721328921012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OIRollWhat","id":"ctrl_1721328921013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the legend's O and I roll up as it goes on, down as it goes off","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HoverFade","id":"ctrl_1721328921014","description":"Hover fade: the caption fades in again as the pointer arrives.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Info"},
+        "Animations": {"_children":{"hoverFade":{"_type":"Animation","name":"hoverFade","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":420,"trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:hover-fade","revision":1,"from":"hoverFade"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HoverFadeCaption","id":"ctrl_1721328921015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Hover fade","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HoverFadeHow","id":"ctrl_1721328921016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HoverFadeWhat","id":"ctrl_1721328921017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption fades in again as the pointer arrives","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlash","id":"ctrl_1721328921018","description":"Ink flash: the caption flashes the accent colour.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Copy"},
+        "Animations": {"_children":{"inkFlash":{"_type":"Animation","name":"inkFlash","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"text":"FF6EF2E8"},{"at":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:ink-flash","revision":1,"from":"inkFlash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashCaption","id":"ctrl_1721328921019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ink flash","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashHow","id":"ctrl_1721328921020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashWhat","id":"ctrl_1721328921021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption flashes the accent colour","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wipe","id":"ctrl_1721328921022","description":"Wipe: the caption is wiped on from the left.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":312,"width":200,"height":100},
+        "Text": {"content":"Clear"},
+        "Animations": {"_children":{"wipe":{"_type":"Animation","name":"wipe","enabled":true,"kind":"text","effect":"wipe","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":500,"direction":"right","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:wipe","revision":1,"from":"wipe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WipeCaption","id":"ctrl_1721328921023","controlType":"Label"},
+        "Transform": {"x":560,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wipe","_children":{"Fill":{"colour":"FFEAF2FF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WipeHow","id":"ctrl_1721328921024","controlType":"Label"},
+        "Transform": {"x":560,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FF6EF2E8"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WipeWhat","id":"ctrl_1721328921025","controlType":"Label"},
+        "Transform": {"x":564,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption is wiped on from the left","_children":{"Fill":{"colour":"FF8FA3B8"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:roll-in",
+      "name": "Roll in",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "rollIn": {
+          "_type": "Animation",
+          "name": "rollIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 300,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 700,
+          "direction": "up",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:push-on-press",
+      "name": "Push on press",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "push": {
+          "_type": "Animation",
+          "name": "push",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 320,
+          "direction": "right",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:o-i-roll",
+      "name": "O / I roll",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "switch"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "rollOn": {
+          "_type": "Animation",
+          "name": "rollOn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "selected"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.legend"
+            }
+          ]
+        },
+        "rollOff": {
+          "_type": "Animation",
+          "name": "rollOff",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 300,
+          "direction": "down",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "selected"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.legend"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:hover-fade",
+      "name": "Hover fade",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "hoverFade": {
+          "_type": "Animation",
+          "name": "hoverFade",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 420,
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:ink-flash",
+      "name": "Ink flash",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "inkFlash": {
+          "_type": "Animation",
+          "name": "inkFlash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "text": "FF6EF2E8"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:wipe",
+      "name": "Wipe",
+      "category": "Button",
+      "tags": [
+        "Words",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "wipe": {
+          "_type": "Animation",
+          "name": "wipe",
+          "enabled": true,
+          "kind": "text",
+          "effect": "wipe",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 500,
+          "direction": "right",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

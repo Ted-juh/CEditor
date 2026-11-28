@@ -1,6 +1,6 @@
 <script>
   import EffectSurface from './EffectSurface.svelte';
-  import { gradientToCSS } from '../../CE_Application/utils/gradientCSS.js';
+  import { gradientBackgroundCSS } from '../../CE_Application/utils/gradientPaint.js';
   import { normalizeCorner } from '../../CE_Application/utils/cornerNormalization.js';
   import { buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
   import { plainBorderCSS } from '../../CE_Application/utils/plainBorderCSS.js';
@@ -10,6 +10,8 @@
   import { outlineBorderDepth, outlineInsetKey } from '../../CE_Application/utils/outlineBorder.js';
   import SegmentedBorder from './SegmentedBorder.svelte';
   import OutlineBorder from './OutlineBorder.svelte';
+  import PatternLayers from './PatternLayers.svelte';
+  import { hasPatterns } from '../../CE_Application/utils/patternLayers.js';
 
   // `absorbFill` — the caller has already painted this fill as `background` on an element it was
   // going to render anyway (utils/plainFillCSS.js), so drawing it here as well would double it.
@@ -21,7 +23,14 @@
   // to it and the border is drawn as bands along it (utils/outlineBorder.js); Corners do not apply, the
   // outline is the shape. `insets[depth]` is the outline pulled inward by `depth`, for dotted borders
   // and fills clipped inside the border.
-  let { background = null, width = 0, height = 0, absorbFill = false, outline = null } = $props();
+  //
+  // `reducedMotion` — the Preview's own Reduced motion switch, for the patterns behind the content
+  // (PatternLayers.svelte), which read the operating system's setting themselves.
+  // `patternAnimations`: a scene's clips on its patterns, by name (PatternLayers.svelte).
+  // `patternTiming`: the colour timing its patterns ease a state's change on (PatternLayers.svelte).
+  // `imageMoves`: a keyframe animation moves the fill's image (keyframeAnimation.js, AND AN IMAGE), so
+  // it is drawn as a clip with its picture inside, which plays `--ce-kf-image`.
+  let { background = null, width = 0, height = 0, absorbFill = false, outline = null, reducedMotion = false, patternAnimations = null, patternTiming = null, imageMoves = false } = $props();
 
   // The two border drawings that need SVG, the segmented one and the one along an outline, are
   // components of their own (SegmentedBorder.svelte, OutlineBorder.svelte), made only for a
@@ -163,14 +172,15 @@
       if (layerId === 'solid' && fillLayerVisible('solid') && fill?.colour) {
         layerStyle = buildSolidFillStyle();
       } else if (layerId === 'gradient' && fillLayerVisible('gradient') && fill?.gradient) {
-        layerStyle = `background: ${gradientToCSS(fill.gradient)}; opacity: ${((fill?.gradientOpacity ?? 100) / 100).toFixed(3)}; mix-blend-mode: ${fill?.gradientBlend ?? 'normal'};`;
+        // Written to ease (utils/gradientPaint.js): a state that turns it or moves a stop glides.
+        layerStyle = `${gradientBackgroundCSS(fill.gradient)} opacity: ${((fill?.gradientOpacity ?? 100) / 100).toFixed(3)}; mix-blend-mode: ${fill?.gradientBlend ?? 'normal'};`;
       } else if (layerId === 'image' && fillLayerVisible('image') && fill?.imageSrc) {
         image = buildImageFillParts('image', resolvedFillSource(fill.imageSrc));
       } else if (layerId === 'overlay' && fillLayerVisible('overlay') && fill?.overlaySrc) {
         image = buildImageFillParts('overlay', resolvedFillSource(fill.overlaySrc));
       }
 
-      if (image?.transformed) {
+      if (image?.transformed || (image && layerId === 'image' && imageMoves)) {
         // The outer element keeps the clip in the component's frame, and `overflow: hidden` holds
         // the cover-scaled picture to the component's box when the clip mode is "none".
         styles[layerId] = [image.compositing, fillLayerClipCSS(layerId), 'overflow: hidden;'].filter(Boolean).join(' ');
@@ -194,6 +204,11 @@
   // nothing. Filtering here leaves one effect per layer that exists, and one for the loop.
   let visibleFillLayers = $derived(fillLayerOrder().filter((layerId) => fillLayerStyles[layerId]));
 
+  // Patterns behind the content (utils/patternLayers.js): over the fill, under the border, clipped to
+  // the control's shape. Only a background that has one mounts the component.
+  let drawsPatterns = $derived(hasPatterns(background));
+  let patternClip = $derived(outline ? outlineClip(outline.d, outline.fillRule ?? 'evenodd') : fillCornerCSS);
+
   // ============ BORDER (SVG) ============
 
   let hasBorder = $derived(border?.enabled && width > 0 && height > 0);
@@ -210,11 +225,16 @@
 {#each visibleFillLayers as layerId (layerId)}
   <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}
     blend={fill?.[`${layerId}Blend`] ?? 'normal'}>
-    <div class="bg-fill-layer" class:solid={layerId === 'solid'} style={fillLayerStyles[layerId]}>
-      {#if fillLayerPaints[layerId]}<div class="bg-fill-paint" style={fillLayerPaints[layerId]}></div>{/if}
+    <div class="bg-fill-layer" class:solid={layerId === 'solid'} class:gradient={layerId === 'gradient'} style={fillLayerStyles[layerId]}>
+      {#if fillLayerPaints[layerId]}<div class="bg-fill-paint" class:image={layerId === 'image'} style={fillLayerPaints[layerId]}></div>{/if}
     </div>
   </EffectSurface>
 {/each}
+
+<!-- Patterns behind the content: tinted, tiled, moving (PatternLayers.svelte). -->
+{#if drawsPatterns}
+  <PatternLayers {background} place="behind" {width} {height} clip={patternClip} {reducedMotion} animations={patternAnimations} timing={patternTiming} />
+{/if}
 
 <!-- Border (CSS) — the plain case, one element instead of eleven -->
 <EffectSurface effects={border?._children?.Effects} {width} {height} target="border">
@@ -254,6 +274,8 @@
      (CE_Application/utils/keyframeAnimation.js). Unset — the player window, any control without
      colour frames — it is none. */
   .bg-fill-layer.solid { animation: var(--ce-kf-paint, none); }
+  /* …and its gradient's turn and shift frames (the `gradient` channel; utils/gradientPaint.js). */
+  .bg-fill-layer.gradient { animation: var(--ce-kf-gradient, none); }
 
   /* A transformed image layer's picture, inside the element that clips it (see fillLayerDraw). */
   .bg-fill-paint {
@@ -261,4 +283,6 @@
     inset: 0;
     pointer-events: none;
   }
+  /* …and the fill image's pan, zoom and spin frames (the `image` channel). */
+  .bg-fill-paint.image { animation: var(--ce-kf-image, none); }
 </style>

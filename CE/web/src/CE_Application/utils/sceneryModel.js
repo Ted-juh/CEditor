@@ -24,6 +24,7 @@
 
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { getControlCore } from './controlOrder.js';
+import { hasPatterns } from './patternLayers.js';
 
 /**
  * Sections whose presence means a control can change, be driven, or be touched.
@@ -94,6 +95,9 @@ export function isScenery(control) {
   // A Label that shows something of a control (utils/labelShows.js) reads that control's value as
   // it moves: never folded into the still picture.
   if (String(control?._children?.Text?.shows ?? '')) return false;
+  // A pattern (utils/patternLayers.js) moves on its own, and the ground is a still picture; one that
+  // does not move is rare enough to keep live rather than teach the ground to draw it. 2026-11-24.
+  if (hasPatterns(control?._children?.Background)) return false;
   return true;
 }
 
@@ -133,6 +137,24 @@ function boxOf(control) {
   };
 }
 
+/**
+ * A box as far as a scene's moves take it (sceneFormat.js sceneMoveReach): out by its travel each
+ * way, grown by its largest scale about its centre, and, if it turns, to its diagonal.
+ */
+function reachedBox(box, reach) {
+  if (!reach) return box;
+  const scale = Math.max(1, Number(reach.scale) || 1);
+  const across = reach.turns ? Math.hypot(box.w, box.h) * scale : 0;
+  const growX = Math.max((box.w * (scale - 1)) / 2, (across - box.w) / 2, 0);
+  const growY = Math.max((box.h * (scale - 1)) / 2, (across - box.h) / 2, 0);
+  return {
+    x: box.x - reach.left - growX,
+    y: box.y - reach.up - growY,
+    w: box.w + reach.left + reach.right + 2 * growX,
+    h: box.h + reach.up + reach.down + 2 * growY,
+  };
+}
+
 function overlaps(a, b) {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
@@ -156,7 +178,7 @@ function overlaps(a, b) {
  * milliseconds, on every hover. The ground is a function of the panel alone. Holding a control live
  * is sceneryHoldSet's job, and it works by drawing over the ground rather than by changing it.
  */
-export function planSceneryFold(orderedControls, neverFold = null) {
+export function planSceneryFold(orderedControls, neverFold = null, moves = null) {
   const controls = orderedControls ?? [];
   // A control a script has written to is treated exactly as a dynamic one: it stays live, and it
   // blocks anything it covers, so the overlap invariant below holds unchanged.
@@ -165,7 +187,8 @@ export function planSceneryFold(orderedControls, neverFold = null) {
     const id = getControlCore(control)?.id;
     return !(id != null && neverFold?.has(String(id)));
   });
-  const boxes = controls.map(boxOf);
+  // A control a scene moves covers everywhere it goes, not only its box (sceneMoveReach).
+  const boxes = controls.map((control) => reachedBox(boxOf(control), moves?.get?.(String(getControlCore(control)?.id ?? '')) ?? null));
 
   const ground = [];
   const live = [];

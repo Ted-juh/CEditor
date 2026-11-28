@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8d2202a1",
+  "fingerprint": "cc5af2ef",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -71,6 +71,7 @@
       "display.screen": "FF0E1A2C",
       "display.backlight": "FF2B3545",
       "panel.surface": "FF14243A",
+      "control.readout": "{control.cap}",
       "section.surface": "FF101C2D"
     },
     "lamp": {

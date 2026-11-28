@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "07cbc625",
+  "fingerprint": "e3a279b1",
   "set": {
     "id": "pinstripe",
     "name": "Pinstripe",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF25272A",
+      "control.readout": "{text.label}",
       "section.surface": "FF1D1E21"
     },
     "lamp": {

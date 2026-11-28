@@ -21,6 +21,7 @@ const num = (value, fallback = 0) => {
  */
 export function shownText(source, shows, session = null) {
   if (!source || !shows) return '';
+  if (shows === 'nameValue') return shownText(source, shownAs(shows, session), session);
   const kids = source._children ?? {};
   const behavior = kids.Behavior ?? {};
   const type = String(kids.Core?.controlType ?? '');
@@ -59,6 +60,16 @@ export function shownText(source, shows, session = null) {
     return value === undefined || value === null ? '' : String(value);
   }
   return '';
+}
+
+/**
+ * Which of its two texts a "name, value while touched" Label shows now: 'value' while its control
+ * is pressed or dragged, else 'name'. For any other Label, what it shows. The Preview writes it on
+ * the Label's text as `shownAs`, so a text swap knows which text has just arrived.
+ */
+export function shownAs(shows, session = null) {
+  if (shows !== 'nameValue') return shows || '';
+  return session?.pressed === true || session?.dragging === true ? 'value' : 'name';
 }
 
 // One index per panel tree: a store update replaces the array, so the old index goes with it.

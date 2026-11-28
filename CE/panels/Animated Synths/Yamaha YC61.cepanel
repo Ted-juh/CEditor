@@ -1,0 +1,2089 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "268cf165-5e17-4a0c-b6d2-268cf165268c",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Yamaha YC61",
+  "scriptId": "synth_yamaha-yc61",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1200,
+  "height": 620,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF18191B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [
+    {
+      "role": "Yamaha YC61",
+      "profileId": "yamaha-yc61",
+      "version": "*"
+    }
+  ],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Drawbar16.value",
+      "label": "Drawbar16",
+      "controlName": "Drawbar16",
+      "path": "Drawbar16.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 127,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar16"
+    },
+    {
+      "id": "Drawbar513.value",
+      "label": "Drawbar513",
+      "controlName": "Drawbar513",
+      "path": "Drawbar513.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 127,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar513"
+    },
+    {
+      "id": "Drawbar8.value",
+      "label": "Drawbar8",
+      "controlName": "Drawbar8",
+      "path": "Drawbar8.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 109,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar8"
+    },
+    {
+      "id": "Drawbar4.value",
+      "label": "Drawbar4",
+      "controlName": "Drawbar4",
+      "path": "Drawbar4.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar4"
+    },
+    {
+      "id": "Drawbar223.value",
+      "label": "Drawbar223",
+      "controlName": "Drawbar223",
+      "path": "Drawbar223.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 55,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar223"
+    },
+    {
+      "id": "Drawbar2.value",
+      "label": "Drawbar2",
+      "controlName": "Drawbar2",
+      "path": "Drawbar2.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar2"
+    },
+    {
+      "id": "Drawbar135.value",
+      "label": "Drawbar135",
+      "controlName": "Drawbar135",
+      "path": "Drawbar135.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar135"
+    },
+    {
+      "id": "Drawbar113.value",
+      "label": "Drawbar113",
+      "controlName": "Drawbar113",
+      "path": "Drawbar113.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar113"
+    },
+    {
+      "id": "Drawbar1.value",
+      "label": "Drawbar1",
+      "controlName": "Drawbar1",
+      "path": "Drawbar1.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 19,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.drawbar1"
+    },
+    {
+      "id": "VibChoType.value",
+      "label": "VibChoType",
+      "controlName": "VibChoType",
+      "path": "VibChoType.value",
+      "min": 0,
+      "max": 5,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "V1",
+        "C1",
+        "V2",
+        "C2",
+        "V3",
+        "C3"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organ.vibratoChorusType"
+    },
+    {
+      "id": "VibChoOn.value",
+      "label": "VibChoOn",
+      "controlName": "VibChoOn",
+      "path": "VibChoOn.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organUpper.vibratoChorusSwitch"
+    },
+    {
+      "id": "Perc.value",
+      "label": "Perc",
+      "controlName": "Perc",
+      "path": "Perc.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organ.percussionSwitch"
+    },
+    {
+      "id": "PercHarmonic.value",
+      "label": "PercHarmonic",
+      "controlName": "PercHarmonic",
+      "path": "PercHarmonic.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "3rd",
+        "2nd"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organ.percussionType"
+    },
+    {
+      "id": "PercDecay.value",
+      "label": "PercDecay",
+      "controlName": "PercDecay",
+      "path": "PercDecay.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Slow",
+        "Fast"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organ.percussionDecay"
+    },
+    {
+      "id": "PercVolume.value",
+      "label": "PercVolume",
+      "controlName": "PercVolume",
+      "path": "PercVolume.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Soft",
+        "Normal"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "organ.percussionVolume"
+    },
+    {
+      "id": "SlowFast.value",
+      "label": "SlowFast",
+      "controlName": "SlowFast",
+      "path": "SlowFast.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Slow",
+        "Fast"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerSlowFast"
+    },
+    {
+      "id": "Rotation.value",
+      "label": "Rotation",
+      "controlName": "Rotation",
+      "path": "Rotation.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "On"
+      ],
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerRotationSwitch"
+    },
+    {
+      "id": "HornFast.value",
+      "label": "HornFast",
+      "controlName": "HornFast",
+      "path": "HornFast.value",
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerHornSpeedFast"
+    },
+    {
+      "id": "HornSlow.value",
+      "label": "HornSlow",
+      "controlName": "HornSlow",
+      "path": "HornSlow.value",
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerHornSpeedSlow"
+    },
+    {
+      "id": "HornAcc.value",
+      "label": "HornAcc",
+      "controlName": "HornAcc",
+      "path": "HornAcc.value",
+      "min": 14,
+      "max": 127,
+      "defaultValue": 83,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerHornAcceleration"
+    },
+    {
+      "id": "HornDec.value",
+      "label": "HornDec",
+      "controlName": "HornDec",
+      "path": "HornDec.value",
+      "min": 14,
+      "max": 127,
+      "defaultValue": 83,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerHornDeceleration"
+    },
+    {
+      "id": "DrumFast.value",
+      "label": "DrumFast",
+      "controlName": "DrumFast",
+      "path": "DrumFast.value",
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerRotorSpeedFast"
+    },
+    {
+      "id": "DrumSlow.value",
+      "label": "DrumSlow",
+      "controlName": "DrumSlow",
+      "path": "DrumSlow.value",
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerRotorSpeedSlow"
+    },
+    {
+      "id": "DrumAcc.value",
+      "label": "DrumAcc",
+      "controlName": "DrumAcc",
+      "path": "DrumAcc.value",
+      "min": 14,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerRotorAcceleration"
+    },
+    {
+      "id": "DrumDec.value",
+      "label": "DrumDec",
+      "controlName": "DrumDec",
+      "path": "DrumDec.value",
+      "min": 14,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Yamaha YC61",
+      "deviceParameterId": "liveSetSoundCommon.rotarySpeakerRotorDeceleration"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "synth_yamaha-yc61_1",
+      "name": "Rotary speaker",
+      "language": "javascript",
+      "source": "// The rotary speaker, turned as the YC61 turns it.\nconst SPEEDS = {\"hornFast\":[209.4,817.6],\"drumFast\":[189.3,736.8],\"hornSlow\":[23,89.6],\"drumSlow\":[22.7,88.3]};\nconst RAMP = 1.2;   // seconds at a factor of 1.00: this panel's own figure; the manual gives only factors\nconst rpm = (v, r) => r[0] * Math.pow(r[1] / r[0], (Math.min(127, Math.max(1, Number(v) || 1)) - 1) / 126);\nconst factor = (v) => (Math.min(127, Math.max(14, Number(v) || 64)) - 1) / 63;\nconst is = (v, word) => v === 1 || v === true || String(v).toLowerCase() === word;\n\nconst values = {};\nfor (const name of ['HornFast', 'HornSlow', 'DrumFast', 'DrumSlow', 'HornAcc', 'HornDec', 'DrumAcc', 'DrumDec', 'SlowFast', 'Rotation']) values[name] = get(name);\non('*', 'onControlChanged', (info) => { if (info.target in values) values[info.target] = info.value; });\n\nconst rotors = [\n  { name: 'Horn', fast: 'HornFast', slow: 'HornSlow', acc: 'HornAcc', dec: 'HornDec', speeds: [SPEEDS.hornFast, SPEEDS.hornSlow], speed: 0, angle: 0 },\n  { name: 'Drum', fast: 'DrumFast', slow: 'DrumSlow', acc: 'DrumAcc', dec: 'DrumDec', speeds: [SPEEDS.drumFast, SPEEDS.drumSlow], speed: 0, angle: 0 },\n];\nconst wanted = (r) => !is(values.Rotation, 'on') ? 0\n  : is(values.SlowFast, 'fast') ? rpm(values[r.fast], r.speeds[0]) : rpm(values[r.slow], r.speeds[1]);\nfor (const r of rotors) r.speed = wanted(r);   // already turning when the panel opens\n\nlet last = Date.now();\nlet ticks = 0;\nfunction turn() {\n  const now = Date.now();\n  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));\n  last = now;\n  for (const r of rotors) {\n    const target = wanted(r);\n    const f = factor(target > r.speed ? values[r.acc] : values[r.dec]);\n    r.speed += (target - r.speed) * (1 - Math.exp(-dt * f / RAMP));\n    r.angle = (r.angle + (r.speed / 60) * 360 * dt) % 360;\n    animateSeek(r.name + ' turn', r.angle / 360);\n    animateSeek(r.name + ' blur', Math.min(1, Math.max(0, (r.speed - 100) / 200)));\n    if (ticks % 5 === 0) set(r.name + 'Rpm.Text.content', Math.round(r.speed) + ' rpm');\n  }\n  ticks += 1;\n  after(40, turn);\n}\nturn();\n"
+    },
+    {
+      "id": "synth_yamaha-yc61_2",
+      "name": "Organ wave",
+      "language": "javascript",
+      "source": "// The wave the drawbars make: each footage a sine at its pitch, as loud as its drawbar's step.\nconst BARS = [{\"name\":\"Drawbar16\",\"ratio\":0.5},{\"name\":\"Drawbar513\",\"ratio\":1.5},{\"name\":\"Drawbar8\",\"ratio\":1},{\"name\":\"Drawbar4\",\"ratio\":2},{\"name\":\"Drawbar223\",\"ratio\":3},{\"name\":\"Drawbar2\",\"ratio\":4},{\"name\":\"Drawbar135\",\"ratio\":5},{\"name\":\"Drawbar113\",\"ratio\":6},{\"name\":\"Drawbar1\",\"ratio\":8}];\nconst step = (v) => (v <= 0 ? 0 : v >= 127 ? 8 : Math.floor((v - 1) / 18) + 1);\n\non('*', 'onControlChanged', (info) => { if (String(info.target).startsWith('Drawbar')) drawRedraw(); });\nafter(50, () => drawRedraw());\n\nfunction onDraw(info) {\n  drawClear();\n  const steps = BARS.map((b) => step(Number(get(b.name)) || 0));\n  const w = info.width;\n  const mid = info.height * 0.52;\n  const amp = info.height * 0.17;\n  const wave = (partials) => {\n    const pts = [];\n    for (let i = 0; i <= 180; i += 1) {\n      const t = (i / 180) * Math.PI * 4;   // two periods of the 8' pitch\n      let y = 0;\n      for (const [k, gain] of partials) y += gain * Math.sin(BARS[k].ratio * t);\n      pts.push(12 + (i / 180) * (w - 24), mid - y * amp);\n    }\n    return pts;\n  };\n  drawOpacity(0.28);\n  drawStroke('#8FD0FF', 1);\n  steps.forEach((s, k) => { if (s) drawPath(wave([[k, s / 8]])); });\n  const total = steps.reduce((a, s) => a + s, 0);\n  drawOpacity(1);\n  drawStroke('#E8F4FF', 2, { join: 'round' });\n  if (total) drawPath(wave(steps.map((s, k) => [k, (s / 8) * Math.min(1, 2.2 / (total / 8))])));\n  // The registration as organists write it: 88 8000 000.\n  drawStroke();\n  drawFill('#8FD0FF');\n  drawText(12, info.height - 10, steps.slice(0, 2).join('') + ' ' + steps.slice(2, 6).join('') + ' ' + steps.slice(6).join(''), { size: 11, family: 'JetBrains Mono' });\n}\n",
+      "scope": "panel",
+      "target": "Wave",
+      "event": "onDraw",
+      "enabled": true
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Stripe","id":"ctrl_1716771045000","controlType":"Label"},
+        "Transform": {"width":1200,"height":6},
+        "Background": {"_children":{"Fill":{"colour":"FFB3262B"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Model","id":"ctrl_1716771045001","controlType":"Label"},
+        "Transform": {"x":36,"y":20,"width":200,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"YC61","_children":{"Fill":{"colour":"FFF2F0EA"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":800,"size":20,"letterSpacing":3},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kind","id":"ctrl_1716771045002","controlType":"Label"},
+        "Transform": {"x":880,"y":25,"width":284,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"STAGE KEYBOARD","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":11,"letterSpacing":2},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OrganFrame","id":"ctrl_1716771045003","controlType":"Label"},
+        "Transform": {"x":28,"y":66,"width":392,"height":420},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22392%22%20height%3D%22420%22%20viewBox%3D%220%200%20392%20420%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22391%22%20height%3D%22419%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OrganTitle","id":"ctrl_1716771045004","controlType":"Label"},
+        "Transform": {"x":38,"y":57,"width":147,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF18191B"},"Border":{"enabled":false}}},
+        "Text": {"content":"ORGAN · UPPER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar16Tab","id":"ctrl_1716771045005","controlType":"Label"},
+        "Transform": {"x":51,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF7A4A26"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar16","id":"ctrl_1716771045006","description":"Drawbar 16' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":49,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":127,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar16","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar16Name","id":"ctrl_1716771045007","attachedTo":"ctrl_1716771045006","controlType":"Label"},
+        "Transform": {"x":42,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"16'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar513Tab","id":"ctrl_1716771045008","controlType":"Label"},
+        "Transform": {"x":91,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF7A4A26"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar513","id":"ctrl_1716771045009","description":"Drawbar 5 1/3' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":89,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":127,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar513","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar513Name","id":"ctrl_1716771045010","attachedTo":"ctrl_1716771045009","controlType":"Label"},
+        "Transform": {"x":82,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"5⅓'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar8Tab","id":"ctrl_1716771045011","controlType":"Label"},
+        "Transform": {"x":131,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar8","id":"ctrl_1716771045012","description":"Drawbar 8' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":129,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":109,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar8","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar8Name","id":"ctrl_1716771045013","attachedTo":"ctrl_1716771045012","controlType":"Label"},
+        "Transform": {"x":122,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"8'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar4Tab","id":"ctrl_1716771045014","controlType":"Label"},
+        "Transform": {"x":171,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar4","id":"ctrl_1716771045015","description":"Drawbar 4' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":169,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":0,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar4","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar4Name","id":"ctrl_1716771045016","attachedTo":"ctrl_1716771045015","controlType":"Label"},
+        "Transform": {"x":162,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"4'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar223Tab","id":"ctrl_1716771045017","controlType":"Label"},
+        "Transform": {"x":211,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar223","id":"ctrl_1716771045018","description":"Drawbar 2 2/3' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":209,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":55,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar223","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar223Name","id":"ctrl_1716771045019","attachedTo":"ctrl_1716771045018","controlType":"Label"},
+        "Transform": {"x":202,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"2⅔'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar2Tab","id":"ctrl_1716771045020","controlType":"Label"},
+        "Transform": {"x":251,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar2","id":"ctrl_1716771045021","description":"Drawbar 2' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":249,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":0,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar2","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar2Name","id":"ctrl_1716771045022","attachedTo":"ctrl_1716771045021","controlType":"Label"},
+        "Transform": {"x":242,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"2'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar135Tab","id":"ctrl_1716771045023","controlType":"Label"},
+        "Transform": {"x":291,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar135","id":"ctrl_1716771045024","description":"Drawbar 1 3/5' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":289,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":0,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar135","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar135Name","id":"ctrl_1716771045025","attachedTo":"ctrl_1716771045024","controlType":"Label"},
+        "Transform": {"x":282,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"1⅗'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar113Tab","id":"ctrl_1716771045026","controlType":"Label"},
+        "Transform": {"x":331,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar113","id":"ctrl_1716771045027","description":"Drawbar 1 1/3' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":329,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":0,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar113","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar113Name","id":"ctrl_1716771045028","attachedTo":"ctrl_1716771045027","controlType":"Label"},
+        "Transform": {"x":322,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"1⅓'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar1Tab","id":"ctrl_1716771045029","controlType":"Label"},
+        "Transform": {"x":371,"y":86,"width":22,"height":8},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar1","id":"ctrl_1716771045030","description":"Drawbar 1' — parameterChange","controlType":"Slider"},
+        "Transform": {"x":369,"y":98,"width":26,"height":176},
+        "Behavior": {"valueType":"int","orientation":"vertical","direction":"ttb","max":127,"defaultCurrentValue":19,"majorTickCount":9,"minorTickCount":0,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"organUpper.drawbar1","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drawbar1Name","id":"ctrl_1716771045031","attachedTo":"ctrl_1716771045030","controlType":"Label"},
+        "Transform": {"x":362,"y":278,"width":40,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"1'","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VibChoType","id":"ctrl_1716771045032","description":"Vibrato/Chorus Type — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":44,"y":310,"width":360,"height":26},
+        "Text": {"content":"vibratoChorusType","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"c3","defaultCurrentValue":1},
+        "Value": {"rows":[{"id":"v1","displayText":"V1","internalValue":"v1","sendValue":0,"receiveValue":0},{"id":"c1","displayText":"C1","internalValue":"c1","sendValue":1,"receiveValue":1},{"id":"v2","displayText":"V2","internalValue":"v2","sendValue":2,"receiveValue":2},{"id":"c2","displayText":"C2","internalValue":"c2","sendValue":3,"receiveValue":3},{"id":"v3","displayText":"V3","internalValue":"v3","sendValue":4,"receiveValue":4},{"id":"c3","displayText":"C3","internalValue":"c3","sendValue":5,"receiveValue":5,"selectedByDefault":true}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.vibratoChorusType","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VibChoTypeName","id":"ctrl_1716771045033","attachedTo":"ctrl_1716771045032","controlType":"Label"},
+        "Transform": {"x":44,"y":340,"width":360,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VIBRATO / CHORUS","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VibChoOn","id":"ctrl_1716771045034","description":"Vibrato/Chorus Switch — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":44,"y":364,"width":100,"height":26},
+        "Text": {"content":"vibratoChorusSwitch","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"off"},
+        "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organUpper.vibratoChorusSwitch","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"VibChoOnName","id":"ctrl_1716771045035","attachedTo":"ctrl_1716771045034","controlType":"Label"},
+        "Transform": {"x":44,"y":394,"width":100,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VIB/CHO","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Perc","id":"ctrl_1716771045036","description":"Percussion Switch — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":156,"y":364,"width":108,"height":26},
+        "Text": {"content":"percussionSwitch","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"off"},
+        "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionSwitch","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercName","id":"ctrl_1716771045037","attachedTo":"ctrl_1716771045036","controlType":"Label"},
+        "Transform": {"x":156,"y":394,"width":108,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PERCUSSION","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercHarmonic","id":"ctrl_1716771045038","description":"Percussion Type — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":276,"y":364,"width":128,"height":26},
+        "Text": {"content":"percussionType","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"3rd"},
+        "Value": {"rows":[{"id":"3rd","displayText":"3rd","internalValue":"3rd","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"2nd","displayText":"2nd","internalValue":"2nd","sendValue":1,"receiveValue":1}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionType","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercHarmonicName","id":"ctrl_1716771045039","attachedTo":"ctrl_1716771045038","controlType":"Label"},
+        "Transform": {"x":276,"y":394,"width":128,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HARMONIC","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercDecay","id":"ctrl_1716771045040","description":"Percussion Decay — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":44,"y":418,"width":170,"height":26},
+        "Text": {"content":"percussionDecay","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"slow"},
+        "Value": {"rows":[{"id":"slow","displayText":"Slow","internalValue":"slow","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"fast","displayText":"Fast","internalValue":"fast","sendValue":1,"receiveValue":1}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionDecay","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercDecayName","id":"ctrl_1716771045041","attachedTo":"ctrl_1716771045040","controlType":"Label"},
+        "Transform": {"x":44,"y":448,"width":170,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DECAY","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercVolume","id":"ctrl_1716771045042","description":"Percussion Volume — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":234,"y":418,"width":170,"height":26},
+        "Text": {"content":"percussionVolume","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"normal","defaultCurrentValue":1},
+        "Value": {"rows":[{"id":"soft","displayText":"Soft","internalValue":"soft","sendValue":0,"receiveValue":0},{"id":"normal","displayText":"Normal","internalValue":"normal","sendValue":1,"receiveValue":1,"selectedByDefault":true}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"organ.percussionVolume","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PercVolumeName","id":"ctrl_1716771045043","attachedTo":"ctrl_1716771045042","controlType":"Label"},
+        "Transform": {"x":234,"y":448,"width":170,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"VOLUME","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave","id":"ctrl_1716771045044","controlType":"Label"},
+        "Transform": {"x":436,"y":66,"width":330,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"FF050607"},"Border":{"enabled":false},"Corners":{"radius":8}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveEdge","id":"ctrl_1716771045045","controlType":"Label"},
+        "Transform": {"x":436,"y":66,"width":330,"height":230},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22330%22%20height%3D%22230%22%20viewBox%3D%220%200%20330%20230%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22329%22%20height%3D%22229%22%20rx%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%232A2D33%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveName","id":"ctrl_1716771045046","controlType":"Label"},
+        "Transform": {"x":452,"y":74,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ORGAN WAVE","_children":{"Fill":{"colour":"FF8FD0FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":11},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveNote","id":"ctrl_1716771045047","controlType":"Label"},
+        "Transform": {"x":436,"y":304,"width":330,"height":44},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each footage a sine at its pitch, as loud as its drawbar's step in eighths (this panel's law, not a measurement); the faint lines are the nine on their own","_children":{"Fill":{"colour":"FF6C7076"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":500,"size":9},"Multiline":{"lineHeight":1.3}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RotaryFrame","id":"ctrl_1716771045048","controlType":"Label"},
+        "Transform": {"x":782,"y":66,"width":390,"height":420},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22390%22%20height%3D%22420%22%20viewBox%3D%220%200%20390%20420%22%3E%3Crect%20x%3D%220.5%22%20y%3D%220.5%22%20width%3D%22389%22%20height%3D%22419%22%20rx%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%234A4D52%22%20stroke-opacity%3D%221.000%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RotaryTitle","id":"ctrl_1716771045049","controlType":"Label"},
+        "Transform": {"x":792,"y":57,"width":157,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"FF18191B"},"Border":{"enabled":false}}},
+        "Text": {"content":"ROTARY SPEAKER","_children":{"Fill":{"colour":"FFE8E8E4"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":2}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornBlur","id":"ctrl_1716771045050","controlType":"Label"},
+        "Transform": {"x":798,"y":84,"width":164,"height":164,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22200%22%20viewBox%3D%220%200%20200%20200%22%3E%3Cdefs%3E%3CradialGradient%20id%3D%22g%22%3E%3Cstop%20offset%3D%22.12%22%20stop-color%3D%22%237a7f86%22%20stop-opacity%3D%22.9%22%2F%3E%3Cstop%20offset%3D%22.2%22%20stop-color%3D%22%23c9cdd1%22%20stop-opacity%3D%22.35%22%2F%3E%3Cstop%20offset%3D%22.98%22%20stop-color%3D%22%23c9cdd1%22%20stop-opacity%3D%22.18%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23c9cdd1%22%20stop-opacity%3D%220%22%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2298%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2298%22%20fill%3D%22none%22%20stroke%3D%22%23c9cdd1%22%20stroke-opacity%3D%22.25%22%20stroke-dasharray%3D%223%209%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2213%22%20fill%3D%22%237a7f86%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Horn","id":"ctrl_1716771045051","controlType":"Label"},
+        "Transform": {"x":798,"y":125,"width":164,"height":82},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22100%22%20viewBox%3D%220%200%20200%20100%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22b%22%20x1%3D%220%22%20x2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f0f2f4%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%239aa0a8%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M4%2034%20L72%2046%20L72%2054%20L4%2066%20Z%22%20fill%3D%22url(%23b)%22%20stroke%3D%22%234a4d52%22%2F%3E%3Cpath%20d%3D%22M196%2034%20L128%2046%20L128%2054%20L196%2066%20Z%22%20fill%3D%22%233a3d42%22%20stroke%3D%22%234a4d52%22%2F%3E%3Crect%20x%3D%2270%22%20y%3D%2244%22%20width%3D%2260%22%20height%3D%2212%22%20rx%3D%223%22%20fill%3D%22%236c7076%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%2250%22%20r%3D%2213%22%20fill%3D%22%237a7f86%22%20stroke%3D%22%232a2d31%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%2250%22%20r%3D%224%22%20fill%3D%22%232a2d31%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornName","id":"ctrl_1716771045052","controlType":"Label"},
+        "Transform": {"x":840,"y":250,"width":80,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HORN","_children":{"Fill":{"colour":"FF9AA0A8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumBlur","id":"ctrl_1716771045053","controlType":"Label"},
+        "Transform": {"x":815,"y":290,"width":130,"height":130,"opacity":0},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20140%20140%22%3E%3Cdefs%3E%3CradialGradient%20id%3D%22g%22%3E%3Cstop%20offset%3D%22.14%22%20stop-color%3D%22%237a7f86%22%2F%3E%3Cstop%20offset%3D%22.16%22%20stop-color%3D%22%235a5e64%22%20stop-opacity%3D%22.9%22%2F%3E%3Cstop%20offset%3D%22.97%22%20stop-color%3D%22%238a8f96%22%20stop-opacity%3D%22.55%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%235a5e64%22%20stop-opacity%3D%22.2%22%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2270%22%20r%3D%2266%22%20fill%3D%22url(%23g)%22%20stroke%3D%22%235a5e64%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2270%22%20r%3D%2210%22%20fill%3D%22%237a7f86%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drum","id":"ctrl_1716771045054","controlType":"Label"},
+        "Transform": {"x":815,"y":290,"width":130,"height":130},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20140%20140%22%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2270%22%20r%3D%2266%22%20fill%3D%22%232a2d31%22%20stroke%3D%22%235a5e64%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M70%2070%20L134%2046%20A66%2066%200%200%201%20134%2094%20Z%22%20fill%3D%22%23c9cdd1%22%20fill-opacity%3D%22.85%22%2F%3E%3Cpath%20d%3D%22M70%2070%20L6%2046%20A66%2066%200%200%200%206%2094%20Z%22%20fill%3D%22%233a3d42%22%2F%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2270%22%20r%3D%2210%22%20fill%3D%22%237a7f86%22%2F%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2270%22%20r%3D%223.5%22%20fill%3D%22%232a2d31%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumName","id":"ctrl_1716771045055","controlType":"Label"},
+        "Transform": {"x":840,"y":426,"width":80,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DRUM","_children":{"Fill":{"colour":"FF9AA0A8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RpmScreen","id":"ctrl_1716771045056","controlType":"Label"},
+        "Transform": {"x":976,"y":86,"width":182,"height":58},
+        "Background": {"_children":{"Fill":{"colour":"FF050607"},"Border":{"enabled":false},"Corners":{"radius":5}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornRpm","id":"ctrl_1716771045057","controlType":"Label"},
+        "Transform": {"x":988,"y":92,"width":160,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFE8F4FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":14},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumRpm","id":"ctrl_1716771045058","controlType":"Label"},
+        "Transform": {"x":988,"y":116,"width":160,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"B3E8F4FF"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":14},"Position":{"justification":"right"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornRpmName","id":"ctrl_1716771045059","controlType":"Label"},
+        "Transform": {"x":988,"y":94,"width":60,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HORN","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":10},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumRpmName","id":"ctrl_1716771045060","controlType":"Label"},
+        "Transform": {"x":988,"y":118,"width":60,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DRUM","_children":{"Fill":{"colour":"FF8E9298"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":10},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SlowFast","id":"ctrl_1716771045061","description":"Rotary Speaker Slow/Fast — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":976,"y":160,"width":182,"height":28},
+        "Text": {"content":"rotarySpeakerSlowFast","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"slow"},
+        "Value": {"rows":[{"id":"slow","displayText":"Slow","internalValue":"slow","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"fast","displayText":"Fast","internalValue":"fast","sendValue":1,"receiveValue":1}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerSlowFast","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SlowFastName","id":"ctrl_1716771045062","attachedTo":"ctrl_1716771045061","controlType":"Label"},
+        "Transform": {"x":976,"y":192,"width":182,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SPEED","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Rotation","id":"ctrl_1716771045063","description":"Rotary Speaker Rotation Switch — parameterChange","controlType":"RadioButtonGroup"},
+        "Transform": {"x":976,"y":216,"width":182,"height":28},
+        "Text": {"content":"rotarySpeakerRotationSwitch","_children":{"Font":{"size":10}}},
+        "Behavior": {"defaultValue":"on","defaultCurrentValue":1},
+        "Value": {"rows":[{"id":"off","displayText":"Off","internalValue":"off","sendValue":0,"receiveValue":0},{"id":"on","displayText":"On","internalValue":"on","sendValue":1,"receiveValue":1,"selectedByDefault":true}]},
+        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotationSwitch","parameterType":"choice"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RotationName","id":"ctrl_1716771045064","attachedTo":"ctrl_1716771045063","controlType":"Label"},
+        "Transform": {"x":976,"y":248,"width":182,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ROTATION","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":9,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornFast","id":"ctrl_1716771045065","description":"Rotary Speaker Horn Speed Fast — parameterChange","controlType":"Knob"},
+        "Transform": {"x":981,"y":289,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":1,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerHornSpeedFast","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornFastName","id":"ctrl_1716771045066","attachedTo":"ctrl_1716771045065","controlType":"Label"},
+        "Transform": {"x":948,"y":323,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"H FAST","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornSlow","id":"ctrl_1716771045067","description":"Rotary Speaker Horn Speed Slow — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1027,"y":289,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":1,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerHornSpeedSlow","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornSlowName","id":"ctrl_1716771045068","attachedTo":"ctrl_1716771045067","controlType":"Label"},
+        "Transform": {"x":994,"y":323,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"H SLOW","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornAcc","id":"ctrl_1716771045069","description":"Rotary Speaker Horn Acceleration — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1073,"y":289,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":14,"max":127,"defaultCurrentValue":83,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerHornAcceleration","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornAccName","id":"ctrl_1716771045070","attachedTo":"ctrl_1716771045069","controlType":"Label"},
+        "Transform": {"x":1040,"y":323,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"H ACC","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornDec","id":"ctrl_1716771045071","description":"Rotary Speaker Horn Deceleration — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1119,"y":289,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":14,"max":127,"defaultCurrentValue":83,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerHornDeceleration","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HornDecName","id":"ctrl_1716771045072","attachedTo":"ctrl_1716771045071","controlType":"Label"},
+        "Transform": {"x":1086,"y":323,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"H DEC","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumFast","id":"ctrl_1716771045073","description":"Rotary Speaker Rotor Speed Fast — parameterChange","controlType":"Knob"},
+        "Transform": {"x":981,"y":375,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":1,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotorSpeedFast","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumFastName","id":"ctrl_1716771045074","attachedTo":"ctrl_1716771045073","controlType":"Label"},
+        "Transform": {"x":948,"y":409,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D FAST","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumSlow","id":"ctrl_1716771045075","description":"Rotary Speaker Rotor Speed Slow — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1027,"y":375,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":1,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotorSpeedSlow","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumSlowName","id":"ctrl_1716771045076","attachedTo":"ctrl_1716771045075","controlType":"Label"},
+        "Transform": {"x":994,"y":409,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D SLOW","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumAcc","id":"ctrl_1716771045077","description":"Rotary Speaker Rotor Acceleration — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1073,"y":375,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":14,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotorAcceleration","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumAccName","id":"ctrl_1716771045078","attachedTo":"ctrl_1716771045077","controlType":"Label"},
+        "Transform": {"x":1040,"y":409,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D ACC","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumDec","id":"ctrl_1716771045079","description":"Rotary Speaker Rotor Deceleration — parameterChange","controlType":"Knob"},
+        "Transform": {"x":1119,"y":375,"width":30,"height":30},
+        "Behavior": {"valueType":"int","min":14,"max":127,"defaultCurrentValue":64,"displayMin":null,"displayMax":null},
+        "DeviceBindings": {"bindings":[{"deviceRole":"Yamaha YC61","parameterId":"liveSetSoundCommon.rotarySpeakerRotorDeceleration","parameterType":"integer"}]}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DrumDecName","id":"ctrl_1716771045080","attachedTo":"ctrl_1716771045079","controlType":"Label"},
+        "Transform": {"x":1086,"y":409,"width":96,"height":13},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"D DEC","_children":{"Fill":{"colour":"FFCFD2D6"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":8,"letterSpacing":1}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RotaryNote","id":"ctrl_1716771045081","controlType":"Label"},
+        "Transform": {"x":970,"y":438,"width":194,"height":40},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"speeds and ramps as the YC61 manual prints them; a ramp at 1.00 here takes 1.2 s, the manual gives no time","_children":{"Fill":{"colour":"FF6C7076"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":500,"size":8},"Multiline":{"lineHeight":1.3}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC2","id":"ctrl_1716771045082","controlType":"Label"},
+        "Transform": {"x":29,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD2","id":"ctrl_1716771045083","controlType":"Label"},
+        "Transform": {"x":61,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE2","id":"ctrl_1716771045084","controlType":"Label"},
+        "Transform": {"x":93,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF2","id":"ctrl_1716771045085","controlType":"Label"},
+        "Transform": {"x":124,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG2","id":"ctrl_1716771045086","controlType":"Label"},
+        "Transform": {"x":156,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA2","id":"ctrl_1716771045087","controlType":"Label"},
+        "Transform": {"x":188,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB2","id":"ctrl_1716771045088","controlType":"Label"},
+        "Transform": {"x":220,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC3","id":"ctrl_1716771045089","controlType":"Label"},
+        "Transform": {"x":251,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD3","id":"ctrl_1716771045090","controlType":"Label"},
+        "Transform": {"x":283,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE3","id":"ctrl_1716771045091","controlType":"Label"},
+        "Transform": {"x":315,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF3","id":"ctrl_1716771045092","controlType":"Label"},
+        "Transform": {"x":347,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG3","id":"ctrl_1716771045093","controlType":"Label"},
+        "Transform": {"x":379,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA3","id":"ctrl_1716771045094","controlType":"Label"},
+        "Transform": {"x":410,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB3","id":"ctrl_1716771045095","controlType":"Label"},
+        "Transform": {"x":442,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC4","id":"ctrl_1716771045096","controlType":"Label"},
+        "Transform": {"x":474,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD4","id":"ctrl_1716771045097","controlType":"Label"},
+        "Transform": {"x":506,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE4","id":"ctrl_1716771045098","controlType":"Label"},
+        "Transform": {"x":537,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF4","id":"ctrl_1716771045099","controlType":"Label"},
+        "Transform": {"x":569,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG4","id":"ctrl_1716771045100","controlType":"Label"},
+        "Transform": {"x":601,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA4","id":"ctrl_1716771045101","controlType":"Label"},
+        "Transform": {"x":633,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB4","id":"ctrl_1716771045102","controlType":"Label"},
+        "Transform": {"x":665,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC5","id":"ctrl_1716771045103","controlType":"Label"},
+        "Transform": {"x":696,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD5","id":"ctrl_1716771045104","controlType":"Label"},
+        "Transform": {"x":728,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE5","id":"ctrl_1716771045105","controlType":"Label"},
+        "Transform": {"x":760,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF5","id":"ctrl_1716771045106","controlType":"Label"},
+        "Transform": {"x":792,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG5","id":"ctrl_1716771045107","controlType":"Label"},
+        "Transform": {"x":823,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA5","id":"ctrl_1716771045108","controlType":"Label"},
+        "Transform": {"x":855,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB5","id":"ctrl_1716771045109","controlType":"Label"},
+        "Transform": {"x":887,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC6","id":"ctrl_1716771045110","controlType":"Label"},
+        "Transform": {"x":919,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD6","id":"ctrl_1716771045111","controlType":"Label"},
+        "Transform": {"x":951,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyE6","id":"ctrl_1716771045112","controlType":"Label"},
+        "Transform": {"x":982,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF6","id":"ctrl_1716771045113","controlType":"Label"},
+        "Transform": {"x":1014,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG6","id":"ctrl_1716771045114","controlType":"Label"},
+        "Transform": {"x":1046,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA6","id":"ctrl_1716771045115","controlType":"Label"},
+        "Transform": {"x":1078,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyB6","id":"ctrl_1716771045116","controlType":"Label"},
+        "Transform": {"x":1109,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC7","id":"ctrl_1716771045117","controlType":"Label"},
+        "Transform": {"x":1141,"y":504,"width":30,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"FFE9E7E2"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#2","id":"ctrl_1716771045118","controlType":"Label"},
+        "Transform": {"x":50,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#2","id":"ctrl_1716771045119","controlType":"Label"},
+        "Transform": {"x":81,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#2","id":"ctrl_1716771045120","controlType":"Label"},
+        "Transform": {"x":145,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#2","id":"ctrl_1716771045121","controlType":"Label"},
+        "Transform": {"x":177,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#2","id":"ctrl_1716771045122","controlType":"Label"},
+        "Transform": {"x":208,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#3","id":"ctrl_1716771045123","controlType":"Label"},
+        "Transform": {"x":272,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#3","id":"ctrl_1716771045124","controlType":"Label"},
+        "Transform": {"x":304,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#3","id":"ctrl_1716771045125","controlType":"Label"},
+        "Transform": {"x":367,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#3","id":"ctrl_1716771045126","controlType":"Label"},
+        "Transform": {"x":399,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#3","id":"ctrl_1716771045127","controlType":"Label"},
+        "Transform": {"x":431,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#4","id":"ctrl_1716771045128","controlType":"Label"},
+        "Transform": {"x":494,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#4","id":"ctrl_1716771045129","controlType":"Label"},
+        "Transform": {"x":526,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#4","id":"ctrl_1716771045130","controlType":"Label"},
+        "Transform": {"x":590,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#4","id":"ctrl_1716771045131","controlType":"Label"},
+        "Transform": {"x":622,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#4","id":"ctrl_1716771045132","controlType":"Label"},
+        "Transform": {"x":653,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#5","id":"ctrl_1716771045133","controlType":"Label"},
+        "Transform": {"x":717,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#5","id":"ctrl_1716771045134","controlType":"Label"},
+        "Transform": {"x":749,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#5","id":"ctrl_1716771045135","controlType":"Label"},
+        "Transform": {"x":812,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#5","id":"ctrl_1716771045136","controlType":"Label"},
+        "Transform": {"x":844,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#5","id":"ctrl_1716771045137","controlType":"Label"},
+        "Transform": {"x":876,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyC#6","id":"ctrl_1716771045138","controlType":"Label"},
+        "Transform": {"x":939,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyD#6","id":"ctrl_1716771045139","controlType":"Label"},
+        "Transform": {"x":971,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyF#6","id":"ctrl_1716771045140","controlType":"Label"},
+        "Transform": {"x":1035,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyG#6","id":"ctrl_1716771045141","controlType":"Label"},
+        "Transform": {"x":1066,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyA#6","id":"ctrl_1716771045142","controlType":"Label"},
+        "Transform": {"x":1098,"y":504,"width":20,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"FF1B1C1E"},"Border":{"enabled":false},"Corners":{"radius":2}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_yamaha-yc61",
+      "name": "Horn turn",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_yamaha-yc61_1",
+          "controlId": "ctrl_1716771045051",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_yamaha-yc61_2",
+          "controlId": "ctrl_1716771045050",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_yamaha-yc61_2",
+      "name": "Horn blur",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_yamaha-yc61_3",
+          "controlId": "ctrl_1716771045051",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.12
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_yamaha-yc61_4",
+          "controlId": "ctrl_1716771045050",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_yamaha-yc61_3",
+      "name": "Drum turn",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_yamaha-yc61_5",
+          "controlId": "ctrl_1716771045054",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_yamaha-yc61_6",
+          "controlId": "ctrl_1716771045053",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": 360
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_yamaha-yc61_4",
+      "name": "Drum blur",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_yamaha-yc61_7",
+          "controlId": "ctrl_1716771045054",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.15
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_yamaha-yc61_8",
+          "controlId": "ctrl_1716771045053",
+          "target": "Transform",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1259 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "bceff7d6-c0b5-4e1a-9f3d-bceff7d6bcef",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Together",
+  "scriptId": "component_button-together",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1040,
+  "height": 706,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFBFC2C6",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "rackmount"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1719843158000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Together","_children":{"Fill":{"colour":"FF1B1B1D"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1719843158001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":980,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"scenes over a row of keys: one effect on many, each a little after the last.","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInCaption","id":"ctrl_1719843158002","controlType":"Label"},
+        "Transform": {"x":30,"y":118,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop in","_children":{"Fill":{"colour":"FF1B1B1D"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInHow","id":"ctrl_1719843158003","controlType":"Label"},
+        "Transform": {"x":30,"y":142,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInWhat","id":"ctrl_1719843158004","controlType":"Label"},
+        "Transform": {"x":30,"y":160,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each key grows in from nothing, 120 ms after the last","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn1","id":"ctrl_1719843158005","controlType":"MomentaryButton"},
+        "Transform": {"x":270,"y":110,"width":112,"height":84},
+        "Text": {"content":"Kick"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn2","id":"ctrl_1719843158006","controlType":"MomentaryButton"},
+        "Transform": {"x":394,"y":110,"width":112,"height":84},
+        "Text": {"content":"Snare"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn3","id":"ctrl_1719843158007","controlType":"MomentaryButton"},
+        "Transform": {"x":518,"y":110,"width":112,"height":84},
+        "Text": {"content":"Hat"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn4","id":"ctrl_1719843158008","controlType":"MomentaryButton"},
+        "Transform": {"x":642,"y":110,"width":112,"height":84},
+        "Text": {"content":"Clap"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn5","id":"ctrl_1719843158009","controlType":"MomentaryButton"},
+        "Transform": {"x":766,"y":110,"width":112,"height":84},
+        "Text": {"content":"Tom"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn6","id":"ctrl_1719843158010","controlType":"MomentaryButton"},
+        "Transform": {"x":890,"y":110,"width":112,"height":84},
+        "Text": {"content":"Rim"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveCaption","id":"ctrl_1719843158011","controlType":"Label"},
+        "Transform": {"x":30,"y":264,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wave","_children":{"Fill":{"colour":"FF1B1B1D"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveHow","id":"ctrl_1719843158012","controlType":"Label"},
+        "Transform": {"x":30,"y":288,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveWhat","id":"ctrl_1719843158013","controlType":"Label"},
+        "Transform": {"x":30,"y":306,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the keys rise in turn along the row","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave1","id":"ctrl_1719843158014","controlType":"MomentaryButton"},
+        "Transform": {"x":270,"y":256,"width":112,"height":84},
+        "Text": {"content":"Kick"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave2","id":"ctrl_1719843158015","controlType":"MomentaryButton"},
+        "Transform": {"x":394,"y":256,"width":112,"height":84},
+        "Text": {"content":"Snare"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave3","id":"ctrl_1719843158016","controlType":"MomentaryButton"},
+        "Transform": {"x":518,"y":256,"width":112,"height":84},
+        "Text": {"content":"Hat"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave4","id":"ctrl_1719843158017","controlType":"MomentaryButton"},
+        "Transform": {"x":642,"y":256,"width":112,"height":84},
+        "Text": {"content":"Clap"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave5","id":"ctrl_1719843158018","controlType":"MomentaryButton"},
+        "Transform": {"x":766,"y":256,"width":112,"height":84},
+        "Text": {"content":"Tom"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave6","id":"ctrl_1719843158019","controlType":"MomentaryButton"},
+        "Transform": {"x":890,"y":256,"width":112,"height":84},
+        "Text": {"content":"Rim"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleCaption","id":"ctrl_1719843158020","controlType":"Label"},
+        "Transform": {"x":30,"y":410,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ripple","_children":{"Fill":{"colour":"FF1B1B1D"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleHow","id":"ctrl_1719843158021","controlType":"Label"},
+        "Transform": {"x":30,"y":434,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK THE FIRST","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RippleWhat","id":"ctrl_1719843158022","controlType":"Label"},
+        "Transform": {"x":30,"y":452,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a press runs along the row from it","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple1","id":"ctrl_1719843158023","description":"Click it: a press runs along the row.","controlType":"MomentaryButton"},
+        "Transform": {"x":270,"y":402,"width":112,"height":84},
+        "Text": {"content":"Kick"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple2","id":"ctrl_1719843158024","controlType":"MomentaryButton"},
+        "Transform": {"x":394,"y":402,"width":112,"height":84},
+        "Text": {"content":"Snare"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple3","id":"ctrl_1719843158025","controlType":"MomentaryButton"},
+        "Transform": {"x":518,"y":402,"width":112,"height":84},
+        "Text": {"content":"Hat"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple4","id":"ctrl_1719843158026","controlType":"MomentaryButton"},
+        "Transform": {"x":642,"y":402,"width":112,"height":84},
+        "Text": {"content":"Clap"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple5","id":"ctrl_1719843158027","controlType":"MomentaryButton"},
+        "Transform": {"x":766,"y":402,"width":112,"height":84},
+        "Text": {"content":"Tom"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ripple6","id":"ctrl_1719843158028","controlType":"MomentaryButton"},
+        "Transform": {"x":890,"y":402,"width":112,"height":84},
+        "Text": {"content":"Rim"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseCaption","id":"ctrl_1719843158029","controlType":"Label"},
+        "Transform": {"x":30,"y":556,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Chase","_children":{"Fill":{"colour":"FF1B1B1D"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseHow","id":"ctrl_1719843158030","controlType":"Label"},
+        "Transform": {"x":30,"y":580,"width":220,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseWhat","id":"ctrl_1719843158031","controlType":"Label"},
+        "Transform": {"x":30,"y":598,"width":220,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a light runs along the keys' legend bars","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase1","id":"ctrl_1719843158032","controlType":"MomentaryButton"},
+        "Transform": {"x":270,"y":548,"width":112,"height":84},
+        "Text": {"content":"Kick"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase2","id":"ctrl_1719843158033","controlType":"MomentaryButton"},
+        "Transform": {"x":394,"y":548,"width":112,"height":84},
+        "Text": {"content":"Snare"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase3","id":"ctrl_1719843158034","controlType":"MomentaryButton"},
+        "Transform": {"x":518,"y":548,"width":112,"height":84},
+        "Text": {"content":"Hat"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase4","id":"ctrl_1719843158035","controlType":"MomentaryButton"},
+        "Transform": {"x":642,"y":548,"width":112,"height":84},
+        "Text": {"content":"Clap"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase5","id":"ctrl_1719843158036","controlType":"MomentaryButton"},
+        "Transform": {"x":766,"y":548,"width":112,"height":84},
+        "Text": {"content":"Tom"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase6","id":"ctrl_1719843158037","controlType":"MomentaryButton"},
+        "Transform": {"x":890,"y":548,"width":112,"height":84},
+        "Text": {"content":"Rim"}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_button-together",
+      "name": "Pop in",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 1400,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_button-together_1",
+          "controlId": "ctrl_1719843158005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.21428571428571427,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.42857142857142855,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_5",
+          "controlId": "ctrl_1719843158006",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.3,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.5142857142857142,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_9",
+          "controlId": "ctrl_1719843158007",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.38571428571428573,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.6,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_13",
+          "controlId": "ctrl_1719843158008",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.4714285714285714,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.6857142857142857,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_17",
+          "controlId": "ctrl_1719843158009",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.5571428571428572,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.7714285714285715,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_21",
+          "controlId": "ctrl_1719843158010",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.6428571428571429,
+                "scale": 0.2,
+                "opacity": 0
+              },
+              {
+                "at": 0.8571428571428571,
+                "scale": 1.1,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_button-together_2",
+      "name": "Wave",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 3000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_button-together_2",
+          "controlId": "ctrl_1719843158014",
+          "target": "Transform",
+          "start": 400,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_6",
+          "controlId": "ctrl_1719843158015",
+          "target": "Transform",
+          "start": 540,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_10",
+          "controlId": "ctrl_1719843158016",
+          "target": "Transform",
+          "start": 680,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_14",
+          "controlId": "ctrl_1719843158017",
+          "target": "Transform",
+          "start": 820,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_18",
+          "controlId": "ctrl_1719843158018",
+          "target": "Transform",
+          "start": 960,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_22",
+          "controlId": "ctrl_1719843158019",
+          "target": "Transform",
+          "start": 1100,
+          "length": 560,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutSine",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.4,
+                "y": -10
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_button-together_3",
+      "name": "Ripple",
+      "trigger": {
+        "type": "event",
+        "controlId": "ctrl_1719843158023",
+        "event": "click"
+      },
+      "length": 810,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_button-together_3",
+          "controlId": "ctrl_1719843158023",
+          "target": "Transform",
+          "start": 0,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_7",
+          "controlId": "ctrl_1719843158024",
+          "target": "Transform",
+          "start": 90,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_11",
+          "controlId": "ctrl_1719843158025",
+          "target": "Transform",
+          "start": 180,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_15",
+          "controlId": "ctrl_1719843158026",
+          "target": "Transform",
+          "start": 270,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_19",
+          "controlId": "ctrl_1719843158027",
+          "target": "Transform",
+          "start": 360,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_23",
+          "controlId": "ctrl_1719843158028",
+          "target": "Transform",
+          "start": 450,
+          "length": 360,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.35,
+                "scale": 0.9
+              },
+              {
+                "at": 0.7,
+                "scale": 1.05
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_button-together_4",
+      "name": "Chase",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 1500,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_button-together_4",
+          "controlId": "ctrl_1719843158032",
+          "target": "Parts.symbol",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_8",
+          "controlId": "ctrl_1719843158033",
+          "target": "Parts.symbol",
+          "start": 200,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_12",
+          "controlId": "ctrl_1719843158034",
+          "target": "Parts.symbol",
+          "start": 400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_16",
+          "controlId": "ctrl_1719843158035",
+          "target": "Parts.symbol",
+          "start": 600,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_20",
+          "controlId": "ctrl_1719843158036",
+          "target": "Parts.symbol",
+          "start": 800,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_button-together_24",
+          "controlId": "ctrl_1719843158037",
+          "target": "Parts.symbol",
+          "start": 1000,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1
+              },
+              {
+                "at": 0.08,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 0.5,
+                "fill": "FFFFB347"
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

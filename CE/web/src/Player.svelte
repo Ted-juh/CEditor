@@ -8,6 +8,7 @@
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
   import { loadBakedRenderedLooks } from './CE_Application/utils/renderedLook.js';
   import { registerDocumentFonts } from './CE_Application/utils/documentFonts.js';
+  import { patternFrameCap, frameCapFor } from './CE_Application/stores/patternFrameCap.js';
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
@@ -509,6 +510,8 @@
     // The imported fonts the author's panel carries (utils/documentFonts.js): the only ones the
     // player has. Registered before the controls draw, so text lands in its face, not a fallback.
     registerDocumentFonts(next.fonts);
+    // Moving patterns step 30 times a second where the author exported it so (Export tab).
+    patternFrameCap.set(frameCapFor(next.exportSettings));
     // The same for the icons it uses (utils/documentIcons.js): the player has no icon library.
     setDocumentIcons(next.icons);
     // A queued frame or partial NRPN belongs to the document that received it. Panel ids and
@@ -774,7 +777,7 @@
     {#if panel}
       <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
         {#key panelLoadGeneration}
-          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} />
+          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} testSignals={false} />
         {/key}
       </div>
     {:else}

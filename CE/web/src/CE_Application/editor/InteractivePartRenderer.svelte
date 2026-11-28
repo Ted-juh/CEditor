@@ -9,8 +9,10 @@
   import { parseTiming } from '../utils/easing.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { numberOr } from '../utils/primitives.js';
-  import { plainFillCSS } from '../utils/plainFillCSS.js';
-  import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { plainFillCSS, fillShapeCSS } from '../utils/plainFillCSS.js';
+  import PatternLayers from '../../CE_Panel/components/PatternLayers.svelte';
+  import { hasPatterns } from '../utils/patternLayers.js';
+  import { gradientBackgroundCSS } from '../utils/gradientPaint.js';
   import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textAlignFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
   import { iconImageStyle } from './iconLook.js';
   import { storedIcons } from '../stores/appSettings.js';
@@ -28,6 +30,7 @@
   import { anatomyForm } from '../models/controlAnatomy.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
+  import { sliderWordsPlace } from '../utils/anatomyWords.js';
   import { booleanShapeFor, booleanShapeRevision, compoundShapeFor } from '../utils/booleanGroups.js';
   import { outlineInsetDepths } from '../utils/outlineBorder.js';
   import { outlineShadows } from '../utils/outlineShadows.js';
@@ -36,6 +39,7 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { splitText, textPieceStyles, reelColumns, REEL_WINDOW } from '../utils/textEffects.js';
   import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
   import { pictureColour, recolourPicture, withRecolouredPicture } from '../utils/pictureRecolour.js';
 
@@ -51,6 +55,11 @@
     colourChannels = null,
     /** Draw a hidden part as invisible rather than not at all, so showing and hiding can fade. */
     fadeHidden = false,
+    // A text effect playing on this part's text (utils/textEffects.js): { name, effect, phase }, or
+    // null. Its @keyframes are in the control's own style element; here the text is cut into pieces.
+    textEffect = null,
+    // A scene's clips on this part's patterns, by pattern name (PatternLayers.svelte), or null.
+    patternAnimations = null,
     debug = false,
     editableInput = null,
     oneditableinput = null,
@@ -126,6 +135,14 @@
   // From the recoloured part: the panel's shadow, recoloured, is a multiply (withRecolouredPicture).
   let effects = $derived(colouredPart?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
+  let textPieces = $derived.by(() => {
+    if (!textEffect?.effect || !text) return null;
+    const pieces = splitText(String(text.content ?? ''), textEffect.effect.split);
+    const seedText = `${partName}:${textEffect.name}`;
+    const styles = textPieceStyles(textEffect.effect, pieces, { phase: textEffect.phase, seedText, at: textEffect.at ?? null, columns: true });
+    const columns = reelColumns(textEffect.effect, pieces, { seedText });
+    return pieces.map((piece, index) => ({ ...piece, style: styles[index], column: columns[index] }));
+  });
   let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
   // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
@@ -145,6 +162,13 @@
   // ControlAnatomy on the panel, not by SliderFamilyRenderer; CanvasControl picks between them the
   // same way. The part always used SliderFamilyRenderer, so a converted knob with a form came out a
   // different knob: smaller, with a larger readout.
+  // A text effect on this part, when it carries a knob, plays on the knob's own first words — its
+  // scale's numbers, else its ticks or its readout (utils/anatomyWords.js), as one on the knob would.
+  let hostedTexts = $derived.by(() => {
+    if (!sliderResolved || !textEffect) return null;
+    const place = sliderWordsPlace(sliderResolved.control);
+    return place ? new Map([[place.slice('Parts.'.length), [textEffect]]]) : null;
+  });
   let sliderAnatomy = $derived(sliderResolved
     ? anatomyForm(sliderResolved.control?._children?.Core?.controlType, sliderResolved.control?._children?.Core?.controlForm)
     : '');
@@ -237,6 +261,12 @@
   let fixedLight = $derived((shape.rendersOutline || !!renderedPlacement) && part?.meta?.fixedLight === true);
   let outlineTurn = $derived(fixedLight && Math.abs(partRotation) > 0.001 ? partRotation : 0);
 
+  // Patterns placed in front of the part's content (PatternLayers.svelte): over its text and its
+  // image, clipped to its shape — its traced outline, or its corners — as the control's own are.
+  let frontPatterns = $derived(hasPatterns(background));
+  let frontPatternClip = $derived(frontPatterns
+    ? (outline?.d ? `clip-path: path(evenodd, '${outline.d}');` : fillShapeCSS(background?._children?.Corners, frame.width, frame.height))
+    : '');
   let outline = $derived.by(() => {
     const traced = outlineState?.shape;
     if (!traced || traced.empty || !traced.pathData) return null;
@@ -322,8 +352,9 @@
       // Keyframe animations on this part (the control's player decides which are playing). A fill
       // absorbed onto this element is painted here, so its colour channel plays here too; the rest
       // travel to the layers inside as custom properties.
-      animationDeclaration(animationList, { extra: colourChannels && absorbedFillCSS ? colourChannels.paint : [] }),
-      colourChannels ? colourVariables(colourChannels, { skip: absorbedFillCSS ? ['paint'] : [] }) : '',
+      // An absorbed fill is a colour or a gradient (utils/gradientPaint.js), so one of the two channels.
+      animationDeclaration(animationList, { extra: colourChannels && absorbedFillCSS ? (colourChannels[absorbedChannel] ?? []) : [] }),
+      colourChannels ? colourVariables(colourChannels, { skip: absorbedFillCSS ? [absorbedChannel] : [] }) : '',
       shadowCSS,
       blendCSS,
       filterCSS,
@@ -340,8 +371,11 @@
   // and the 474 that are left over still wanted a div each just to hold a colour.
   // Not on a layer that casts a control's shadows: its fill must be inside the surface that casts
   // them, or only its border would.
+  let absorbedChannel = $derived(/gradient\(/.test(absorbedFillCSS ?? '') ? 'gradient' : 'paint');
+  // A fill whose image a keyframe animation moves is drawn as a layer, as on a control (CanvasControl).
+  let imageMoves = $derived(!!colourChannels?.image?.length);
   let absorbedFillCSS = $derived(
-    background && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
+    background && !imageMoves && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -683,7 +717,7 @@
     if (!shape.usesSimpleBackground && !(shape.rendersVectorShape && shape.polygonVerts && !shape.rendersOpenPath)) return '';
     const fill = background?._children?.Fill ?? null;
     if (fill?.gradientEnabled !== true || !(fill?.gradient?.stops?.length >= 2)) return '';
-    return `background: ${gradientToCSS(fill.gradient)}; opacity: ${(numberOr(fill.gradientOpacity, 100) / 100).toFixed(3)}; mix-blend-mode: ${fill.gradientBlend ?? 'normal'};`;
+    return `${gradientBackgroundCSS(fill.gradient)} opacity: ${(numberOr(fill.gradientOpacity, 100) / 100).toFixed(3)}; mix-blend-mode: ${fill.gradientBlend ?? 'normal'};`;
   });
 
   let simpleBackgroundStyle = $derived.by(() => {
@@ -932,7 +966,7 @@
           </svg>
         {/if}
         {#if background}
-          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} />
+          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} patternAnimations={patternAnimations} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
         {/if}
         {#if shadowLayers?.inner.length}
           <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
@@ -971,7 +1005,7 @@
            holds the colour and thickness that fall back to, and drawn as a box it put a full ring,
            radius 999 and the arc's own colour, under every arc the Arc pen made, so the arc's gap
            never showed. -->
-      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
+      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} patternAnimations={patternAnimations} patternTiming={transitionBucket?.colour ?? null} {imageMoves} />
     {/if}
 
     {#if polygonFillStyle}
@@ -1033,6 +1067,7 @@
         width={frame.width}
         height={frame.height}
         label={String(sliderResolved.control?._children?.Text?.content ?? '')}
+        partTexts={hostedTexts}
       />
     {:else if sliderResolved}
       <SliderFamilyRenderer
@@ -1041,6 +1076,7 @@
         width={frame.width}
         height={frame.height}
         partTransitions={sliderTransitions?.partTransitions ?? null}
+        partTexts={hostedTexts}
         {debug}
       />
     {/if}
@@ -1108,7 +1144,12 @@
         <div class="interactive-part-text-line" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
       {/each}
       <div class="interactive-part-text ce-colour-anim" style={textStyle}>
-        {text?.content ?? ''}
+        {#if textPieces}
+          <!-- One flex item holding the pieces, so they flow as the words did. -->
+          <span class="interactive-part-text-pieces" style="--ce-part-reach:{Math.round(layoutFrame.width || 0)}px">{#each textPieces as piece}{#if piece.column}<span style={REEL_WINDOW}><span style={piece.style}>{piece.column}</span></span>{:else}<span style={piece.style}>{piece.text}</span>{/if}{/each}</span>
+        {:else}
+          {text?.content ?? ''}
+        {/if}
       </div>
       {#each textDecorations.filter((line) => line.front) as line (line.kind)}
         <div class="interactive-part-text-line front" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
@@ -1141,6 +1182,10 @@
       </div>
     {:else if image}
       <div class="interactive-part-image" style={imageStyle}></div>
+    {/if}
+
+    {#if frontPatterns}
+      <PatternLayers {background} place="front" width={frame.width} height={frame.height} clip={frontPatternClip} animations={patternAnimations} timing={transitionBucket?.colour ?? null} />
     {/if}
 
     {#if debug}
@@ -1183,6 +1228,10 @@
   .interactive-simple-background { animation: var(--ce-kf-paint, none); }
   .interactive-vector-shape :global(polygon) { animation: var(--ce-kf-shape, none); }
   .interactive-vector-shape :global(line) { animation: var(--ce-kf-stroke, none); }
+  .interactive-part-text-pieces {
+    white-space: inherit;
+  }
+
   .interactive-part-text { animation: var(--ce-kf-text, none); }
   /* A text layer's underline, strikethrough or overline: under its glyphs, or over them (front). */
   .interactive-part-text-line { position: absolute; pointer-events: none; z-index: 1; }
@@ -1250,6 +1299,9 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
+    /* Eases with the part's colour timing, and plays its gradient's turn and shift frames. */
+    transition: var(--ce-colour-transition, none);
+    animation: var(--ce-kf-gradient, none);
   }
 
   .interactive-envelope-path,

@@ -55,8 +55,9 @@ function filmstripStarter() {
 const rowOf = (animation) => describeAnimation('test', animation);
 const switched = (animation, kind, control) => ({ ...animation, ...kindPatch(rowOf(animation), kind, control) });
 
-test('sequence is a third kind, beside the transition and the CSS keyframes', () => {
-  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence']);
+test('sequence is a third kind, beside the transition and the CSS keyframes, and before text', () => {
+  // The Text engine (textEffects.js) added the fourth kind after it; the order is the tab's.
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes', 'sequence', 'text']);
   assert.equal(SEQUENCE_KIND, 'sequence');
   assert.deepEqual(SEQUENCE_ONLY_BUCKETS, ['channel', 'frame']);
 });
@@ -199,7 +200,9 @@ test('a sequence can track the control itself, beside its channels and frames', 
   const { OFFERED_ROOT_PROPERTIES, CONTROL_ITSELF } = await import('../src/CE_Application/utils/animationModel.js');
   const control = filmstripStarter();
   const offered = offeredTargetsFor(control, 'sequence', { onControl: true });
-  assert.deepEqual(offered.filter((e) => e.scope === 'root').map((e) => e.path), OFFERED_ROOT_PROPERTIES.map((e) => e.path));
+  // All of the control's own properties but the gradient, which a sequence cannot move (it is not a
+  // number or a colour); a transition glides it (gradientPaint.js).
+  assert.deepEqual(offered.filter((e) => e.scope === 'root').map((e) => e.path), OFFERED_ROOT_PROPERTIES.filter((e) => e.sequence !== false).map((e) => e.path));
   assert.deepEqual(offered.filter((e) => e.scope === 'control').map((e) => e.path), ['ValueChannels.mainValue', 'Parts.filmstrip_knobFrames.Image.frameIndex']);
   const rotation = buildTarget(CONTROL_ITSELF, offered.find((e) => e.path === 'Transform.rotation'));
   assert.equal(sequenceTargetStatus(rotation, []).animates, 'transform');

@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDocumentationTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, openAnimationDesigner, closeAnimationDesigner, closeSettingsTab, closeInstrumentHostTab, closeDocumentationTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
@@ -52,6 +52,7 @@
     screen: 'Screen',
     instrumentHost: 'Hostage',
     documentation: 'Documentation',
+    animation: 'Animation Designer',
   };
 
   function tabTooltip(tab) {
@@ -314,6 +315,8 @@
       }
     } else if (tab.tabType === 'screen') {
       closeScreenTab(tab.id);
+    } else if (tab.tabType === 'animation') {
+      closeAnimationDesigner(tab.id);
     } else {
       closePanel(tab.id);
     }
@@ -458,6 +461,8 @@
         <button role="menuitem" onclick={() => runNew(createComponentTab)}>Custom Component</button>
         <button role="menuitem" onclick={() => runNew(createDeviceProfileTab)}>Device Profile Designer</button>
         <button role="menuitem" onclick={() => runNew(createScriptTab)}>Script Workspace</button>
+        <button role="menuitem" disabled={!$panels.length} title="The Animation Designer of the panel in front"
+                onclick={() => runNew(() => openAnimationDesigner())}>Animation Designer</button>
       </div>
     {:else if tray === 'open'}
       <div class="tray-menu" use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end'] }} role="menu" aria-label="Open document">

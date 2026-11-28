@@ -21,6 +21,8 @@
 
   let {
     rows = [],
+    // The control the rows are on, so a knob can say where it draws no words (utils/anatomyWords.js).
+    control = null,
     partNames = [],
     stateNames = [],
     clashes = [],
@@ -35,7 +37,7 @@
 
 <div class="list" role="listbox" tabindex="-1" aria-label="Animations">
   {#each rows as row (row.name)}
-    {@const dead = deadTargetCount(row, partNames)}
+    {@const dead = deadTargetCount(row, partNames, { control })}
     {@const unknown = unknownTriggerStates(row, stateNames)}
     {@const loses = clashesFor(row.name, clashes).filter((clash) => clash.role === 'loses')}
     <div
@@ -68,7 +70,7 @@
       </span>
 
       <span class="meta">
-        <span class="sum" title={`${row.duration} ms ${row.kind}, ${triggerSummary(row)}`}>{row.duration}ms{row.kind === 'keyframes' ? ' keyframes' : row.kind === 'sequence' ? ' sequence' : ''}, {triggerSummary(row)}</span>
+        <span class="sum" title={`${row.duration} ms ${row.kind}, ${triggerSummary(row)}`}>{row.duration}ms{row.kind === 'keyframes' ? ' keyframes' : row.kind === 'sequence' ? ' sequence' : row.kind === 'value' ? ' value' : ''}, {triggerSummary(row)}</span>
         {#if dead}
           <i class="bad" title={`${dead} of this animation's targets do nothing`}>
             <TriangleAlert size={12} aria-hidden="true" /> {dead}

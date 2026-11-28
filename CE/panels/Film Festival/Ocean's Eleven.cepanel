@@ -1,0 +1,1933 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "917ce64b-f11d-4fe5-a5e5-917ce64b917c",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Ocean's Eleven",
+  "scriptId": "film_oceans",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF12040A",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Velvet","id":"ctrl_1710881739000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#3a0614"},{"position":100,"color":"#120208"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb1","id":"ctrl_1710881739001","controlType":"Label"},
+        "Transform": {"x":24,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb2","id":"ctrl_1710881739002","controlType":"Label"},
+        "Transform": {"x":75,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb3","id":"ctrl_1710881739003","controlType":"Label"},
+        "Transform": {"x":126,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb4","id":"ctrl_1710881739004","controlType":"Label"},
+        "Transform": {"x":177,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb5","id":"ctrl_1710881739005","controlType":"Label"},
+        "Transform": {"x":227,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb6","id":"ctrl_1710881739006","controlType":"Label"},
+        "Transform": {"x":278,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb7","id":"ctrl_1710881739007","controlType":"Label"},
+        "Transform": {"x":329,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb8","id":"ctrl_1710881739008","controlType":"Label"},
+        "Transform": {"x":380,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb9","id":"ctrl_1710881739009","controlType":"Label"},
+        "Transform": {"x":431,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb10","id":"ctrl_1710881739010","controlType":"Label"},
+        "Transform": {"x":482,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb11","id":"ctrl_1710881739011","controlType":"Label"},
+        "Transform": {"x":533,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb12","id":"ctrl_1710881739012","controlType":"Label"},
+        "Transform": {"x":583,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb13","id":"ctrl_1710881739013","controlType":"Label"},
+        "Transform": {"x":634,"y":18,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb14","id":"ctrl_1710881739014","controlType":"Label"},
+        "Transform": {"x":684,"y":19,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb15","id":"ctrl_1710881739015","controlType":"Label"},
+        "Transform": {"x":684,"y":70,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb16","id":"ctrl_1710881739016","controlType":"Label"},
+        "Transform": {"x":684,"y":121,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb17","id":"ctrl_1710881739017","controlType":"Label"},
+        "Transform": {"x":684,"y":172,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb18","id":"ctrl_1710881739018","controlType":"Label"},
+        "Transform": {"x":684,"y":222,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb19","id":"ctrl_1710881739019","controlType":"Label"},
+        "Transform": {"x":684,"y":273,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb20","id":"ctrl_1710881739020","controlType":"Label"},
+        "Transform": {"x":684,"y":324,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb21","id":"ctrl_1710881739021","controlType":"Label"},
+        "Transform": {"x":684,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb22","id":"ctrl_1710881739022","controlType":"Label"},
+        "Transform": {"x":633,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb23","id":"ctrl_1710881739023","controlType":"Label"},
+        "Transform": {"x":582,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb24","id":"ctrl_1710881739024","controlType":"Label"},
+        "Transform": {"x":531,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb25","id":"ctrl_1710881739025","controlType":"Label"},
+        "Transform": {"x":481,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb26","id":"ctrl_1710881739026","controlType":"Label"},
+        "Transform": {"x":430,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb27","id":"ctrl_1710881739027","controlType":"Label"},
+        "Transform": {"x":379,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb28","id":"ctrl_1710881739028","controlType":"Label"},
+        "Transform": {"x":328,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb29","id":"ctrl_1710881739029","controlType":"Label"},
+        "Transform": {"x":277,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb30","id":"ctrl_1710881739030","controlType":"Label"},
+        "Transform": {"x":226,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb31","id":"ctrl_1710881739031","controlType":"Label"},
+        "Transform": {"x":176,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb32","id":"ctrl_1710881739032","controlType":"Label"},
+        "Transform": {"x":125,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb33","id":"ctrl_1710881739033","controlType":"Label"},
+        "Transform": {"x":74,"y":375,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb34","id":"ctrl_1710881739034","controlType":"Label"},
+        "Transform": {"x":24,"y":374,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb35","id":"ctrl_1710881739035","controlType":"Label"},
+        "Transform": {"x":24,"y":323,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb36","id":"ctrl_1710881739036","controlType":"Label"},
+        "Transform": {"x":24,"y":272,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb37","id":"ctrl_1710881739037","controlType":"Label"},
+        "Transform": {"x":24,"y":221,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb38","id":"ctrl_1710881739038","controlType":"Label"},
+        "Transform": {"x":24,"y":171,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb39","id":"ctrl_1710881739039","controlType":"Label"},
+        "Transform": {"x":24,"y":120,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bulb40","id":"ctrl_1710881739040","controlType":"Label"},
+        "Transform": {"x":24,"y":69,"width":12,"height":12},
+        "Background": {"_children":{"Fill":{"colour":"FFFFE08A"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":10,"spread":1,"colour":"FFFFC44A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Window","id":"ctrl_1710881739041","controlType":"Label"},
+        "Transform": {"x":180,"y":110,"width":360,"height":150},
+        "Background": {"_children":{"Fill":{"colour":"FFF4EEE2"},"Border":{"enabled":false},"Corners":{"radius":12}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Reel1","id":"ctrl_1710881739042","controlType":"Label"},
+        "Transform": {"x":196,"y":122,"width":104,"height":126},
+        "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"7","_children":{"Fill":{"colour":"FFD62828"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Reel2","id":"ctrl_1710881739043","controlType":"Label"},
+        "Transform": {"x":308,"y":122,"width":104,"height":126},
+        "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"7","_children":{"Fill":{"colour":"FFD62828"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Reel3","id":"ctrl_1710881739044","controlType":"Label"},
+        "Transform": {"x":420,"y":122,"width":104,"height":126},
+        "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"enabled":false},"Corners":{"radius":6}}},
+        "Text": {"content":"7","_children":{"Fill":{"colour":"FFD62828"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":96}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Jackpot","id":"ctrl_1710881739045","controlType":"Label"},
+        "Transform": {"y":50,"width":720,"height":54},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"JACKPOT","_children":{"Fill":{"colour":"FFFFD24A"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":44,"letterSpacing":6}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"FFFF9A2A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1710881739046","controlType":"Label"},
+        "Transform": {"y":290,"width":720,"height":54},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OCEAN'S ELEVEN","_children":{"Fill":{"colour":"FFF4EEE2"},"Font":{"family":"Barlow Semi Condensed","weight":"Bold","weightValue":700,"size":36,"letterSpacing":8}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_oceans",
+      "name": "Jackpot",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7200,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_oceans_1",
+          "controlId": "ctrl_1710881739001",
+          "target": "Transform",
+          "start": 0,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_2",
+          "controlId": "ctrl_1710881739002",
+          "target": "Transform",
+          "start": 30,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_3",
+          "controlId": "ctrl_1710881739003",
+          "target": "Transform",
+          "start": 60,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_4",
+          "controlId": "ctrl_1710881739004",
+          "target": "Transform",
+          "start": 90,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_5",
+          "controlId": "ctrl_1710881739005",
+          "target": "Transform",
+          "start": 120,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_6",
+          "controlId": "ctrl_1710881739006",
+          "target": "Transform",
+          "start": 150,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_7",
+          "controlId": "ctrl_1710881739007",
+          "target": "Transform",
+          "start": 180,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_8",
+          "controlId": "ctrl_1710881739008",
+          "target": "Transform",
+          "start": 210,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_9",
+          "controlId": "ctrl_1710881739009",
+          "target": "Transform",
+          "start": 240,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_10",
+          "controlId": "ctrl_1710881739010",
+          "target": "Transform",
+          "start": 270,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_11",
+          "controlId": "ctrl_1710881739011",
+          "target": "Transform",
+          "start": 300,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_12",
+          "controlId": "ctrl_1710881739012",
+          "target": "Transform",
+          "start": 330,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_13",
+          "controlId": "ctrl_1710881739013",
+          "target": "Transform",
+          "start": 360,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_14",
+          "controlId": "ctrl_1710881739014",
+          "target": "Transform",
+          "start": 390,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_15",
+          "controlId": "ctrl_1710881739015",
+          "target": "Transform",
+          "start": 420,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_16",
+          "controlId": "ctrl_1710881739016",
+          "target": "Transform",
+          "start": 450,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_17",
+          "controlId": "ctrl_1710881739017",
+          "target": "Transform",
+          "start": 480,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_18",
+          "controlId": "ctrl_1710881739018",
+          "target": "Transform",
+          "start": 510,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_19",
+          "controlId": "ctrl_1710881739019",
+          "target": "Transform",
+          "start": 540,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_20",
+          "controlId": "ctrl_1710881739020",
+          "target": "Transform",
+          "start": 570,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_21",
+          "controlId": "ctrl_1710881739021",
+          "target": "Transform",
+          "start": 600,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_22",
+          "controlId": "ctrl_1710881739022",
+          "target": "Transform",
+          "start": 630,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_23",
+          "controlId": "ctrl_1710881739023",
+          "target": "Transform",
+          "start": 660,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_24",
+          "controlId": "ctrl_1710881739024",
+          "target": "Transform",
+          "start": 690,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_25",
+          "controlId": "ctrl_1710881739025",
+          "target": "Transform",
+          "start": 720,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_26",
+          "controlId": "ctrl_1710881739026",
+          "target": "Transform",
+          "start": 750,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_27",
+          "controlId": "ctrl_1710881739027",
+          "target": "Transform",
+          "start": 780,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_28",
+          "controlId": "ctrl_1710881739028",
+          "target": "Transform",
+          "start": 810,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_29",
+          "controlId": "ctrl_1710881739029",
+          "target": "Transform",
+          "start": 840,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_30",
+          "controlId": "ctrl_1710881739030",
+          "target": "Transform",
+          "start": 870,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_31",
+          "controlId": "ctrl_1710881739031",
+          "target": "Transform",
+          "start": 900,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_32",
+          "controlId": "ctrl_1710881739032",
+          "target": "Transform",
+          "start": 930,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_33",
+          "controlId": "ctrl_1710881739033",
+          "target": "Transform",
+          "start": 960,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_34",
+          "controlId": "ctrl_1710881739034",
+          "target": "Transform",
+          "start": 990,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_35",
+          "controlId": "ctrl_1710881739035",
+          "target": "Transform",
+          "start": 1020,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_36",
+          "controlId": "ctrl_1710881739036",
+          "target": "Transform",
+          "start": 1050,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_37",
+          "controlId": "ctrl_1710881739037",
+          "target": "Transform",
+          "start": 1080,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_38",
+          "controlId": "ctrl_1710881739038",
+          "target": "Transform",
+          "start": 1110,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_39",
+          "controlId": "ctrl_1710881739039",
+          "target": "Transform",
+          "start": 1140,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_40",
+          "controlId": "ctrl_1710881739040",
+          "target": "Transform",
+          "start": 1170,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 6,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.3,
+                "opacity": 0.3,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0.3,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_41",
+          "controlId": "ctrl_1710881739042",
+          "target": "Text",
+          "start": 300,
+          "length": 1600,
+          "effect": {
+            "kind": "text",
+            "effect": "reel",
+            "way": "in",
+            "iterations": 1,
+            "spins": 18,
+            "glyphs": "7$★♦♣♠♥€",
+            "duration": 1500,
+            "easing": "outCubic"
+          }
+        },
+        {
+          "id": "cl_oceans_42",
+          "controlId": "ctrl_1710881739043",
+          "target": "Text",
+          "start": 300,
+          "length": 2250,
+          "effect": {
+            "kind": "text",
+            "effect": "reel",
+            "way": "in",
+            "iterations": 1,
+            "spins": 18,
+            "glyphs": "7$★♦♣♠♥€",
+            "duration": 2150,
+            "easing": "outCubic"
+          }
+        },
+        {
+          "id": "cl_oceans_43",
+          "controlId": "ctrl_1710881739044",
+          "target": "Text",
+          "start": 300,
+          "length": 2900,
+          "effect": {
+            "kind": "text",
+            "effect": "reel",
+            "way": "in",
+            "iterations": 1,
+            "spins": 18,
+            "glyphs": "7$★♦♣♠♥€",
+            "duration": 2800,
+            "easing": "outCubic"
+          }
+        },
+        {
+          "id": "cl_oceans_44",
+          "controlId": "ctrl_1710881739041",
+          "target": "Transform",
+          "start": 3000,
+          "length": 300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 3,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "fill": "FFFFF6B0",
+                "scale": 1.04
+              },
+              {
+                "at": 1,
+                "scale": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_oceans_45",
+          "controlId": "ctrl_1710881739045",
+          "target": "Text",
+          "start": 3000,
+          "length": 800,
+          "effect": {
+            "kind": "text",
+            "effect": "explode",
+            "way": "in",
+            "iterations": 1,
+            "scatter": 120,
+            "scale": 2.6,
+            "stagger": 30,
+            "duration": 520
+          }
+        },
+        {
+          "id": "cl_oceans_46",
+          "controlId": "ctrl_1710881739046",
+          "target": "Text",
+          "start": 4200,
+          "length": 1100,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 60,
+            "duration": 200
+          }
+        }
+      ]
+    }
+  ]
+}

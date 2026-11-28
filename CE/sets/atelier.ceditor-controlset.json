@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "471e11cf",
+  "fingerprint": "5badfdcd",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -71,6 +71,7 @@
       "display.screen": "FF1C1C1A",
       "display.backlight": "FF373735",
       "panel.surface": "FFD9D9D4",
+      "control.readout": "{control.cap}",
       "section.surface": "FFE6E6E3"
     },
     "lamp": {

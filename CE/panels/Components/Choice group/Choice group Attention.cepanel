@@ -1,0 +1,851 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "e7a174af-c0b5-4e1a-9f3d-e7a174afe7a1",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Choice group Attention",
+  "scriptId": "component_choice-attention",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFD9D9D4",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Pulse.value",
+      "label": "Pulse",
+      "controlName": "Pulse",
+      "path": "Pulse.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Square",
+        "Tri",
+        "Sine"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Breathe.value",
+      "label": "Breathe",
+      "controlName": "Breathe",
+      "path": "Breathe.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Off",
+        "Slow",
+        "Fast"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wiggle.value",
+      "label": "Wiggle",
+      "controlName": "Wiggle",
+      "path": "Wiggle.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LP",
+        "BP",
+        "HP"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BeatPulse.value",
+      "label": "BeatPulse",
+      "controlName": "BeatPulse",
+      "path": "BeatPulse.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1/4",
+        "1/8",
+        "1/16"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "LookHere.value",
+      "label": "LookHere",
+      "controlName": "LookHere",
+      "path": "LookHere.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Mono",
+        "Poly",
+        "Uni"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "PopIn.value",
+      "label": "PopIn",
+      "controlName": "PopIn",
+      "path": "PopIn.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "component_choice-attention_1",
+      "name": "Look here",
+      "language": "javascript",
+      "source": "// Plays the Look here group's own animation every four seconds, as a panel would to draw the\n// eye to one control: ce.anim.play(control, animation).\nfunction lookHere() {\n  ce.anim.play('LookHere', 'lookHere');\n  after(4000, lookHere);\n}\nafter(1500, lookHere);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "atelier"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1716118063000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice group · Attention","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1716118063001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"motion that calls the eye to the group. Each group wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pulse","id":"ctrl_1716118063002","description":"Pulse: swells and settles, again and again: \"choose\".","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Square","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"Sine","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"pulse":{"_type":"Animation","name":"pulse","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.5,"scale":1.04},{"at":1,"scale":1}],"duration":1600,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:choice:pulse","revision":1,"from":"pulse"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseCaption","id":"ctrl_1716118063003","controlType":"Label"},
+        "Transform": {"x":40,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pulse","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseHow","id":"ctrl_1716118063004","controlType":"Label"},
+        "Transform": {"x":40,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PulseWhat","id":"ctrl_1716118063005","controlType":"Label"},
+        "Transform": {"x":44,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"swells and settles, again and again: \"choose\"","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Breathe","id":"ctrl_1716118063006","description":"Breathe: fades a little and back, slowly.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Off","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Slow","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Fast","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"breathe":{"_type":"Animation","name":"breathe","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.55},{"at":1,"opacity":1}],"duration":2400,"delay":0,"easing":"inOutSine","iterations":"infinite","direction":"normal","preset":{"id":"ce:choice:breathe","revision":1,"from":"breathe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheCaption","id":"ctrl_1716118063007","controlType":"Label"},
+        "Transform": {"x":360,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Breathe","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheHow","id":"ctrl_1716118063008","controlType":"Label"},
+        "Transform": {"x":360,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BreatheWhat","id":"ctrl_1716118063009","controlType":"Label"},
+        "Transform": {"x":364,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"fades a little and back, slowly","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wiggle","id":"ctrl_1716118063010","description":"Wiggle: a small wiggle as the pointer arrives.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":690,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"LP","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"BP","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"HP","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"wiggle":{"_type":"Animation","name":"wiggle","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"rotate":0},{"at":0.2,"rotate":-3},{"at":0.45,"rotate":2.5},{"at":0.7,"rotate":-1.5},{"at":1,"rotate":0}],"duration":460,"delay":0,"easing":"inOutSine","iterations":1,"direction":"normal","preset":{"id":"ce:choice:wiggle","revision":1,"from":"wiggle"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleCaption","id":"ctrl_1716118063011","controlType":"Label"},
+        "Transform": {"x":680,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wiggle","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleHow","id":"ctrl_1716118063012","controlType":"Label"},
+        "Transform": {"x":680,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WiggleWhat","id":"ctrl_1716118063013","controlType":"Label"},
+        "Transform": {"x":684,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small wiggle as the pointer arrives","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulse","id":"ctrl_1716118063014","description":"Beat pulse: pulses on each beat while the transport plays.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"1/4","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"1/8","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"1/16","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"beatPulse":{"_type":"Animation","name":"beatPulse","enabled":true,"kind":"keyframes","trigger":{"type":"beat","every":1},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.2,"scale":1.05},{"at":1,"scale":1}],"duration":280,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:beat-pulse","revision":1,"from":"beatPulse"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseCaption","id":"ctrl_1716118063015","controlType":"Label"},
+        "Transform": {"x":40,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat pulse","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseHow","id":"ctrl_1716118063016","controlType":"Label"},
+        "Transform": {"x":40,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatPulseWhat","id":"ctrl_1716118063017","controlType":"Label"},
+        "Transform": {"x":44,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"pulses on each beat while the transport plays","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHere","id":"ctrl_1716118063018","description":"Look here: jumps, as a panel says \"choose one here\".","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Mono","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Poly","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Uni","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"lookHere":{"_type":"Animation","name":"lookHere","enabled":true,"kind":"keyframes","trigger":{"type":"script","from":["*"],"to":[]},"targets":[{"path":"Transform"}],"frames":[{"at":0,"y":0},{"at":0.3,"y":-10},{"at":0.55,"y":0},{"at":0.75,"y":-3},{"at":1,"y":0}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:look-here","revision":1,"from":"lookHere"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereCaption","id":"ctrl_1716118063019","controlType":"Label"},
+        "Transform": {"x":360,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Look here","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereHow","id":"ctrl_1716118063020","controlType":"Label"},
+        "Transform": {"x":360,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"A SCRIPT PLAYS IT","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LookHereWhat","id":"ctrl_1716118063021","controlType":"Label"},
+        "Transform": {"x":364,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"jumps, as a panel says \"choose one here\"","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopIn","id":"ctrl_1716118063022","description":"Pop in: grows in from nothing as the panel opens.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":690,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"A","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"B","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"C","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"D","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"popIn":{"_type":"Animation","name":"popIn","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":0.2,"opacity":0},{"at":0.6,"scale":1.06,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":560,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:pop-in","revision":1,"from":"popIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInCaption","id":"ctrl_1716118063023","controlType":"Label"},
+        "Transform": {"x":680,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop in","_children":{"Fill":{"colour":"FF1C1C1A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInHow","id":"ctrl_1716118063024","controlType":"Label"},
+        "Transform": {"x":680,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF8C2F14"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopInWhat","id":"ctrl_1716118063025","controlType":"Label"},
+        "Transform": {"x":684,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"grows in from nothing as the panel opens","_children":{"Fill":{"colour":"FF45453F"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:pulse",
+      "name": "Pulse",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pulse": {
+          "_type": "Animation",
+          "name": "pulse",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.5,
+              "scale": 1.04
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 1600,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:breathe",
+      "name": "Breathe",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "breathe": {
+          "_type": "Animation",
+          "name": "breathe",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.55
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 2400,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:wiggle",
+      "name": "Wiggle",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "wiggle": {
+          "_type": "Animation",
+          "name": "wiggle",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "rotate": 0
+            },
+            {
+              "at": 0.2,
+              "rotate": -3
+            },
+            {
+              "at": 0.45,
+              "rotate": 2.5
+            },
+            {
+              "at": 0.7,
+              "rotate": -1.5
+            },
+            {
+              "at": 1,
+              "rotate": 0
+            }
+          ],
+          "duration": 460,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:beat-pulse",
+      "name": "Beat pulse",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "transport beat"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "beatPulse": {
+          "_type": "Animation",
+          "name": "beatPulse",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "beat",
+            "every": 1
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "scale": 1.05
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 280,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:look-here",
+      "name": "Look here",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "a script plays it"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lookHere": {
+          "_type": "Animation",
+          "name": "lookHere",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "script",
+            "from": [
+              "*"
+            ],
+            "to": []
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0
+            },
+            {
+              "at": 0.3,
+              "y": -10
+            },
+            {
+              "at": 0.55,
+              "y": 0
+            },
+            {
+              "at": 0.75,
+              "y": -3
+            },
+            {
+              "at": 1,
+              "y": 0
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:pop-in",
+      "name": "Pop in",
+      "category": "Choice group",
+      "tags": [
+        "Attention",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "popIn": {
+          "_type": "Animation",
+          "name": "popIn",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.2,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 1.06,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 560,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

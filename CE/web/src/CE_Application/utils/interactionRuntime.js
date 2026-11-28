@@ -1,6 +1,7 @@
+import { resolveTimedButtonConfig } from './timedButtonPreview.js';
 import { curveIsIdentity, curveSpec, fractionToTravel } from './channelCurves.js';
 import { deepClone } from './deepClone.js';
-import { resolveRadioSelectedKeys } from './radioSegmentStyle.js';
+import { isChoiceGroupBehavior, isOptionState, selectedChoiceKeys } from './choiceGroupLayout.js';
 import { setNestedValue } from '../stores/controlTreeUtils.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
 import {
@@ -41,7 +42,8 @@ import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 import { easingToCss } from './easing.js';
 // A cycle, and a safe one: keyframeAnimation.js reads readTrigger from here, and this file reads
 // readKeyframes from there, each only when called — never while either module is loading.
-import { readKeyframes } from './keyframeAnimation.js';
+import { readKeyframes, readValueAnimation, readEmit } from './keyframeAnimation.js';
+import { readTextEffect } from './textEffects.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -73,7 +75,7 @@ function findRowByInternalValue(rows = [], value) {
 }
 
 function isRadioGroupControl(control) {
-  return String(getNodeChild(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio';
+  return isChoiceGroupBehavior(getNodeChild(control, 'Behavior'));
 }
 
 function normalizeKey(value) {
@@ -396,6 +398,30 @@ function applyPatchMap(target, patchMap = {}) {
   }
 }
 
+/** Whether a state's condition holds for these signals: what decides it is active. */
+export const stateMatches = evaluateState;
+
+/** A state's patch map laid onto a tree, as a state is laid onto its control (paths, `_children`). */
+export const applyStatePatchMap = applyPatchMap;
+
+/**
+ * A States section's children in the order their patches are laid down, later winning: the known
+ * interaction states by KNOWN_STATE_PRECEDENCE (hover first, disabled last), then the section's own
+ * `priority`, then the rest. Every child, whether or not its condition holds.
+ */
+export function statesInPrecedence(statesSection) {
+  const priority = Array.isArray(statesSection?.priority)
+    ? statesSection.priority.map((value) => normalizeKey(value))
+    : [];
+  const rank = ([name, state]) => {
+    const key = normalizeKey(name ?? state?.name);
+    const known = KNOWN_STATE_PRECEDENCE[key];
+    const index = priority.indexOf(key);
+    return known ?? (index === -1 ? Number.MAX_SAFE_INTEGER : 200 + index);
+  };
+  return Object.entries(statesSection?._children ?? {}).sort((left, right) => rank(left) - rank(right));
+}
+
 function applyStatePatches(control, state) {
   const patches = state?.patches ?? {};
   applyPatchMap(control, patches.component);
@@ -435,12 +461,18 @@ export const PART_PATH_BUCKETS = {
   'Layout.offsetY': 'transform',
   'Layout.rotation': 'transform',
   'Layout.scale': 'transform',
+  // How far a fader cap stands out toward you, drawn as a scale about its centre (SliderFamilyRenderer
+  // capLiftStyle): the Slider's Lift and Grip.
+  'Layout.lift': 'transform',
   opacity: 'opacity',
   'Layout.width': 'size',
   'Layout.height': 'size',
   'Background.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
   'Text.Fill.colour': 'colour',
+  // A fill's gradient eases on the colour timing: its angle, centre and stops are registered
+  // properties (utils/gradientPaint.js), listed with the colours in utils/transitionCss.js.
+  'Background.Fill.gradient': 'colour',
   // A state that shows or hides a part — a tab group swapping its pages — used to make it pop. With
   // this target it fades: the renderer keeps such a part mounted while hidden, so there is a
   // `visibility: hidden; opacity: 0` to ease to and from (utils/transitionCss.js).
@@ -459,6 +491,7 @@ export const ROOT_PATH_BUCKETS = {
   'Background.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
   'Text.Fill.colour': 'colour',
+  'Background.Fill.gradient': 'colour',
 };
 
 /**
@@ -526,7 +559,28 @@ export function readTrigger(animation) {
     origin: ['user', 'external'].includes(trigger.origin) ? trigger.origin : 'any',
     every: Math.max(1, Math.round(Number(trigger.every) || 1)),
     event: String(trigger.event ?? ''),
+    // Plays when a state in `from` is LEFT (transitionSelection.js, rule 1). The States tab's
+    // Leaving slot writes it: "to default" cannot say "leaving hover" on a knob, which is never in
+    // the default state — ActiveHandleCurrent is active at rest. 2026-11-24.
+    leaving: trigger.leaving === true,
+    // valueStep: how many steps the range is cut into; 0, the control's own (stepsOfControl).
+    steps: Math.max(0, Math.min(400, Math.round(Number(trigger.steps) || 0))),
+    // level: the line a meter's level crosses, 0 to 1 along its scale, and the way that counts.
+    at: Number.isFinite(Number(trigger.at)) && trigger.at !== null && trigger.at !== '' ? Math.max(0, Math.min(1, Number(trigger.at))) : 0.9,
+    way: ['up', 'down', 'both'].includes(trigger.way) ? trigger.way : 'up',
   };
+}
+
+/**
+ * How many steps a control's range is cut into, for a step trigger that names none: its own step
+ * (Behavior.step over min..max) when that gives 2 to 400 of them, else 20.
+ */
+export function stepsOfControl(control) {
+  const behavior = getNodeChild(control, 'Behavior') ?? {};
+  const span = Number(behavior.max ?? 1) - Number(behavior.min ?? 0);
+  const step = Number(behavior.step);
+  const steps = Number.isFinite(span) && step > 0 ? Math.round(span / step) : NaN;
+  return steps >= 2 && steps <= 400 ? steps : 20;
 }
 
 /**
@@ -606,6 +660,34 @@ function buildTransitionCatalog(control, previewSession) {
  * them is playing at any moment needs the frame before, so a player beside the transition tracker
  * decides that, in the renderer.
  */
+/**
+ * A text effect (utils/textEffects.js) as the keyframe player plays it: the same triggers, the same
+ * runs and restarts, with `text` holding the effect instead of frames. Its span is how long a run is
+ * busy for a value trigger, which needs a number before the text is known; a generous one.
+ */
+function textEffectEntry(animation, key, timeScale) {
+  const effect = readTextEffect(animation, key, { timeScale });
+  if (!effect) return null;
+  return {
+    name: effect.name,
+    text: effect,
+    moves: false,
+    part: effect.part,
+    trigger: effect.trigger,
+    iterations: effect.iterations,
+    frames: [],
+    span: effect.iterations === 'infinite' ? Infinity : effect.delay + effect.duration * effect.iterations + effect.stagger * 24,
+  };
+}
+
+/** How long a timed button must be held, or waits for its next click: a hold entry's duration. */
+function holdTiming(control, entry, timeScale = 1) {
+  const config = resolveTimedButtonConfig(getNodeChild(control, 'Behavior') ?? {});
+  const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+  const duration = (config.subtype === 'double_click' ? config.clickWindow : config.holdDuration) * scale;
+  return { duration, iterations: 1, span: (entry.delay ?? 0) + duration };
+}
+
 function buildKeyframeCatalog(control, previewSession) {
   const animations = getNodeChild(control, 'Animations');
   const enabled = animations?.enabled !== false && previewSession?.animationsEnabled !== false;
@@ -613,8 +695,18 @@ function buildKeyframeCatalog(control, previewSession) {
   if (!enabled) return { enabled: false, reducedMotion, entries: [] };
   const entries = [];
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
-    const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale });
-    if (entry) entries.push(entry);
+    const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale })
+      ?? textEffectEntry(animation, key, previewSession?.animationTimeScale)
+      ?? readValueAnimation(animation, key, { timeScale: previewSession?.animationTimeScale })
+      ?? readEmit(animation, key, { timeScale: previewSession?.animationTimeScale });
+    if (!entry) continue;
+    // A step trigger that names no count steps as the control does.
+    if (entry.trigger?.type === 'valueStep' && !entry.trigger.steps) entry.trigger = { ...entry.trigger, steps: stepsOfControl(control) };
+    // A keyframe animation on a hold plays once, over the button's own hold (or, for a double-click
+    // one, its wait for the next click): its own duration is not asked for. A text effect or a word
+    // keeps its own.
+    if (entry.trigger?.type === 'hold' && entry.frames?.length) Object.assign(entry, holdTiming(control, entry, previewSession?.animationTimeScale));
+    entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };
 }
@@ -911,7 +1003,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
       && (valueRaw === '' || (Array.isArray(valueRaw) && valueRaw.length === 0));
     const selectedKeys = multi ? (previewSession?.valueOverrideEnabled === true
       ? (Array.isArray(valueRaw) ? valueRaw : [valueRaw])
-      : [...resolveRadioSelectedKeys(valueRows, behavior)]) : null;
+      : [...selectedChoiceKeys(valueRows, behavior)]) : null;
     const selectedRows = multi ? valueRows.filter(row => selectedKeys.map(String).includes(String(row.internalValue ?? row.id))) : [];
     const resolvedRow = emptyRadio ? null : multi ? selectedRows[0]
       : findRowByInternalValue(valueRows, valueRaw) ?? findDefaultRow(valueRows);
@@ -1112,26 +1204,16 @@ export function resolveInteractiveControl(control, previewSession = {}, { shareU
   applyCustomBindings(resolved, signals);
   const resolvedStates = getNodeChild(resolved, 'States');
 
-  const priority = Array.isArray(resolvedStates?.priority)
-    ? resolvedStates.priority.map((value) => normalizeKey(value))
-    : [];
   const activeStates = resolvedStates?.enabled === false
     ? []
-    : Object.entries(resolvedStates?._children ?? {})
-      .filter(([, state]) => evaluateState(state, signals))
-      .sort((left, right) => {
-        const leftKey = normalizeKey(left[0] ?? left[1]?.name);
-        const rightKey = normalizeKey(right[0] ?? right[1]?.name);
-        const leftKnown = KNOWN_STATE_PRECEDENCE[leftKey];
-        const rightKnown = KNOWN_STATE_PRECEDENCE[rightKey];
-        const leftIndex = priority.indexOf(leftKey);
-        const rightIndex = priority.indexOf(rightKey);
-        const safeLeft = leftKnown ?? (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + leftIndex);
-        const safeRight = rightKnown ?? (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + rightIndex);
-        return safeLeft - safeRight;
-      });
+    : statesInPrecedence(resolvedStates).filter(([, state]) => evaluateState(state, signals));
 
+  // A choice group's hover, press, focus and choice belong to its options, each drawn with the
+  // states it is in (choiceGroupStyle.js): laid on the whole control they painted every option and
+  // the frame alike. They are still reported active, for animations keyed to a state.
+  const choiceGroup = isRadioGroupControl(resolved);
   for (const [, state] of activeStates) {
+    if (choiceGroup && isOptionState(state)) continue;
     applyStatePatches(resolved, state);
   }
 

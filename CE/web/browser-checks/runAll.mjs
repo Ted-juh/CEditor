@@ -20,12 +20,12 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const CHECKS = [
   'run', 'textPlacement', 'playerInbound', 'playerHostKeys', 'playerKeys', 'playerIcons', 'learnChips', 'effectsTab', 'assetsTab',
-  'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'animationTab', 'panelMotion',
+  'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'animationTab', 'animationDesigner', 'scenePlayback', 'shapeClip', 'panelMotion',
   'designerTab', 'profileDesigner', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'panelShot',
   'releaseWorkflow', 'numberCellSelection', 'displayGapReview', 'ctrl49Screen', 'noteModules',
   'hostWorkspace', 'performanceTools', 'soundsPage', 'stageScreen', 'pluginPresets', 'songsPage',
   'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms', 'panelFile', 'valuesSidebar',
-  'valueCompletion', 'pictureColour', 'vectorArtwork', 'scene3d', 'pictureExport', 'accessCheck',
+  'valueCompletion', 'pictureColour', 'vectorArtwork', 'scene3d', 'pictureExport', 'accessCheck', 'showcases', 'choiceGroup', 'knobShowcase', 'sliderShowcase', 'buttonShowcase', 'choiceShowcase', 'meterShowcase', 'noSendWhileAnimating',
 ];
 
 // The checks launch the browser CHROMIUM_PATH names, or else the one this repo's Linux containers

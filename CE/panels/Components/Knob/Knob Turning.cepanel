@@ -1,0 +1,919 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "48861727-c0b5-4e1a-9f3d-488617274886",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Knob Turning",
+  "scriptId": "component_knob-turning",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 870,
+  "height": 644,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF15171A",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Glide.value",
+      "label": "Glide",
+      "controlName": "Glide",
+      "path": "Glide.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Snap.value",
+      "label": "Snap",
+      "controlName": "Snap",
+      "path": "Snap.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Spring.value",
+      "label": "Spring",
+      "controlName": "Spring",
+      "path": "Spring.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Overload.value",
+      "label": "Overload",
+      "controlName": "Overload",
+      "path": "Overload.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Modulated.value",
+      "label": "Modulated",
+      "controlName": "Modulated",
+      "path": "Modulated.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Detent.value",
+      "label": "Detent",
+      "controlName": "Detent",
+      "path": "Detent.value",
+      "min": 0,
+      "max": 12,
+      "defaultValue": 6,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "arc-line"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1746747303000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Knob · Turning","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1746747303001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":810,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how the value moves. Each knob wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glide","id":"ctrl_1746747303002","description":"Glide: eases into each new value.","controlType":"Knob"},
+        "Transform": {"x":97,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"pointerSlide":{"duration":320,"preset":{"id":"ce:knob:glide","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":320,"preset":{"id":"ce:knob:glide","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideCaption","id":"ctrl_1746747303003","controlType":"Label"},
+        "Transform": {"x":40,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Glide","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideHow","id":"ctrl_1746747303004","controlType":"Label"},
+        "Transform": {"x":40,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TURN","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlideWhat","id":"ctrl_1746747303005","controlType":"Label"},
+        "Transform": {"x":44,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"eases into each new value","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Snap","id":"ctrl_1746747303006","description":"Snap: no easing: lands at once.","controlType":"Knob"},
+        "Transform": {"x":367,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"pointerSlide":{"duration":0,"easing":"linear","preset":{"id":"ce:knob:snap","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":0,"easing":"linear","preset":{"id":"ce:knob:snap","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapCaption","id":"ctrl_1746747303007","controlType":"Label"},
+        "Transform": {"x":310,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Snap","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapHow","id":"ctrl_1746747303008","controlType":"Label"},
+        "Transform": {"x":310,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TURN","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SnapWhat","id":"ctrl_1746747303009","controlType":"Label"},
+        "Transform": {"x":314,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"no easing: lands at once","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spring","id":"ctrl_1746747303010","description":"Spring: overshoots, then settles.","controlType":"Knob"},
+        "Transform": {"x":637,"y":96,"width":136,"height":136},
+        "Animations": {"_children":{"pointerSlide":{"duration":420,"easing":"outBack","preset":{"id":"ce:knob:spring","revision":1,"from":"pointerSlide"}},"rangeSlide":{"duration":420,"easing":"outBack","preset":{"id":"ce:knob:spring","revision":1,"from":"rangeSlide"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringCaption","id":"ctrl_1746747303011","controlType":"Label"},
+        "Transform": {"x":580,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Spring","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringHow","id":"ctrl_1746747303012","controlType":"Label"},
+        "Transform": {"x":580,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TURN","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpringWhat","id":"ctrl_1746747303013","controlType":"Label"},
+        "Transform": {"x":584,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"overshoots, then settles","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Overload","id":"ctrl_1746747303014","description":"Overload: the arc turns red: a state with a rule.","controlType":"Knob"},
+        "Transform": {"x":97,"y":358,"width":136,"height":136},
+        "Behavior": {"defaultCurrentValue":0.8},
+        "States": {"_children":{"Overload":{"_type":"State","name":"Overload","group":"interaction","description":"Overload (animation preset).","enabled":true,"when":{},"rule":"valueNormalized > 0.9","patches":{"component":{},"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFF3B30"}}}}}},
+        "Animations": {"_children":{"overload":{"_type":"Animation","name":"overload","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["overload"],"reverse":true},"targets":[{"path":"Parts.bodyTrackFill.Background.Fill.colour","properties":["colour"]}],"duration":220,"delay":0,"easing":"outQuad","preset":{"id":"ce:knob:overload","revision":1,"from":"overload"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadCaption","id":"ctrl_1746747303015","controlType":"Label"},
+        "Transform": {"x":40,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Overload","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadHow","id":"ctrl_1746747303016","controlType":"Label"},
+        "Transform": {"x":40,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ABOVE 90%","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverloadWhat","id":"ctrl_1746747303017","controlType":"Label"},
+        "Transform": {"x":44,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the arc turns red: a state with a rule","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Modulated","id":"ctrl_1746747303018","description":"Modulated: the drawing wobbles round the value, as if an LFO were on it.","controlType":"Knob"},
+        "Transform": {"x":367,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"modulated":{"_type":"Animation","name":"modulated","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"by":0},{"at":0.25,"by":0.06},{"at":0.75,"by":-0.06},{"at":1,"by":0}],"duration":1800,"delay":0,"easing":"inOutSine","iterations":"infinite","preset":{"id":"ce:knob:modulated","revision":1,"from":"modulated"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedCaption","id":"ctrl_1746747303019","controlType":"Label"},
+        "Transform": {"x":310,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Modulated","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedHow","id":"ctrl_1746747303020","controlType":"Label"},
+        "Transform": {"x":310,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ModulatedWhat","id":"ctrl_1746747303021","controlType":"Label"},
+        "Transform": {"x":314,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the drawing wobbles round the value, as if an LFO were on it","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Detent","id":"ctrl_1746747303022","description":"Detent: the pointer pulses once a step, as a notch is felt.","controlType":"Knob"},
+        "Transform": {"x":637,"y":358,"width":136,"height":136},
+        "Behavior": {"max":12,"step":1,"defaultCurrentValue":6,"precision":0},
+        "Animations": {"_children":{"detent":{"_type":"Animation","name":"detent","enabled":true,"kind":"keyframes","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.pointerCurrent"}],"frames":[{"at":0,"scale":1},{"at":0.3,"scale":1.45,"fill":"FFFFFFFF"},{"at":1,"scale":1}],"duration":160,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:detent","revision":1,"from":"detent"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentCaption","id":"ctrl_1746747303023","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Detent","_children":{"Fill":{"colour":"FFE9ECEF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentHow","id":"ctrl_1746747303024","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FFFF9F5A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DetentWhat","id":"ctrl_1746747303025","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the pointer pulses once a step, as a notch is felt","_children":{"Fill":{"colour":"FF9EA6AE"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:glide",
+      "name": "Glide",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "turn"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outCubic"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:snap",
+      "name": "Snap",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "turn"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 0,
+          "delay": 0,
+          "easing": "linear"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 0,
+          "delay": 0,
+          "easing": "linear"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:spring",
+      "name": "Spring",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "turn"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pointerSlide": {
+          "_type": "Animation",
+          "name": "pointerSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerStart.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.x",
+              "properties": [
+                "transform"
+              ]
+            },
+            {
+              "path": "Parts.pointerEnd.Layout.y",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outBack"
+        },
+        "rangeSlide": {
+          "_type": "Animation",
+          "name": "rangeSlide",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Layout.width",
+              "properties": [
+                "size"
+              ]
+            },
+            {
+              "path": "Parts.bodySelectedRange.Layout.width",
+              "properties": [
+                "size"
+              ]
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outBack"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:overload",
+      "name": "Overload",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "above 90%"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "overload": {
+          "_type": "Animation",
+          "name": "overload",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "overload"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            }
+          ],
+          "duration": 220,
+          "delay": 0,
+          "easing": "outQuad"
+        }
+      },
+      "states": {
+        "Overload": {
+          "when": {},
+          "rule": "valueNormalized > 0.9",
+          "patches": {
+            "component": {},
+            "parts": {
+              "bodyTrackFill": {
+                "Background.Fill.colour": "FFFF3B30"
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:modulated",
+      "name": "Modulated",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "modulated": {
+          "_type": "Animation",
+          "name": "modulated",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "by": 0
+            },
+            {
+              "at": 0.25,
+              "by": 0.06
+            },
+            {
+              "at": 0.75,
+              "by": -0.06
+            },
+            {
+              "at": 1,
+              "by": 0
+            }
+          ],
+          "duration": 1800,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:detent",
+      "name": "Detent",
+      "category": "Knob",
+      "tags": [
+        "Turning",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "detent": {
+          "_type": "Animation",
+          "name": "detent",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.3,
+              "scale": 1.45,
+              "fill": "FFFFFFFF"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

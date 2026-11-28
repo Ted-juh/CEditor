@@ -275,7 +275,10 @@ export function createSliderSemanticParts() {
       labelCurrent: createPartNode('labelCurrent', {
         role: 'labelCurrent',
         zIndex: 5,
-        sections: { Text: textSection({ colour: '{control.cap}' }) },
+        // The readout stands on the panel (beside a fader's cap, past a knob's pointer), in the colour
+        // its set reads there (controlSets.js withReadout). A knob's in its cap is lettered to read on
+        // the knob instead (models/readoutInk.js), unless its author chose a colour.
+        sections: { Text: textSection({ colour: '{control.readout}' }) },
       }),
       labelEnd: createPartNode('labelEnd', {
         role: 'labelEnd',

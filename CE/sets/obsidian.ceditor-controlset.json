@@ -11,20 +11,20 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f611b0d0",
+  "fingerprint": "35533a57",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
     "description": "A slab of black glass in a dark room. Cut-glass pucks on illuminated rings, light-guide pointers, keys that glow through frosted glass, an OLED behind the same pane.",
     "tokens": {
       "instrument.face": "FF03040A",
-      "instrument.ink": "FFA2A9B2",
-      "instrument.text": "FFE6F0FA",
+      "instrument.ink": "FFAFB2B5",
+      "instrument.text": "FFF9FCFE",
       "series.one": "FF5FE3FF",
       "series.two": "FFE0A43A",
       "series.three": "FF5CC492",
       "series.four": "FFB58CFF",
-      "series.five": "FFE6F0FA",
+      "series.five": "FFF9FCFE",
       "series.alert": "FFE5534B",
       "surface": "FF161A21",
       "surface.hover": "FF1E232B",
@@ -57,8 +57,8 @@
       "control.tick.minor": "885A6270",
       "accent": "FF5FE3FF",
       "accent.hot": "FFFFFFFF",
-      "text.primary": "FFE6F0FA",
-      "text.label": "FFE6F0FA",
+      "text.primary": "FFF9FCFE",
+      "text.label": "FFF9FCFE",
       "text.muted": "FF7FDCF2",
       "text.focus": "FFFFFFFF",
       "text.inverse": "FF9FE9FF",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF0B0D11",
+      "control.readout": "{text.label}",
       "section.surface": "FF090A0D"
     },
     "lamp": {
@@ -2183,7 +2184,7 @@
           "Text.Effects.glowEnabled": true,
           "Text.Effects.glowSize": 3,
           "Text.Effects.glowIntensity": 1,
-          "Text.Effects.glowColour": "B3E6F0FA"
+          "Text.Effects.glowColour": "B3F9FCFE"
         }
       },
       "Background": {
@@ -2268,7 +2269,7 @@
           ],
           "Text.Font.family": "Space Grotesk",
           "Looper.laneColour": "FF0B0C11",
-          "Looper.gridColour": "22A2A9B2",
+          "Looper.gridColour": "22AFB2B5",
           "Looper.playheadColour": "{series.two}",
           "Looper.labelColour": "{instrument.ink}"
         }
@@ -2297,7 +2298,7 @@
           "Router.curveColour": "{series.one}",
           "Router.inputColour": "{series.two}",
           "Router.fieldColour": "{instrument.face}",
-          "Router.gridColour": "18A2A9B2",
+          "Router.gridColour": "18AFB2B5",
           "Router.labelColour": "{instrument.ink}"
         }
       },
@@ -2430,7 +2431,7 @@
           ],
           "Text.Font.family": "Space Grotesk",
           "Constraint.fieldColour": "{instrument.face}",
-          "Constraint.trackColour": "18A2A9B2",
+          "Constraint.trackColour": "18AFB2B5",
           "Constraint.linkColour": "55E0A43A",
           "Constraint.labelColour": "{instrument.ink}"
         }

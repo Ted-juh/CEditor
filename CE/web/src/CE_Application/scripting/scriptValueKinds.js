@@ -979,19 +979,22 @@ export function readAnimation(value, { panel, controls, controlName }) {
   // The control's id and the animation's own key, for the row's Open (the Animation tab, on it).
   meaning.controlId = control._children?.Core?.id ?? null;
   const all = control._children?.Animations?._children ?? {};
-  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  // As ce.anim.play takes them (panelRuntime.js animatePlayImpl): keyframe animations, text effects
+  // and value animations.
+  const canPlay = (a) => ['keyframes', 'text', 'value'].includes(String(a?.kind ?? ''));
+  const playable = Object.entries(all).filter(([, a]) => canPlay(a)).map(([k]) => k);
   meaning.choices = playable;
   const key = Object.keys(all).find((k) => k.toLowerCase() === value.toLowerCase());
   const node = key === undefined ? null : all[key];
   meaning.key = key ?? null;
-  if (node && String(node.kind ?? '') === 'keyframes') { meaning.found = true; return { meaning, problem: null }; }
+  if (node && canPlay(node)) { meaning.found = true; return { meaning, problem: null }; }
   meaning.found = false;
   const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${value}"`;
   return {
     meaning,
     problem: {
       severity: 'error',
-      message: `ce.anim.play: ${why}. ${playable.length ? `Its keyframe animations: ${playable.join(', ')}.` : 'It has no keyframe animations — make one in the Animation tab.'}${node ? '' : didYouMean(value, playable)}`,
+      message: `ce.anim.play: ${why}. ${playable.length ? `The animations it can play: ${playable.join(', ')}.` : 'It has no keyframe animations or text effects — make one in the Animation tab.'}${node ? '' : didYouMean(value, playable)}`,
     },
   };
 }

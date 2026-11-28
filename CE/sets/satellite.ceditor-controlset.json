@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "20b15901",
+  "fingerprint": "c23e743f",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -71,6 +71,7 @@
       "display.screen": "FF2B2358",
       "display.backlight": "FF443D6C",
       "panel.surface": "FF162B35",
+      "control.readout": "{control.cap}",
       "section.surface": "FF112229"
     },
     "lamp": {

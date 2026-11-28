@@ -27,7 +27,7 @@
 
 import { normalizeCorner } from './cornerNormalization.js';
 import { resolveColourValue } from '../models/controlSets.js';
-import { gradientToCSS } from './gradientCSS.js';
+import { gradientBackgroundCSS } from './gradientPaint.js';
 import { buildLayerStyle, buildLayerStyleParts } from './backgroundCSS.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { numberOr } from './primitives.js';
@@ -298,8 +298,9 @@ export function plainFillCSS(background, width, height) {
   if (layer === 'image' || layer === 'overlay') {
     paint = absorbableImageStyle(fill, layer, String(fill[`${layer}Src`]), width, height);
   } else {
-    const colour = layer === 'solid' ? argbToCss(fill.colour) : gradientToCSS(fill.gradient);
-    paint = colour ? `background: ${colour};` : null;
+    // A gradient is written to ease (utils/gradientPaint.js), its properties beside it.
+    const colour = layer === 'solid' ? argbToCss(fill.colour) : null;
+    paint = layer === 'solid' ? (colour ? `background: ${colour};` : null) : gradientBackgroundCSS(fill.gradient);
   }
   if (!paint) return null;
 
@@ -308,4 +309,62 @@ export function plainFillCSS(background, width, height) {
     : fillShapeCSS(background._children.Corners, width, height);
 
   return `${paint}${shape ? ` ${shape}` : ''}`;
+}
+
+/** The fill layers that paint, bottom first: BackgroundRenderer's own choice, copied (see above). */
+export function visibleFillLayers(background) {
+  const fill = background?._children?.Fill;
+  if (!fill) return [];
+  const order = fill.layerOrder?.length ? fill.layerOrder : DEFAULT_ORDER;
+  return order.filter((id) => LAYERS.includes(id) && layerVisible(background, id));
+}
+
+/**
+ * A colour under a gradient — the two layers the designed control sets give a knob's plate, cap and
+ * pointer — said as ONE element's background: the gradient its image, the colour beneath it its
+ * `background-color`, which is exactly the order the two layers paint in. Null for anything else.
+ *
+ * For SliderShapeFill, whose fill must not be two positioned layers: WebKit paints a layer inside an
+ * SVG foreignObject over whatever the SVG draws after it (the knob's pointer, its edge), and past the
+ * clip that shapes it. The wrappers above do not take two layers, for the reasons whyFillNotPlainCSS
+ * gives; this is the one pair that needs no opacity and no second image to say.
+ */
+export function colourUnderGradientCSS(background, width, height) {
+  if (hasBackgroundEffects(background)) return null;
+  if (!(width > 0 && height > 0)) return null;
+  const fill = background?._children?.Fill;
+  if (!fill) return null;
+  const order = fill.layerOrder?.length ? fill.layerOrder : DEFAULT_ORDER;
+  const visible = order.filter((id) => LAYERS.includes(id) && layerVisible(background, id));
+  if (visible.length !== 2 || visible[0] !== 'solid' || visible[1] !== 'gradient') return null;
+  const clipModes = new Set(visible.map((layer) => String(fill[`${layer}ClipMode`] ?? 'shape')));
+  if (clipModes.size !== 1) return null;
+  const [clipMode] = clipModes;
+  if (clipMode !== 'shape' && clipMode !== 'none') return null;
+  if (visible.some((layer) => String(fill[`${layer}Blend`] ?? 'normal') !== 'normal')) return null;
+  if (clipMode === 'shape' && cornersNeedClipPath(background._children?.Corners)) return null;
+  const colour = argbToCss(fill.colour);
+  if (!colour || !fill.gradient) return null;
+  // A faded gradient is its stops faded: gradients interpolate premultiplied, so scaling every stop's
+  // alpha is the layer's opacity exactly (the soft set fades its caps' highlight to 45 %).
+  const gradient = fadedGradient(fill.gradient, numberOr(fill.gradientOpacity, 100) / 100);
+  if (!gradient) return null;
+  const shape = clipMode === 'none' ? '' : fillShapeCSS(background._children?.Corners, width, height);
+  return `${gradientBackgroundCSS(gradient)} background-color: ${colour};${shape ? ` ${shape}` : ''}`;
+}
+
+/** A gradient with every stop's alpha scaled by `fade` (0..1); null if a stop is not hex. */
+function fadedGradient(gradient, fade) {
+  if (!(fade < 1)) return gradient;
+  const stops = gradient?.stops;
+  if (!Array.isArray(stops)) return null;
+  const faded = [];
+  for (const stop of stops) {
+    const hex = String(stop?.color ?? '').replace(/^#/, '');
+    if (!/^([0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) return null;
+    const alpha = hex.length === 8 ? parseInt(hex.slice(0, 2), 16) / 255 : 1;
+    const scaled = Math.round(Math.max(0, Math.min(1, alpha * fade)) * 255).toString(16).padStart(2, '0').toUpperCase();
+    faded.push({ ...stop, color: `${scaled}${hex.slice(-6)}` });
+  }
+  return { ...gradient, stops: faded };
 }

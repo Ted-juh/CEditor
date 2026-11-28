@@ -3,8 +3,10 @@
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import AdditionalAnatomy from './AdditionalAnatomy.svelte';
   import { anatomyForm, anatomyValue } from '../models/controlAnatomy.js';
-  import { meterConfig, meterPosition } from '../utils/meterLayout.js';
+  import { meterConfig, meterDrawnPosition } from '../utils/meterLayout.js';
   import { formatSliderNumericValue } from '../utils/sliderBehavior.js';
+  import { markPieceStyles, markClipBox } from '../utils/anatomyWords.js';
+  import { textEffectClips } from '../utils/textEffects.js';
   import { buttonAnatomyLayout } from '../utils/anatomyLayout.js';
   import ButtonDeviceParts from './ButtonDeviceParts.svelte';
   import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
@@ -13,7 +15,14 @@
   import { meterFigures } from '../utils/meterParts.js';
   // `captionShown`: a Label of its own shows this button's text (utils/attachedLabels.js
   // textShownOwners), so a key or switch drawn from its parts prints no caption and fills its box.
-  let { control, runtime = null, width = 160, height = 160, checked = false, label = '', captionShown = false } = $props();
+  // `drawnValue`: what a value effect draws instead of a knob's value or a meter's place, 0 to 1, or null (step 6).
+  // `partTexts`: text effects playing on a knob form's own words, by part (utils/anatomyWords.js):
+  // tickMajor is its ring of ticks, labelCurrent its readout. The keyframe player's `texts`, or null.
+  // `partAnimations`, `partColours`, `partTransitions`: what plays on a key's own parts (its lamp, its
+  // legend, the key), handed to ButtonDeviceParts. A button's caption plays the control's own text
+  // effects and text colour frames: it is the only place a button drawn here shows its words.
+  let { control, runtime = null, drawnValue = null, width = 160, height = 160, checked = false, label = '', captionShown = false, partTexts = null,
+    partAnimations = null, partColours = null, partTransitions = null } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
   let form = $derived(core.controlForm);
@@ -29,7 +38,7 @@
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));
   let cfg = $derived(meterConfig(control));
-  let p = $derived(meter ? meterPosition(cfg.__value ?? cfg.value, cfg) : value.normalized);
+  let p = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : (meter ? meterDrawnPosition(cfg) : value.normalized));
   let active = $derived(toggle ? checked : signals.pressed === true);
   let depth = $derived(Math.max(0, Math.min(1, Number(core.formDepth ?? 60) / 100)));
   let detail = $derived(Math.max(4, Math.min(48, Math.round(Number(core.formDivisions) || 12))));
@@ -56,6 +65,43 @@
   let captionSpacing = $derived(Math.max(0, Number(font.letterSpacing) || 0));
   let lay = $derived(!knob && !meter && !bareDevice ? buttonAnatomyLayout(width, height, label, { letterSpacing: captionSpacing }) : null);
   const point = (a,r,cx=80,cy=76) => ({x:cx+Math.sin(a*Math.PI/180)*r,y:cy-Math.cos(a*Math.PI/180)*r});
+  // Text effects on a knob form's words: its ring of ticks one piece a tick, round it in order; its
+  // readout whole, as SVG text plays one (utils/anatomyWords.js markPieceStyles).
+  const wordsItem = (part) => (knob ? partTexts?.get?.(part)?.at(-1) ?? null : null);
+  let tickFx = $derived.by(() => {
+    const item = wordsItem('tickMajor');
+    return item ? markPieceStyles(item.effect, Array.from({ length: detail + 1 }, () => ''), { phase: item.phase, seedText: `tickMajor:${item.name}`, at: item.at ?? null }) : null;
+  });
+  let readoutFx = $derived.by(() => {
+    const item = wordsItem('labelCurrent');
+    return item ? markPieceStyles({ ...item.effect, split: 'whole' }, [readout], { phase: item.phase, seedText: `labelCurrent:${item.name}`, at: item.at ?? null })[0] ?? '' : '';
+  });
+  const readoutAttrs = (colour) => (readoutFx ? { fill: 'currentColor', style: `color:${colour};${readoutFx}`, 'data-word-piece': '' } : { fill: colour });
+  // A button's or a switch's caption: the control's own text effect, whole (SVG text has no letters
+  // to move one at a time), and the control's text colour frames (`--ce-kf-text`, set on the
+  // control's box) on it. Nothing on a knob or a meter, whose words are their readouts.
+  let captionItem = $derived(!knob && !meter ? partTexts?.get?.('')?.at(-1) ?? null : null);
+  const captionFxFor = (text) => (captionItem
+    ? markPieceStyles({ ...captionItem.effect, split: 'whole' }, [text], { phase: captionItem.phase, seedText: `caption:${captionItem.name}`, at: captionItem.at ?? null })[0] ?? ''
+    : '');
+  const captionAttrs = (text) => {
+    const fx = captionFxFor(text);
+    return fx
+      ? { fill: 'currentColor', style: `color:${legend};${fx}`, 'data-word-piece': '' }
+      : { fill: 'currentColor', style: `color:${legend};animation:var(--ce-kf-text, none);` };
+  };
+  // A roll or a push moves the words through a box about them, as a Label's box clips its words.
+  let captionClips = $derived(!!captionItem && textEffectClips(captionItem.effect));
+  function captionBox(text, x, y, size, anchor = 'middle') {
+    const box = markClipBox({ text, x, y: y - size * 0.35, size });
+    const shift = anchor === 'start' ? box.width / 2 : anchor === 'end' ? -box.width / 2 : 0;
+    return { ...box, x: box.x + shift };
+  }
+  // A roll or a push moves a mark through a box about itself, as a Label's box clips its words: the
+  // clip is on a group that stays still, the tick or the readout moving inside it.
+  let tickClip = $derived(!!tickFx && textEffectClips(wordsItem('tickMajor')?.effect));
+  let readoutClip = $derived(!!readoutFx && textEffectClips(wordsItem('labelCurrent')?.effect));
+  const readoutBox = (x, y, size) => markClipBox({ text: readout, x, y: y - size * 0.35, size });
   // The disc's value: an arc in the accent along its track, from the start of the sweep to the pointer.
   let discArc = $derived.by(() => {
     if (!(p > 0.001)) return '';
@@ -73,14 +119,20 @@
   {#snippet ticks(radius=62, cy=76)}
     {#each Array.from({length:detail+1}) as _,i}
       {@const a=-135+i*270/detail}{@const q=point(a,radius,80,cy)}{@const z=point(a,radius-(i%3?4:9),80,cy)}
-      <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke={legend} stroke-width={i%3?1:2}/>
+      {#if tickClip}
+        {@const tb = markClipBox({ x1: q.x, y1: q.y, x2: z.x, y2: z.y, width: i%3?1:2 })}
+        <g clip-path={`url(#${uid}-tk${radius}-${i})`}><clipPath id={`${uid}-tk${radius}-${i}`}><rect x={tb.x} y={tb.y} width={tb.width} height={tb.height}/></clipPath>
+          <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke="currentColor" stroke-width={i%3?1:2} style={`color:${legend};${tickFx[i]}`} data-word-piece=""/></g>
+      {:else}
+        <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke={tickFx ? 'currentColor' : legend} stroke-width={i%3?1:2} style={tickFx ? `color:${legend};${tickFx[i]}` : undefined} data-word-piece={tickFx ? '' : undefined}/>
+      {/if}
     {/each}
   {/snippet}
   <g transform={lay?.device}>
   {#if PHYSICAL_DIRECTIONS.some(d=>form===`new-${d.id}`)}
-    <PhysicalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} />
+    <PhysicalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} {readoutFx} {readoutClip} />
   {:else if String(form).startsWith('new-')}
-    <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} />
+    <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} {readoutFx} {readoutClip} />
   {:else if knob}
     <g transform={`translate(80 76) scale(${size}) translate(-80 -76)`}>
     {#if form==='disc'}
@@ -102,7 +154,7 @@
       <g transform={`rotate(${angle} 80 76)`}><path d="M46 34A54 54 0 0 1 111 31" fill="none" stroke="white" stroke-width="4"/><circle cx="80" cy="29" r="9" fill={accent} stroke={ink}/></g>
     {:else if form==='lens'}
       <path d="M30 12H130L148 30V123L130 140H30L12 123V30Z" fill={housing} stroke={ink} stroke-opacity=".35"/><circle cx="80" cy="76" r="58" fill={face}/><circle cx="80" cy="76" r="49" fill={`url(#${uid}-dome)`}/><circle cx="80" cy="76" r="30" fill={housing} stroke={ink} stroke-opacity=".35"/>
-      <g transform={`rotate(${angle} 80 76)`}><path d="M48 35A52 52 0 0 1 112 35" fill="none" stroke={accent} stroke-width="5"/><path d="M79 21H81V38H79Z" fill="white"/></g><text x="80" y="80" fill={accent} text-anchor="middle" font-size="12">{core.formShowValue!==false ? readout : ""}</text>
+      <g transform={`rotate(${angle} 80 76)`}><path d="M48 35A52 52 0 0 1 112 35" fill="none" stroke={accent} stroke-width="5"/><path d="M79 21H81V38H79Z" fill="white"/></g>{#if readoutClip}{@const rb = readoutBox(80, 80, 12)}<g clip-path={`url(#${uid}-ro80)`}><clipPath id={`${uid}-ro80`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="80" {...readoutAttrs(accent)} text-anchor="middle" font-size="12">{core.formShowValue!==false ? readout : ""}</text></g>{:else}<text x="80" y="80" {...readoutAttrs(accent)} text-anchor="middle" font-size="12">{core.formShowValue!==false ? readout : ""}</text>{/if}
     {:else if form==='skirt'}
       {@render ticks(70)}<circle cx="80" cy="76" r="52" fill={housing} stroke={ink} stroke-opacity=".35"/><circle cx="80" cy="76" r="45" fill={face}/><g transform={`rotate(${angle} 80 76)`}><path d="M69 26H91L101 90 87 109H73L59 90Z" fill={ink}/><rect x="76" y="32" width="8" height="44" rx="2" fill={accent}/></g><path d="M43 133H117" stroke={ink} stroke-width="2"/>
     {:else if form==='roller'}
@@ -111,7 +163,7 @@
     {:else if form==='vernier'}
       {@render ticks(71)}<circle cx="80" cy="76" r="55" fill={face} stroke={ink} stroke-width="3"/><circle cx="80" cy="76" r="48" fill={`url(#${uid}-metal)`}/>
       {#each Array.from({length:24}) as _,i}{@const q=point(i*15,47)}<circle cx={q.x} cy={q.y} r="2" fill={ink}/>{/each}
-      <g transform={`rotate(${angle} 80 76)`}><circle cx="80" cy="76" r="32" fill={housing} stroke={ink} stroke-opacity=".35"/><rect x="76" y="45" width="8" height="30" fill={accent}/></g>{#if core.formShowValue!==false}<path d="M111 35L139 18" stroke={ink}/><rect x="110" y="12" width="39" height="19" rx="2" fill={ink}/><text x="130" y="26" text-anchor="middle" fill={face} font-size="11">{readout}</text>{/if}
+      <g transform={`rotate(${angle} 80 76)`}><circle cx="80" cy="76" r="32" fill={housing} stroke={ink} stroke-opacity=".35"/><rect x="76" y="45" width="8" height="30" fill={accent}/></g>{#if core.formShowValue!==false}<path d="M111 35L139 18" stroke={ink}/><rect x="110" y="12" width="39" height="19" rx="2" fill={ink}/>{#if readoutClip}{@const rb = readoutBox(130, 26, 11)}<g clip-path={`url(#${uid}-ro26)`}><clipPath id={`${uid}-ro26`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="130" y="26" text-anchor="middle" {...readoutAttrs(face)} font-size="11">{readout}</text></g>{:else}<text x="130" y="26" text-anchor="middle" {...readoutAttrs(face)} font-size="11">{readout}</text>{/if}{/if}
     {:else if form==='tuning'}
       <path d="M10 100V59A70 48 0 0 1 150 59V100Z" fill={housing} stroke={ink} stroke-opacity=".35"/><path d="M18 91V60A62 40 0 0 1 142 60V91Z" fill={face}/>
       {#each Array.from({length:detail+1}) as _,i}<line x1={23+i*114/detail} y1="47" x2={23+i*114/detail} y2={i%3?53:60} stroke={ink}/>{/each}<text x="28" y="76" fill={ink} font-size="9">{control?._children?.Behavior?.min ?? 0}</text><text x="121" y="76" fill={ink} font-size="9">{control?._children?.Behavior?.max ?? 1}</text><line x1={24+p*112} y1="31" x2={24+p*112} y2="89" stroke={accent} stroke-width="3"/>
@@ -120,12 +172,12 @@
       {@render ticks(72)}<polygon points={polygon(8,55,43)} fill={housing}/><g transform={`rotate(${angle} 80 76)`}><polygon points={polygon(8,48,39)} fill={face}/><polygon points={polygon(8,48,39)} fill={`url(#${uid}-dome)`}/><path d="M73 110V44L80 26 87 44V110Z" fill={ink}/><path d="M80 31V60" stroke={accent} stroke-width="5"/></g>
     {:else if form==='encoder'}
       {#each Array.from({length:detail}) as _,i}{@const q=point(-135+i*270/(detail-1),58)}<rect x={q.x-3} y={q.y-6} width="6" height="12" transform={`rotate(${-135+i*270/(detail-1)} ${q.x} ${q.y})`} fill={i/(detail-1)<=p?accent:ink} opacity={i/(detail-1)<=p?1:.25}/>{/each}
-      <path d="M50 37H110L128 76 110 115H50L32 76Z" fill={housing} stroke={ink} stroke-opacity=".35"/><text x="80" y="83" text-anchor="middle" fill={accent} font-family="monospace" font-size="18">{core.formShowValue!==false ? readout : ""}</text><path d="M68 102H92" stroke={face}/>
+      <path d="M50 37H110L128 76 110 115H50L32 76Z" fill={housing} stroke={ink} stroke-opacity=".35"/>{#if readoutClip}{@const rb = readoutBox(80, 83, 18)}<g clip-path={`url(#${uid}-ro83)`}><clipPath id={`${uid}-ro83`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="83" text-anchor="middle" {...readoutAttrs(accent)} font-family="monospace" font-size="18">{core.formShowValue!==false ? readout : ""}</text></g>{:else}<text x="80" y="83" text-anchor="middle" {...readoutAttrs(accent)} font-family="monospace" font-size="18">{core.formShowValue!==false ? readout : ""}</text>{/if}<path d="M68 102H92" stroke={face}/>
     {/if}
     </g>
-    {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}<text x="80" y="164" text-anchor="middle" fill={legend} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}
+    {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}{#if readoutClip}{@const rb = readoutBox(80, 164, 12)}<g clip-path={`url(#${uid}-ro164)`}><clipPath id={`${uid}-ro164`}><rect x={rb.x} y={rb.y} width={rb.width} height={rb.height}/></clipPath><text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text></g>{:else}<text x="80" y="164" text-anchor="middle" {...readoutAttrs(legend)} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}{/if}
   {:else if meter && meterPartsDrawn}
-    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} />
+    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} {partAnimations} {partColours} {partTransitions} {partTexts} />
     <!-- Its reading is a Label of its own beside it (utils/labelShows.js); a legend part prints what the design prints. -->
   {:else if meter}
     <g transform={`translate(80 46) scale(${size}) translate(-80 -46)`}>
@@ -153,11 +205,11 @@
       <rect x="8" y="34" width="144" height="30" rx={form==='capsule'?15:0} fill={ink} opacity=".22"/><rect x="8" y="34" width={Math.max(1,p*144)} height="30" rx={form==='capsule'?15:0} fill={accent}/>{#if form==='capsule'}<rect x="8" y="34" width="144" height="30" rx="15" fill={`url(#${uid}-metal)`} opacity=".35"/>{/if}
     {/if}
     </g>
-    {#if core.formShowValue!==false}<text x="80" y="98" text-anchor="middle" fill={legend} font-size="10">{core.formShowValue!==false ? readout : ""}</text>{/if}
+    {#if core.formShowValue!==false}<text x="80" y="98" text-anchor="middle" {...readoutAttrs(legend)} font-size="10">{core.formShowValue!==false ? readout : ""}</text>{/if}
   {:else}
     <g transform={partsDrawn ? undefined : `translate(80 40) scale(${size}) translate(-80 -40)`}>
     {#if partsDrawn}
-      <ButtonDeviceParts parts={control?._children?.Parts?._children ?? {}} {active} uid={`${uid}-device`} />
+      <ButtonDeviceParts parts={control?._children?.Parts?._children ?? {}} {active} uid={`${uid}-device`} {partAnimations} {partColours} {partTransitions} {partTexts} />
     {:else if toggle}
       {#if form==='slide'}
         <rect x="18" y="18" width="124" height="45" rx="22" fill={ink} opacity=".18"/><rect x={active?81:21} y="21" width="58" height="39" rx="19" fill={active?accent:face}/><text x={active?49:112} y="47" fill={ink} text-anchor="middle" font-size="12">{active?'ON':'OFF'}</text>
@@ -201,10 +253,18 @@
       </g>
     {/if}
     </g>
-    {#if !lay && !bareDevice}<text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle && !partsDrawn ? ` · ${active?'ON':'OFF'}` : ''}</text>{/if}
+    {#if !lay && !bareDevice}
+      {@const words = `${label || (toggle ? 'SWITCH' : 'PRESS')}${toggle && !partsDrawn ? ` · ${active?'ON':'OFF'}` : ''}`}
+      {#if captionClips}{@const cb = captionBox(words, 80, 96, 11)}<g clip-path={`url(#${uid}-cap-frame)`}><clipPath id={`${uid}-cap-frame`}><rect x={cb.x} y={cb.y} width={cb.width} height={cb.height}/></clipPath><text x="80" y="96" text-anchor="middle" {...captionAttrs(words)} font-size="11" font-family="inherit">{words}</text></g>
+      {:else}<text x="80" y="96" text-anchor="middle" {...captionAttrs(words)} font-size="11" font-family="inherit">{words}</text>{/if}
+    {/if}
   {/if}
   </g>
-  {#if lay?.caption}<text class="caption" x={lay.caption.x} y={lay.caption.y} text-anchor={lay.caption.anchor} fill={legend} font-size={lay.caption.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{lay.caption.text}</text>{/if}
+  {#if lay?.caption}
+    {@const cap = lay.caption}
+    {#if captionClips}{@const cb = captionBox(cap.text, cap.x, cap.y, cap.size, cap.anchor)}<g clip-path={`url(#${uid}-cap-lay)`}><clipPath id={`${uid}-cap-lay`}><rect x={cb.x} y={cb.y} width={cb.width} height={cb.height}/></clipPath><text class="caption" x={cap.x} y={cap.y} text-anchor={cap.anchor} {...captionAttrs(cap.text)} font-size={cap.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{cap.text}</text></g>
+    {:else}<text class="caption" x={cap.x} y={cap.y} text-anchor={cap.anchor} {...captionAttrs(cap.text)} font-size={cap.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{cap.text}</text>{/if}
+  {/if}
 </svg>
 
 <style>

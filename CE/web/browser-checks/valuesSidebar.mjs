@@ -46,6 +46,8 @@
  *   bytes      getBits and setBits draw the byte with the field marked; ce.midi.read names what the
  *              mapped profile's dumps hold at its byte, and what a dump the script declares holds
  *   lcd        an LCD line is drawn in its row as the display shows it, the cut part marked
+ *   effects    ce.anim.effect's effect is previewed in its row and chosen from the library's cards under
+ *              it, each previewing while pointed at; its target is a choice of the control's places
  *   open       ce.anim.play's row opens the panel's Animation tab on the animation it plays
  *   file       the panel file view has the Values tab alone; a control's colour row edits the item's
  *              text as typing would, which Apply then puts on the control; Every field and the whole
@@ -1076,6 +1078,38 @@ function onMidiIn(midi) {
     await page.waitForSelector(`${SCRIPT} textarea.ce-ta`);
     await kit.settle(500);
   }
+
+  // ===============================================================================================
+  // EFFECTS — ce.anim.effect's effect: the one written previewed in its row, the library under the
+  // row as cards that preview while pointed at, one written by a click; its target, Cutoff's places.
+  // ===============================================================================================
+  const FX = `function onValueChanged(value) {
+  ce.anim.effect("Cutoff", "Fade in");
+}
+`;
+  await typeScript(FX);
+  await clickAt(FX.indexOf('Fade in') + 2);
+  await waitHead('Line 2');
+  await until(() => document.querySelectorAll('.vrow[data-name="effect"] [data-effect-card]').length > 0);
+  const fxRow = await page.evaluate(() => {
+    const row = document.querySelector('.vrow[data-name="effect"]');
+    return { kind: row?.dataset.kind, preview: row?.querySelector('.vline .pv')?.dataset.preview ?? null,
+      cards: row?.querySelectorAll('[data-effect-card]').length ?? 0, meaning: row?.querySelector('.vmeaning')?.textContent ?? '' };
+  });
+  const POP = '.vrow[data-name="effect"] [data-effect-card="Pop"]';
+  await page.hover(POP);
+  await kit.settle(150);
+  const popPlays = await page.evaluate((sel) => document.querySelector(`${sel} .pv`)?.hasAttribute('data-playing') ?? false, POP);
+  await page.click(POP);
+  await until(() => document.querySelector('.bd-app .detail textarea.ce-ta')?.value.includes('"Pop"'));
+  const fxWritten = (await editorText()).split('\n')[1].trim();
+  await clickAt(FX.indexOf('Cutoff') + 2);
+  await until(() => document.querySelector('.vrow[data-name="target"]')?.dataset.kind === 'animTarget');
+  const places = await page.evaluate(() => [...(document.querySelector('.vrow[data-name="target"] select')?.options ?? [])].map((option) => option.value));
+  if (process.env.VALUES_SHOT_DIR) await page.locator('[data-testid="values-sidebar"]').screenshot({ path: `${process.env.VALUES_SHOT_DIR}/values-effects.png` });
+  led.check(S, 'ce.anim.effect offers the library, each effect previewed', 'the effect\'s row is a choice with the written effect on a stand-in; under it, while the caret is in it, the library as cards, Pop playing while pointed at and written by a click; the target offers Cutoff\'s places',
+    { kind: 'animEffect', preview: 'box', cards: true, meaning: 'Fade in · a move or a paint', popPlays: true, written: 'ce.anim.effect("Cutoff", "Pop");', places: ['Cutoff', 'Cutoff.Value'] },
+    { kind: fxRow.kind, preview: fxRow.preview, cards: fxRow.cards > 30, meaning: fxRow.meaning, popPlays, written: fxWritten, places: places.slice(0, 2) });
 
   // ===============================================================================================
   // LCD — a line drawn as the display shows it; OPEN — ce.anim.play's animation in the Animation tab.

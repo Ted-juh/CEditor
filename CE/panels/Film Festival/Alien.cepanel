@@ -1,0 +1,475 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "d71a7f11-f11d-4fe5-a5e5-d71a7f11d71a",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Alien",
+  "scriptId": "film_alien",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF010402",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Scan","id":"ctrl_1708837905000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:scanlines","tint":"FF1F7A3A","opacity":28,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":10,"direction":90,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tracker","id":"ctrl_1708837905001","controlType":"Label"},
+        "Transform": {"x":50,"y":70,"width":250,"height":250},
+        "Background": {"_children":{"Fill":{"colour":"FF031208","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22250%22%20height%3D%22250%22%20viewBox%3D%220%200%20250%20250%22%3E%3Ccircle%20cx%3D%22125%22%20cy%3D%22125%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.55%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22125%22%20cy%3D%22125%22%20r%3D%2260%22%20fill%3D%22none%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.55%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22125%22%20cy%3D%22125%22%20r%3D%2290%22%20fill%3D%22none%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.55%22%20stroke-width%3D%221.5%22%2F%3E%3Ccircle%20cx%3D%22125%22%20cy%3D%22125%22%20r%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.55%22%20stroke-width%3D%221.5%22%2F%3E%3Cline%20x1%3D%22125%22%20y1%3D%220%22%20x2%3D%22125%22%20y2%3D%22250%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.35%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22125%22%20x2%3D%22250%22%20y2%3D%22125%22%20stroke%3D%22%233cff7a%22%20stroke-opacity%3D%22.35%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false},"Corners":{"radius":125}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep","id":"ctrl_1708837905002","controlType":"Label"},
+        "Transform": {"x":50,"y":70,"width":250,"height":250},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22250%22%20height%3D%22250%22%20viewBox%3D%220%200%20250%20250%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233cff7a%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%233cff7a%22%20stop-opacity%3D%22.55%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M125%20125%20L%20245%20125%20A%20120%20120%200%200%200%20210%2040%20Z%22%20fill%3D%22url(%23g)%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Ping","id":"ctrl_1708837905003","controlType":"Label"},
+        "Transform": {"x":50,"y":70,"width":250,"height":250},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2246%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Blip1","id":"ctrl_1708837905004","controlType":"Label"},
+        "Transform": {"x":255,"y":91,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF9CFFBC"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":12,"spread":1,"colour":"FF3CFF7A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Blip2","id":"ctrl_1708837905005","controlType":"Label"},
+        "Transform": {"x":229,"y":125,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF9CFFBC"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":12,"spread":1,"colour":"FF3CFF7A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Blip3","id":"ctrl_1708837905006","controlType":"Label"},
+        "Transform": {"x":203,"y":153,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF9CFFBC"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":12,"spread":1,"colour":"FF3CFF7A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Blip4","id":"ctrl_1708837905007","controlType":"Label"},
+        "Transform": {"x":181,"y":175,"width":14,"height":14},
+        "Background": {"_children":{"Fill":{"colour":"FF9CFFBC"},"Border":{"enabled":false},"Corners":{"radius":7}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":12,"spread":1,"colour":"FF3CFF7A"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Dist","id":"ctrl_1708837905008","controlType":"Label"},
+        "Transform": {"x":50,"y":334,"width":250,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"02 M","_children":{"Fill":{"colour":"FF3CFF7A"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":500,"size":20}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1708837905009","controlType":"Label"},
+        "Transform": {"x":316,"y":150,"width":390,"height":110},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALIEN","_children":{"Fill":{"colour":"FFDDEFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":84,"letterSpacing":12}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_alien",
+      "name": "Motion tracker",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6800,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_alien_1",
+          "controlId": "ctrl_1708837905002",
+          "target": "Transform",
+          "start": 0,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 5,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "spin": 0
+              },
+              {
+                "at": 1,
+                "spin": 360
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_2",
+          "controlId": "ctrl_1708837905003",
+          "target": "Transform",
+          "start": 0,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 5,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0.1,
+                "opacity": 0.9
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_3",
+          "controlId": "ctrl_1708837905004",
+          "target": "Transform",
+          "start": 500,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 0.5
+              },
+              {
+                "at": 0.12,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.5,
+                "opacity": 0.5,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_4",
+          "controlId": "ctrl_1708837905005",
+          "target": "Transform",
+          "start": 1800,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 0.5
+              },
+              {
+                "at": 0.12,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.5,
+                "opacity": 0.5,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_5",
+          "controlId": "ctrl_1708837905006",
+          "target": "Transform",
+          "start": 3100,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 0.5
+              },
+              {
+                "at": 0.12,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.5,
+                "opacity": 0.5,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_6",
+          "controlId": "ctrl_1708837905007",
+          "target": "Transform",
+          "start": 4400,
+          "length": 1300,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0,
+                "scale": 0.5
+              },
+              {
+                "at": 0.12,
+                "opacity": 1,
+                "scale": 1.3
+              },
+              {
+                "at": 0.5,
+                "opacity": 0.5,
+                "scale": 1
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_alien_7",
+          "controlId": "ctrl_1708837905008",
+          "target": "Text",
+          "start": 300,
+          "length": 5000,
+          "effect": {
+            "kind": "text",
+            "effect": "reel",
+            "way": "in",
+            "iterations": 1,
+            "spins": 20,
+            "glyphs": "0123456789",
+            "stagger": 700,
+            "duration": 4200,
+            "easing": "outCubic"
+          }
+        },
+        {
+          "id": "cl_alien_8",
+          "controlId": "ctrl_1708837905009",
+          "target": "Text",
+          "start": 600,
+          "length": 3800,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "random",
+            "stagger": 700,
+            "duration": 900
+          }
+        }
+      ]
+    }
+  ]
+}

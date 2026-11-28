@@ -61,7 +61,8 @@ test('an exported panel carries its images, and a part finds them without WebGL'
 
 test('the knob draws a rendered plate from its image, and export bakes them', () => {
   const knob = read('CE_Application/editor/SliderFamilyRenderer.svelte');
-  assert.match(knob, /\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\} href=\{rendered\.url\}/);
+  // Inside the group that carries the plate's own scale and motion (plateScaleStyle).
+  assert.match(knob, /\{@const rendered = renderedPlate\(part, r\)\}[\s\S]*?<g data-plate=\{role\} style=\{plateScaleStyle\(part, role\)\}>\s*\{#if rendered\}\s*<image data-rendered-look=\{role\} href=\{rendered\.url\}/);
   assert.match(knob, /if \(String\(part\?\.look \?\? ''\) !== 'rendered' \|\| r <= 0\) return null;/);
   const prep = read('CE_Application/stores/panelExportPreparation.js');
   assert.match(prep, /const looks = await bakeRenderedLooks\(controlsInTree\(panel\.controls\), \{\s*lamp: panelSet\?\.lamp \?\? null,\s*resolve: \(control\) => resolveControlForSet\(control, panelSet, sources\),/);
@@ -208,6 +209,8 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   assert.equal(baked.plates, 1);
   const slider = read('CE_Application/editor/SliderFamilyRenderer.svelte');
   assert.match(slider, /\{@const rendered = g\.kind === 'ring' \|\| g\.kind === 'line' \? null : renderedCap\(part, point, g\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{name\}/);
+  // A lifted cap, rendered or drawn, is drawn inside the group that lifts it (capLiftStyle).
+  assert.match(slider, /\{#if lift\}\s*<g style=\{lift\}>\{@render capBody\(part, point, name\)\}<\/g>/);
   assert.match(slider, /const spec = renderedCapSpec\(part, \{\s*vertical: orientation === 'vertical',/);
   const button = read('CE_Application/editor/ButtonDeviceParts.svelte');
   assert.match(button, /rendered: renderedPart\(name, part, box, lit \? part\.activeColour : fill\.colour\),/);
@@ -215,9 +218,11 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   const meter = read('CE_Application/editor/MeterDeviceParts.svelte');
   assert.match(meter, /rendered: renderedPart\(name, part, drawing\),/);
   assert.match(meter, /const spec = renderedMeterPartSpec\(part, \{ colour, topColour: part\?\.renderTopColour \|\| null, lamp: \$activeControlSet\?\.lamp, name \}\);/);
-  assert.match(meter, /\{#if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
+  // After every lamp drawn alone, when something plays on them (the Meter, phase 2), which a rendered
+  // housing or clip lamp never is: neither lights cells.
+  assert.match(meter, /\{:else if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
   // What the image draws, its cells and zone are not drawn again over it.
-  assert.match(meter, /\{#if !item\.rendered\}\s*\{#each item\.zoned as path, i \(i\)\}/);
+  assert.match(meter, /\{#if !item\.rendered && !item\.cells\}\s*\{#each item\.zoned as path, i \(i\)\}/);
 });
 
 test('a slider\'s rendered cap, a button\'s rendered key and a meter\'s rendered housing are made into layers too', async () => {

@@ -1,0 +1,279 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "cbf3cab0-f11d-4fe5-a5e5-cbf3cab0cbf3",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "2001 A Space Odyssey",
+  "scriptId": "film_odyssey",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF000000",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1701751984000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22110%22%20height%3D%2280%22%20viewBox%3D%220%200%20110%2080%22%3E%3Ccircle%20cx%3D%2227.2%22%20cy%3D%2257.6%22%20r%3D%220.52%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2292.4%22%20cy%3D%2256.4%22%20r%3D%220.58%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2254.9%22%20cy%3D%2218.8%22%20r%3D%220.43%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2294.1%22%20cy%3D%227.0%22%20r%3D%220.48%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2254.8%22%20cy%3D%2251.0%22%20r%3D%220.47%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2291.6%22%20cy%3D%2238.0%22%20r%3D%220.59%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2295.0%22%20cy%3D%228.0%22%20r%3D%220.89%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2239.7%22%20cy%3D%2259.1%22%20r%3D%220.70%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2265.5%22%20cy%3D%2238.1%22%20r%3D%220.89%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2249.4%22%20cy%3D%2240.2%22%20r%3D%220.51%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2231.8%22%20cy%3D%2262.6%22%20r%3D%220.49%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2245.3%22%20cy%3D%2276.3%22%20r%3D%220.52%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFFFFFFF","opacity":70,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22130%22%20viewBox%3D%220%200%20190%20130%22%3E%3Ccircle%20cx%3D%2246.1%22%20cy%3D%2271.4%22%20r%3D%221.87%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%22146.9%22%20cy%3D%2250.3%22%20r%3D%221.86%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%22120.5%22%20cy%3D%2251.0%22%20r%3D%221.03%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%22142.3%22%20cy%3D%2221.9%22%20r%3D%221.79%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%22103.3%22%20cy%3D%2295.3%22%20r%3D%221.69%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%22171.8%22%20cy%3D%2223.1%22%20r%3D%221.36%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2254.0%22%20cy%3D%2240.4%22%20r%3D%221.60%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2244.8%22%20cy%3D%2253.8%22%20r%3D%221.46%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2269.8%22%20cy%3D%2276.4%22%20r%3D%221.78%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FFFFFFFF","opacity":95,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":37,"offsetY":21,"place":"behind","speed":0,"direction":0,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sun","id":"ctrl_1701751984001","controlType":"Label"},
+        "Transform": {"x":300,"y":150,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":30,"stops":[{"position":0,"color":"#ffffff"},{"position":18,"color":"#fff6d8"},{"position":40,"color":"#88FFB84A"},{"position":100,"color":"#00FF6A00"}]}},"Border":{"enabled":false},"Corners":{"radius":60}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":30,"spread":1,"colour":"FFFFE0A0"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Earth","id":"ctrl_1701751984002","controlType":"Label"},
+        "Transform": {"x":210,"y":200,"width":300,"height":300},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":30,"stops":[{"position":0,"color":"#9fd3ff"},{"position":45,"color":"#1e5fa8"},{"position":80,"color":"#0a1a3a"},{"position":100,"color":"#020611"}]}},"Border":{"enabled":false},"Corners":{"radius":150}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Moon","id":"ctrl_1701751984003","controlType":"Label"},
+        "Transform": {"x":-140,"y":290,"width":1000,"height":1000},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":30,"stops":[{"position":0,"color":"#9a9a9a"},{"position":12,"color":"#3c3c3c"},{"position":40,"color":"#141414"},{"position":100,"color":"#050505"}]}},"Border":{"enabled":false},"Corners":{"radius":500}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1701751984004","controlType":"Label"},
+        "Transform": {"y":36,"width":720,"height":50},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"2001 : A SPACE ODYSSEY","_children":{"Fill":{"colour":"FFE8EEF5"},"Font":{"family":"Space Grotesk","weight":"Light","weightValue":300,"size":26,"letterSpacing":12}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_odyssey",
+      "name": "Sunrise",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_odyssey_1",
+          "controlId": "ctrl_1701751984002",
+          "target": "Transform",
+          "start": 0,
+          "length": 3600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 140
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_odyssey_2",
+          "controlId": "ctrl_1701751984001",
+          "target": "Transform",
+          "start": 1600,
+          "length": 3400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 150,
+                "scale": 0.6,
+                "opacity": 0
+              },
+              {
+                "at": 0.2,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "y": -40,
+                "scale": 1.25,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_odyssey_3",
+          "controlId": "ctrl_1701751984004",
+          "target": "Text",
+          "start": 4400,
+          "length": 1700,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 50,
+            "duration": 900
+          }
+        }
+      ]
+    }
+  ]
+}

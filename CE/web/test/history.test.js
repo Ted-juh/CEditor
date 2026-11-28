@@ -12,13 +12,14 @@ import {
   undoAvailable,
   redoAvailable,
   setHistoryRecordingSuppressed,
+  flushHistory,
 } from '../src/CE_Application/stores/history.js';
 import {
   componentWorkspaceMode,
   componentDocuments,
   activeComponentDocumentId,
 } from '../src/CE_Application/stores/componentWorkspace.js';
-import { activeEditorTab } from '../src/CE_Application/stores/panels.js';
+import { activeEditorTab, panels, activePanelId, selectedComponentIds, addPanel, createPanel, updatePanel } from '../src/CE_Application/stores/panels.js';
 
 function makeDoc(id, value) {
   return {
@@ -243,4 +244,20 @@ test('undo restores the selection that went with the state', async () => {
 
   panels.set([]);
   activeEditorTab.set({ type: 'panel', id: null });
+});
+
+test('undo takes away a panel field the earlier state did not have: the first scene, the first carried preset', () => {
+  componentWorkspaceMode.set('panel'); panels.set([]); activePanelId.set(null);
+  activeEditorTab.set({ type: 'panel', id: null }); selectedComponentIds.set(new Set());
+  initHistory(); addPanel(createPanel('Undo')); flushHistory();
+  const id = get(panels)[0].id;
+  assert.equal('animationScenes' in get(panels)[0], false, 'a new panel has none');
+  updatePanel(id, { animationScenes: [{ id: 'sc_1' }], filePath: '/tmp/kept.cepanel' });
+  flushHistory();
+  undo();
+  const after = get(panels)[0];
+  assert.equal('animationScenes' in after, false, 'gone again, not left behind');
+  assert.equal(after.filePath, '/tmp/kept.cepanel', 'where the document lives is not history\'s to take back');
+  redo();
+  assert.deepEqual(get(panels)[0].animationScenes, [{ id: 'sc_1' }]);
 });

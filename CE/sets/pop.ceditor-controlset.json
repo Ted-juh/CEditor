@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0b43d2ae",
+  "fingerprint": "b5327588",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -71,6 +71,7 @@
       "display.screen": "FF1B1B1B",
       "display.backlight": "FF363636",
       "panel.surface": "FFF6D96B",
+      "control.readout": "{text.label}",
       "section.surface": "FFF9E69F"
     },
     "lamp": {

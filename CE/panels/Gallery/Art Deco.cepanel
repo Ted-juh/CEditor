@@ -1,0 +1,466 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "e602e712-9a11-4e7b-b3c0-e602e712e602",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Art Deco",
+  "scriptId": "gallery_artdeco",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF0B0B0D",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Burst","id":"ctrl_1778949906000","controlType":"Label"},
+        "Transform": {"x":-40,"y":-180,"width":800,"height":800},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22800%22%20height%3D%22800%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cpath%20d%3D%22M400%20400%20L%20380.5%20-159.7%20L%20419.5%20-159.7%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20477.9%20-154.6%20L%20516.4%20-147.8%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20573.0%20-132.6%20L%20609.8%20-119.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20662.9%20-94.5%20L%20696.8%20-74.9%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20744.8%20-41.3%20L%20774.7%20-16.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20816.2%2025.3%20L%20841.3%2055.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20874.9%20103.2%20L%20894.5%20137.1%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20919.2%20190.2%20L%20932.6%20227.0%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20947.8%20283.6%20L%20954.6%20322.1%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20959.7%20380.5%20L%20959.7%20419.5%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20954.6%20477.9%20L%20947.8%20516.4%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20932.6%20573.0%20L%20919.2%20609.8%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20894.5%20662.9%20L%20874.9%20696.8%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20841.3%20744.8%20L%20816.2%20774.7%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20774.7%20816.2%20L%20744.8%20841.3%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20696.8%20874.9%20L%20662.9%20894.5%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20609.8%20919.2%20L%20573.0%20932.6%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20516.4%20947.8%20L%20477.9%20954.6%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20419.5%20959.7%20L%20380.5%20959.7%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20322.1%20954.6%20L%20283.6%20947.8%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20227.0%20932.6%20L%20190.2%20919.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20137.1%20894.5%20L%20103.2%20874.9%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%2055.2%20841.3%20L%2025.3%20816.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-16.2%20774.7%20L%20-41.3%20744.8%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-74.9%20696.8%20L%20-94.5%20662.9%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-119.2%20609.8%20L%20-132.6%20573.0%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-147.8%20516.4%20L%20-154.6%20477.9%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-159.7%20419.5%20L%20-159.7%20380.5%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-154.6%20322.1%20L%20-147.8%20283.6%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-132.6%20227.0%20L%20-119.2%20190.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-94.5%20137.1%20L%20-74.9%20103.2%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20-41.3%2055.2%20L%20-16.2%2025.3%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%2025.3%20-16.2%20L%2055.2%20-41.3%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20103.2%20-74.9%20L%20137.1%20-94.5%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20190.2%20-119.2%20L%20227.0%20-132.6%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.3%22%2F%3E%3Cpath%20d%3D%22M400%20400%20L%20283.6%20-147.8%20L%20322.1%20-154.6%20Z%22%20fill%3D%22%23d4af37%22%20fill-opacity%3D%22.16%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glow","id":"ctrl_1778949906001","controlType":"Label"},
+        "Transform": {"x":160,"y":60,"width":400,"height":400},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#55D4AF37"},{"position":100,"color":"#00D4AF37"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LineTop","id":"ctrl_1778949906002","controlType":"Label"},
+        "Transform": {"y":108,"width":720,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFD4AF37"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LineMid","id":"ctrl_1778949906003","controlType":"Label"},
+        "Transform": {"y":236,"width":720,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFD4AF37"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LineFoot","id":"ctrl_1778949906004","controlType":"Label"},
+        "Transform": {"y":330,"width":720,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","_children":{"Fill":{"colour":"FFD4AF37"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanL","id":"ctrl_1778949906005","controlType":"Label"},
+        "Transform": {"x":120,"y":260,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2260%22%20viewBox%3D%220%200%20120%2060%22%3E%3Cpath%20d%3D%22M60%2058%20L%204%204%20A%2080%2080%200%200%201%20116%204%20Z%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M46%2044%20A%2020%2020%200%200%201%2074%2044%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M32%2030%20A%2040%2040%200%200%201%2088%2030%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M18%2016%20A%2060%2060%200%200%201%20102%2016%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanR","id":"ctrl_1778949906006","controlType":"Label"},
+        "Transform": {"x":480,"y":260,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2260%22%20viewBox%3D%220%200%20120%2060%22%3E%3Cpath%20d%3D%22M60%2058%20L%204%204%20A%2080%2080%200%200%201%20116%204%20Z%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M46%2044%20A%2020%2020%200%200%201%2074%2044%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M32%2030%20A%2040%2040%200%200%201%2088%2030%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M18%2016%20A%2060%2060%200%200%201%20102%2016%22%20fill%3D%22none%22%20stroke%3D%22%23d4af37%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1778949906007","controlType":"Label"},
+        "Transform": {"y":140,"width":720,"height":90},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ART DECO","_children":{"Fill":{"colour":"FFD4AF37"},"Font":{"family":"Space Grotesk","weight":"Light","weightValue":300,"size":66,"letterSpacing":24}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"outer-glow","offsetX":0,"offsetY":0,"blur":16,"spread":1,"colour":"88D4AF37"}]}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Year","id":"ctrl_1778949906008","controlType":"Label"},
+        "Transform": {"y":358,"width":720,"height":24},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MCMXXV","_children":{"Fill":{"colour":"FFB8962E"},"Font":{"family":"JetBrains Mono","weight":"Bold","weightValue":700,"size":14,"letterSpacing":8}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_artdeco",
+      "name": "Opening night",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_artdeco_1",
+          "controlId": "ctrl_1778949906000",
+          "target": "Transform",
+          "start": 0,
+          "length": 6400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": -4
+              },
+              {
+                "at": 0.5,
+                "rotate": 4
+              },
+              {
+                "at": 1,
+                "rotate": -4
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_artdeco_2",
+          "controlId": "ctrl_1778949906002",
+          "target": "Text",
+          "start": 200,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 22,
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_artdeco_3",
+          "controlId": "ctrl_1778949906003",
+          "target": "Text",
+          "start": 450,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 22,
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_artdeco_4",
+          "controlId": "ctrl_1778949906004",
+          "target": "Text",
+          "start": 700,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 22,
+            "duration": 220
+          }
+        },
+        {
+          "id": "cl_artdeco_5",
+          "controlId": "ctrl_1778949906005",
+          "target": "Transform",
+          "start": 1200,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_artdeco_6",
+          "controlId": "ctrl_1778949906006",
+          "target": "Transform",
+          "start": 1350,
+          "length": 600,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outCubic",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_artdeco_7",
+          "controlId": "ctrl_1778949906005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_artdeco_8",
+          "controlId": "ctrl_1778949906006",
+          "target": "Transform",
+          "start": 0,
+          "length": 1200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_artdeco_9",
+          "controlId": "ctrl_1778949906007",
+          "target": "Text",
+          "start": 1600,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "crossfade",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "centre",
+            "stagger": 70,
+            "duration": 600
+          }
+        },
+        {
+          "id": "cl_artdeco_10",
+          "controlId": "ctrl_1778949906007",
+          "target": "Text",
+          "start": 3600,
+          "length": 1400,
+          "effect": {
+            "kind": "text",
+            "effect": "shimmer",
+            "way": "in",
+            "iterations": 1,
+            "colour": "FFFFF6D8",
+            "stagger": 60,
+            "duration": 700
+          }
+        },
+        {
+          "id": "cl_artdeco_11",
+          "controlId": "ctrl_1778949906008",
+          "target": "Text",
+          "start": 2400,
+          "length": 700,
+          "effect": {
+            "kind": "text",
+            "effect": "typewriter",
+            "way": "in",
+            "iterations": 1,
+            "stagger": 80,
+            "duration": 160
+          }
+        }
+      ]
+    }
+  ]
+}

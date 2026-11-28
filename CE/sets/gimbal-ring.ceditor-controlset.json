@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b00ed210",
+  "fingerprint": "ad393b36",
   "set": {
     "id": "gimbal-ring",
     "name": "Gimbal Ring",
@@ -71,6 +71,7 @@
       "display.screen": "FF03040A",
       "display.backlight": "FF212227",
       "panel.surface": "FF263238",
+      "control.readout": "{text.label}",
       "section.surface": "FF1E272C"
     },
     "lamp": {

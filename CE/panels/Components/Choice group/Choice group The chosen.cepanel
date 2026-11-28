@@ -1,0 +1,705 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "f2343085-c0b5-4e1a-9f3d-f2343085f234",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Choice group The chosen",
+  "scriptId": "component_choice-chosen",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF10151F",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Pop.value",
+      "label": "Pop",
+      "controlName": "Pop",
+      "path": "Pop.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Lo",
+        "Mid",
+        "Hi"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "PressIn.value",
+      "label": "PressIn",
+      "controlName": "PressIn",
+      "path": "PressIn.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Mono",
+        "Poly",
+        "Uni"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Glow.value",
+      "label": "Glow",
+      "controlName": "Glow",
+      "path": "Glow.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Sqr",
+        "Tri"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "LabelRoll.value",
+      "label": "LabelRoll",
+      "controlName": "LabelRoll",
+      "path": "LabelRoll.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Hall",
+        "Room",
+        "Plate",
+        "Spring"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "InkFlash.value",
+      "label": "InkFlash",
+      "controlName": "InkFlash",
+      "path": "InkFlash.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Edit",
+        "Mix",
+        "Save"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "chrome"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1713506565000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice group · The chosen","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1713506565001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the option just chosen. Each group wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pop","id":"ctrl_1713506565002","description":"Pop: the option chosen pops up and settles.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Lo","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Mid","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Hi","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"pop":{"_type":"Animation","name":"pop","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.chosen"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.14},{"at":1,"scale":1}],"duration":340,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:pop","revision":1,"from":"pop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopCaption","id":"ctrl_1713506565003","controlType":"Label"},
+        "Transform": {"x":40,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopHow","id":"ctrl_1713506565004","controlType":"Label"},
+        "Transform": {"x":40,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FF2FC4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopWhat","id":"ctrl_1713506565005","controlType":"Label"},
+        "Transform": {"x":44,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the option chosen pops up and settles","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PressIn","id":"ctrl_1713506565006","description":"Press in: the option chosen is pressed in and comes back.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Mono","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Poly","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Uni","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"pressIn":{"_type":"Animation","name":"pressIn","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.chosen"}],"frames":[{"at":0,"scale":1,"y":0},{"at":0.3,"scale":0.9,"y":1},{"at":1,"scale":1,"y":0}],"duration":280,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:press-in","revision":1,"from":"pressIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PressInCaption","id":"ctrl_1713506565007","controlType":"Label"},
+        "Transform": {"x":360,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Press in","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PressInHow","id":"ctrl_1713506565008","controlType":"Label"},
+        "Transform": {"x":360,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FF2FC4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PressInWhat","id":"ctrl_1713506565009","controlType":"Label"},
+        "Transform": {"x":364,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the option chosen is pressed in and comes back","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glow","id":"ctrl_1713506565010","description":"Glow: the option chosen lights up and fades to its colour.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":690,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Sqr","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"glow":{"_type":"Animation","name":"glow","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.chosen"}],"frames":[{"at":0,"scale":1},{"at":0.15,"fill":"FFFFF4D6"},{"at":1,"scale":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:glow","revision":1,"from":"glow"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowCaption","id":"ctrl_1713506565011","controlType":"Label"},
+        "Transform": {"x":680,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Glow","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowHow","id":"ctrl_1713506565012","controlType":"Label"},
+        "Transform": {"x":680,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FF2FC4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowWhat","id":"ctrl_1713506565013","controlType":"Label"},
+        "Transform": {"x":684,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the option chosen lights up and fades to its colour","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LabelRoll","id":"ctrl_1713506565014","description":"Label roll: the chosen option's word rolls up into place.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Hall","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Room","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Plate","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"Spring","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"labelRoll":{"_type":"Animation","name":"labelRoll","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":30,"duration":300,"direction":"up","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.chosenLabel"}],"preset":{"id":"ce:choice:label-roll","revision":1,"from":"labelRoll"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LabelRollCaption","id":"ctrl_1713506565015","controlType":"Label"},
+        "Transform": {"x":40,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Label roll","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LabelRollHow","id":"ctrl_1713506565016","controlType":"Label"},
+        "Transform": {"x":40,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FF2FC4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LabelRollWhat","id":"ctrl_1713506565017","controlType":"Label"},
+        "Transform": {"x":44,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the chosen option's word rolls up into place","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlash","id":"ctrl_1713506565018","description":"Ink flash: the chosen tab's word flashes gold.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"tab"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Edit","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Mix","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Save","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"ink":{"_type":"Animation","name":"ink","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.chosenLabel"}],"frames":[{"at":0,"scale":1},{"at":0.2,"text":"FFF2B84B"},{"at":1,"scale":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:ink-flash","revision":1,"from":"ink"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashCaption","id":"ctrl_1713506565019","controlType":"Label"},
+        "Transform": {"x":360,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Ink flash","_children":{"Fill":{"colour":"FFEEF3F8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashHow","id":"ctrl_1713506565020","controlType":"Label"},
+        "Transform": {"x":360,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FF2FC4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"InkFlashWhat","id":"ctrl_1713506565021","controlType":"Label"},
+        "Transform": {"x":364,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the chosen tab's word flashes gold","_children":{"Fill":{"colour":"FF9AA6B4"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:pop",
+      "name": "Pop",
+      "category": "Choice group",
+      "tags": [
+        "The chosen",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pop": {
+          "_type": "Animation",
+          "name": "pop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.chosen"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.14
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 340,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:press-in",
+      "name": "Press in",
+      "category": "Choice group",
+      "tags": [
+        "The chosen",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pressIn": {
+          "_type": "Animation",
+          "name": "pressIn",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.chosen"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1,
+              "y": 0
+            },
+            {
+              "at": 0.3,
+              "scale": 0.9,
+              "y": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "y": 0
+            }
+          ],
+          "duration": 280,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:glow",
+      "name": "Glow",
+      "category": "Choice group",
+      "tags": [
+        "The chosen",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "glow": {
+          "_type": "Animation",
+          "name": "glow",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.chosen"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.15,
+              "fill": "FFFFF4D6"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:label-roll",
+      "name": "Label roll",
+      "category": "Choice group",
+      "tags": [
+        "The chosen",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "labelRoll": {
+          "_type": "Animation",
+          "name": "labelRoll",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 30,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.chosenLabel"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:ink-flash",
+      "name": "Ink flash",
+      "category": "Choice group",
+      "tags": [
+        "The chosen",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "ink": {
+          "_type": "Animation",
+          "name": "ink",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.chosenLabel"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "text": "FFF2B84B"
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

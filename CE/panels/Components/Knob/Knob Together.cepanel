@@ -1,0 +1,991 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "ec723c68-c0b5-4e1a-9f3d-ec723c68ec72",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Knob Together",
+  "scriptId": "component_knob-together",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 900,
+  "height": 560,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF141518",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Sweep1.value",
+      "label": "Sweep1",
+      "controlName": "Sweep1",
+      "path": "Sweep1.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.7,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sweep2.value",
+      "label": "Sweep2",
+      "controlName": "Sweep2",
+      "path": "Sweep2.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.55,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sweep3.value",
+      "label": "Sweep3",
+      "controlName": "Sweep3",
+      "path": "Sweep3.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.4,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sweep4.value",
+      "label": "Sweep4",
+      "controlName": "Sweep4",
+      "path": "Sweep4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.62,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sweep5.value",
+      "label": "Sweep5",
+      "controlName": "Sweep5",
+      "path": "Sweep5.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.3,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave1.value",
+      "label": "Wave1",
+      "controlName": "Wave1",
+      "path": "Wave1.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave2.value",
+      "label": "Wave2",
+      "controlName": "Wave2",
+      "path": "Wave2.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave3.value",
+      "label": "Wave3",
+      "controlName": "Wave3",
+      "path": "Wave3.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave4.value",
+      "label": "Wave4",
+      "controlName": "Wave4",
+      "path": "Wave4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Wave5.value",
+      "label": "Wave5",
+      "controlName": "Wave5",
+      "path": "Wave5.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Follow1.value",
+      "label": "Follow1",
+      "controlName": "Follow1",
+      "path": "Follow1.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Follow2.value",
+      "label": "Follow2",
+      "controlName": "Follow2",
+      "path": "Follow2.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Follow3.value",
+      "label": "Follow3",
+      "controlName": "Follow3",
+      "path": "Follow3.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Follow4.value",
+      "label": "Follow4",
+      "controlName": "Follow4",
+      "path": "Follow4.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Follow5.value",
+      "label": "Follow5",
+      "controlName": "Follow5",
+      "path": "Follow5.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "diesel"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1706909544000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Knob · Together","_children":{"Fill":{"colour":"FFEDEEF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1706909544001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":840,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"scenes over a row of knobs: a scene preset plays one effect on many, each a little after the last.","_children":{"Fill":{"colour":"FF9FA4AB"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SweepCaption","id":"ctrl_1706909544002","controlType":"Label"},
+        "Transform": {"x":30,"y":116,"width":200,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sweep in","_children":{"Fill":{"colour":"FFEDEEF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SweepHow","id":"ctrl_1706909544003","controlType":"Label"},
+        "Transform": {"x":30,"y":140,"width":200,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFB59CFF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SweepWhat","id":"ctrl_1706909544004","controlType":"Label"},
+        "Transform": {"x":30,"y":158,"width":200,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each knob sweeps in, 150 ms after the last","_children":{"Fill":{"colour":"FF9FA4AB"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep1","id":"ctrl_1706909544005","controlType":"Knob"},
+        "Transform": {"x":250,"y":104,"width":84,"height":84},
+        "Behavior": {"defaultCurrentValue":0.7}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep2","id":"ctrl_1706909544006","controlType":"Knob"},
+        "Transform": {"x":374,"y":104,"width":84,"height":84},
+        "Behavior": {"defaultCurrentValue":0.55}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep3","id":"ctrl_1706909544007","controlType":"Knob"},
+        "Transform": {"x":498,"y":104,"width":84,"height":84},
+        "Behavior": {"defaultCurrentValue":0.4}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep4","id":"ctrl_1706909544008","controlType":"Knob"},
+        "Transform": {"x":622,"y":104,"width":84,"height":84},
+        "Behavior": {"defaultCurrentValue":0.62}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sweep5","id":"ctrl_1706909544009","controlType":"Knob"},
+        "Transform": {"x":746,"y":104,"width":84,"height":84},
+        "Behavior": {"defaultCurrentValue":0.3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveCaption","id":"ctrl_1706909544010","controlType":"Label"},
+        "Transform": {"x":30,"y":264,"width":200,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wave","_children":{"Fill":{"colour":"FFEDEEF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveHow","id":"ctrl_1706909544011","controlType":"Label"},
+        "Transform": {"x":30,"y":288,"width":200,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFB59CFF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WaveWhat","id":"ctrl_1706909544012","controlType":"Label"},
+        "Transform": {"x":30,"y":306,"width":200,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a wiggle runs along the row","_children":{"Fill":{"colour":"FF9FA4AB"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave1","id":"ctrl_1706909544013","controlType":"Knob"},
+        "Transform": {"x":250,"y":252,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave2","id":"ctrl_1706909544014","controlType":"Knob"},
+        "Transform": {"x":374,"y":252,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave3","id":"ctrl_1706909544015","controlType":"Knob"},
+        "Transform": {"x":498,"y":252,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave4","id":"ctrl_1706909544016","controlType":"Knob"},
+        "Transform": {"x":622,"y":252,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Wave5","id":"ctrl_1706909544017","controlType":"Knob"},
+        "Transform": {"x":746,"y":252,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FollowCaption","id":"ctrl_1706909544018","controlType":"Label"},
+        "Transform": {"x":30,"y":412,"width":200,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Follow the leader","_children":{"Fill":{"colour":"FFEDEEF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FollowHow","id":"ctrl_1706909544019","controlType":"Label"},
+        "Transform": {"x":30,"y":436,"width":200,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TURN THE FIRST","_children":{"Fill":{"colour":"FFB59CFF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FollowWhat","id":"ctrl_1706909544020","controlType":"Label"},
+        "Transform": {"x":30,"y":454,"width":200,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the others' drawings follow it, on a spring","_children":{"Fill":{"colour":"FF9FA4AB"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Follow1","id":"ctrl_1706909544021","description":"The leader: turn it.","controlType":"Knob"},
+        "Transform": {"x":250,"y":400,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Follow2","id":"ctrl_1706909544022","controlType":"Knob"},
+        "Transform": {"x":374,"y":400,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Follow3","id":"ctrl_1706909544023","controlType":"Knob"},
+        "Transform": {"x":498,"y":400,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Follow4","id":"ctrl_1706909544024","controlType":"Knob"},
+        "Transform": {"x":622,"y":400,"width":84,"height":84}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Follow5","id":"ctrl_1706909544025","controlType":"Knob"},
+        "Transform": {"x":746,"y":400,"width":84,"height":84}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_knob-together",
+      "name": "Sweep in",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2100,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_knob-together_1",
+          "controlId": "ctrl_1706909544005",
+          "target": "Value",
+          "start": 300,
+          "length": 1200,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.55,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_3",
+          "controlId": "ctrl_1706909544006",
+          "target": "Value",
+          "start": 450,
+          "length": 1200,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.55,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_6",
+          "controlId": "ctrl_1706909544007",
+          "target": "Value",
+          "start": 600,
+          "length": 1200,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.55,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_9",
+          "controlId": "ctrl_1706909544008",
+          "target": "Value",
+          "start": 750,
+          "length": 1200,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.55,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_12",
+          "controlId": "ctrl_1706909544009",
+          "target": "Value",
+          "start": 900,
+          "length": 1200,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.55,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_knob-together_2",
+      "name": "Wave",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 3200,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_knob-together_2",
+          "controlId": "ctrl_1706909544013",
+          "target": "Value",
+          "start": 400,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.15,
+                "by": 0.08
+              },
+              {
+                "at": 0.35,
+                "by": -0.08
+              },
+              {
+                "at": 0.55,
+                "by": 0.05
+              },
+              {
+                "at": 0.75,
+                "by": -0.02
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_4",
+          "controlId": "ctrl_1706909544014",
+          "target": "Value",
+          "start": 540,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.15,
+                "by": 0.08
+              },
+              {
+                "at": 0.35,
+                "by": -0.08
+              },
+              {
+                "at": 0.55,
+                "by": 0.05
+              },
+              {
+                "at": 0.75,
+                "by": -0.02
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_7",
+          "controlId": "ctrl_1706909544015",
+          "target": "Value",
+          "start": 680,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.15,
+                "by": 0.08
+              },
+              {
+                "at": 0.35,
+                "by": -0.08
+              },
+              {
+                "at": 0.55,
+                "by": 0.05
+              },
+              {
+                "at": 0.75,
+                "by": -0.02
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_10",
+          "controlId": "ctrl_1706909544016",
+          "target": "Value",
+          "start": 820,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.15,
+                "by": 0.08
+              },
+              {
+                "at": 0.35,
+                "by": -0.08
+              },
+              {
+                "at": 0.55,
+                "by": 0.05
+              },
+              {
+                "at": 0.75,
+                "by": -0.02
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_13",
+          "controlId": "ctrl_1706909544017",
+          "target": "Value",
+          "start": 960,
+          "length": 700,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.15,
+                "by": 0.08
+              },
+              {
+                "at": 0.35,
+                "by": -0.08
+              },
+              {
+                "at": 0.55,
+                "by": 0.05
+              },
+              {
+                "at": 0.75,
+                "by": -0.02
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_knob-together_3",
+      "name": "Follow the leader",
+      "trigger": {
+        "type": "script"
+      },
+      "length": 1000,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_knob-together_5",
+          "controlId": "ctrl_1706909544022",
+          "target": "Value",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "value",
+            "easing": "linear",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1,
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_8",
+          "controlId": "ctrl_1706909544023",
+          "target": "Value",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "value",
+            "easing": "linear",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1,
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_11",
+          "controlId": "ctrl_1706909544024",
+          "target": "Value",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "value",
+            "easing": "linear",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1,
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_knob-together_14",
+          "controlId": "ctrl_1706909544025",
+          "target": "Value",
+          "start": 0,
+          "length": 1000,
+          "effect": {
+            "kind": "value",
+            "easing": "linear",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 1,
+                "value": 1
+              }
+            ]
+          }
+        }
+      ],
+      "clock": {
+        "source": "value",
+        "controlId": "ctrl_1706909544021",
+        "span": 130,
+        "direction": "up",
+        "follow": "spring",
+        "release": "stay"
+      }
+    }
+  ]
+}

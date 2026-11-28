@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "517e6f61",
+  "fingerprint": "2940789b",
   "set": {
     "id": "hex-drive",
     "name": "Hex Drive",
@@ -71,6 +71,7 @@
       "border.field": "66303338",
       "border.mixed": "FFC9A227",
       "panel.surface": "FF2B3032",
+      "control.readout": "{text.label}",
       "section.surface": "FF222527"
     },
     "lamp": {

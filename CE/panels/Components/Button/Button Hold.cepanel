@@ -1,0 +1,673 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2df57dcb-c0b5-4e1a-9f3d-2df57dcb2df5",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Hold",
+  "scriptId": "component_button-hold",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF32383B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "hi-fi"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1751063243000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Hold","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1751063243001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a timed button held to confirm. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFills","id":"ctrl_1751063243002","description":"Lamp fills: the lamp fills green over the hold and flashes as it fires.","controlType":"TimedButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Erase"},
+        "States": {"_children":{"Executed":{"_type":"State","name":"Executed","group":"interaction","description":"Lamp fills (animation preset).","enabled":true,"when":{"executed":true},"patches":{"component":{},"parts":{}}}}},
+        "Animations": {"_children":{"lampFills":{"_type":"Animation","name":"lampFills","enabled":true,"kind":"keyframes","trigger":{"type":"hold"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"scale":1},{"at":1,"scale":1.3,"fill":"FF2BB673"}],"duration":1500,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:lamp-fills","revision":1,"from":"lampFills"}},"lampFired":{"_type":"Animation","name":"lampFired","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["executed"]},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0,"scale":1.3,"fill":"FF2BB673"},{"at":0.7,"scale":1,"fill":"FF2BB673"},{"at":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:lamp-fills","revision":1,"from":"lampFired"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFillsCaption","id":"ctrl_1751063243003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lamp fills","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFillsHow","id":"ctrl_1751063243004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOLD TO CONFIRM","_children":{"Fill":{"colour":"FF99C5B2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LampFillsWhat","id":"ctrl_1751063243005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the lamp fills green over the hold and flashes as it fires","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyFills","id":"ctrl_1751063243006","description":"Key fills: the key colours amber over the hold, and goes back if let go.","controlType":"TimedButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Reset"},
+        "Animations": {"_children":{"keyFills":{"_type":"Animation","name":"keyFills","enabled":true,"kind":"keyframes","trigger":{"type":"hold"},"targets":[{"path":"Parts.key"}],"frames":[{"at":0,"scale":1},{"at":1,"scale":1,"fill":"FFF5A524"}],"duration":1500,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:key-fills","revision":1,"from":"keyFills"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyFillsCaption","id":"ctrl_1751063243007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Key fills","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyFillsHow","id":"ctrl_1751063243008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOLD TO CONFIRM","_children":{"Fill":{"colour":"FF99C5B2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyFillsWhat","id":"ctrl_1751063243009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the key colours amber over the hold, and goes back if let go","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Swell","id":"ctrl_1751063243010","description":"Swell: the key grows as you hold, and snaps back if let go early.","controlType":"TimedButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Purge"},
+        "Animations": {"_children":{"swell":{"_type":"Animation","name":"swell","enabled":true,"kind":"keyframes","trigger":{"type":"hold"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":1,"scale":1.12}],"duration":1500,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:swell","revision":1,"from":"swell"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SwellCaption","id":"ctrl_1751063243011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Swell","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SwellHow","id":"ctrl_1751063243012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOLD TO CONFIRM","_children":{"Fill":{"colour":"FF99C5B2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SwellWhat","id":"ctrl_1751063243013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the key grows as you hold, and snaps back if let go early","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tremble","id":"ctrl_1751063243014","description":"Tremble: it trembles harder the nearer the hold comes to firing.","controlType":"TimedButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Wipe"},
+        "Animations": {"_children":{"tremble":{"_type":"Animation","name":"tremble","enabled":true,"kind":"keyframes","trigger":{"type":"hold"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0},{"at":0.3,"x":0},{"at":0.4,"x":-1},{"at":0.5,"x":1},{"at":0.6,"x":-2},{"at":0.7,"x":2},{"at":0.8,"x":-3},{"at":0.9,"x":3},{"at":1,"x":0}],"duration":1500,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:tremble","revision":1,"from":"tremble"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrembleCaption","id":"ctrl_1751063243015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Tremble","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrembleHow","id":"ctrl_1751063243016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOLD TO CONFIRM","_children":{"Fill":{"colour":"FF99C5B2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TrembleWhat","id":"ctrl_1751063243017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"it trembles harder the nearer the hold comes to firing","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Confirmed","id":"ctrl_1751063243018","description":"Confirmed: OK rises from the key once the hold has done its work.","controlType":"TimedButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Commit"},
+        "States": {"_children":{"Executed":{"_type":"State","name":"Executed","group":"interaction","description":"Confirmed (animation preset).","enabled":true,"when":{"executed":true},"patches":{"component":{},"parts":{}}}}},
+        "Animations": {"_children":{"confirmed":{"_type":"Animation","name":"confirmed","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["*"],"to":["executed"]},"targets":[],"shows":"words","from":"tip","direction":"up","travel":34,"size":16,"duration":900,"delay":0,"easing":"outCubic","iterations":1,"words":"OK","preset":{"id":"ce:button:confirmed","revision":1,"from":"confirmed"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ConfirmedCaption","id":"ctrl_1751063243019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Confirmed","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ConfirmedHow","id":"ctrl_1751063243020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHEN IT FIRES","_children":{"Fill":{"colour":"FF99C5B2"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ConfirmedWhat","id":"ctrl_1751063243021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OK rises from the key once the hold has done its work","_children":{"Fill":{"colour":"FFB8BCC2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:lamp-fills",
+      "name": "Lamp fills",
+      "category": "Button",
+      "tags": [
+        "Hold",
+        "hold to confirm"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lampFills": {
+          "_type": "Animation",
+          "name": "lampFills",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "hold"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 1,
+              "scale": 1.3,
+              "fill": "FF2BB673"
+            }
+          ],
+          "duration": 1500,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "lampFired": {
+          "_type": "Animation",
+          "name": "lampFired",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "executed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1.3,
+              "fill": "FF2BB673"
+            },
+            {
+              "at": 0.7,
+              "scale": 1,
+              "fill": "FF2BB673"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "Executed": {
+          "when": {
+            "executed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {}
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:key-fills",
+      "name": "Key fills",
+      "category": "Button",
+      "tags": [
+        "Hold",
+        "hold to confirm"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "keyFills": {
+          "_type": "Animation",
+          "name": "keyFills",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "hold"
+          },
+          "targets": [
+            {
+              "path": "Parts.key"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "fill": "FFF5A524"
+            }
+          ],
+          "duration": 1500,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:swell",
+      "name": "Swell",
+      "category": "Button",
+      "tags": [
+        "Hold",
+        "hold to confirm"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "swell": {
+          "_type": "Animation",
+          "name": "swell",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "hold"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 1,
+              "scale": 1.12
+            }
+          ],
+          "duration": 1500,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:tremble",
+      "name": "Tremble",
+      "category": "Button",
+      "tags": [
+        "Hold",
+        "hold to confirm"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "tremble": {
+          "_type": "Animation",
+          "name": "tremble",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "hold"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0
+            },
+            {
+              "at": 0.3,
+              "x": 0
+            },
+            {
+              "at": 0.4,
+              "x": -1
+            },
+            {
+              "at": 0.5,
+              "x": 1
+            },
+            {
+              "at": 0.6,
+              "x": -2
+            },
+            {
+              "at": 0.7,
+              "x": 2
+            },
+            {
+              "at": 0.8,
+              "x": -3
+            },
+            {
+              "at": 0.9,
+              "x": 3
+            },
+            {
+              "at": 1,
+              "x": 0
+            }
+          ],
+          "duration": 1500,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:confirmed",
+      "name": "Confirmed",
+      "category": "Button",
+      "tags": [
+        "Hold",
+        "when it fires"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "confirmed": {
+          "_type": "Animation",
+          "name": "confirmed",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "executed"
+            ]
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "tip",
+          "direction": "up",
+          "travel": 34,
+          "size": 16,
+          "duration": 900,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "OK"
+        }
+      },
+      "states": {
+        "Executed": {
+          "when": {
+            "executed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {}
+          }
+        }
+      },
+      "fields": {}
+    }
+  ]
+}

@@ -7,8 +7,10 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
+  import StateMotionSection from './StateMotionSection.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
   import { STATE_RULE_VALUE_NAMES } from '../utils/interactionRuntime.js';
+  import { choicePartNames } from '../utils/choiceGroupLayout.js';
   import Layers from 'lucide-svelte/icons/layers';
   import Target from 'lucide-svelte/icons/target';
   import SquareCheck from 'lucide-svelte/icons/square-check';
@@ -27,8 +29,14 @@
     { key: 'checked', label: 'Checked' },
     { key: 'mixed', label: 'Mixed' },
   ];
+  // A choice group's states are about one option each (choiceGroupStyle.js); this one is about every
+  // option but the one under the pointer, so the rest can dim while one is pointed at.
+  const CHOICE_FLAGS = [
+    { key: 'peerHover', label: 'Other hovered', hint: 'Require the pointer on another option of this group: the state applies to every option but that one.' },
+  ];
 
   let core = $derived(getSection(control, 'Core'));
+  let flags = $derived(choicePartNames(control).length ? [...COMMON_FLAGS, ...CHOICE_FLAGS] : COMMON_FLAGS);
   let designer = $derived(getSection(control, 'Designer'));
   let states = $derived(getSection(control, 'States'));
   // Channel names for the rule builder's operand list. A plain panel control has no
@@ -283,8 +291,8 @@
           placeholder="no rule — flags only"
         />
       </PropertyCell>
-      {#each COMMON_FLAGS as flag}
-        <PropertyCell label={flag.label} span={1} hint={`Require ${flag.label.toLowerCase()} to activate this state.`}>
+      {#each flags as flag}
+        <PropertyCell label={flag.label} span={1} hint={flag.hint ?? `Require ${flag.label.toLowerCase()} to activate this state.`}>
           <PropertyToggle
             value={selectedState.when?.[flag.key] === true}
             onchange={() => setStateWhenFlag(flag.key, !(selectedState.when?.[flag.key] === true))}
@@ -320,6 +328,9 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- How the control gets into this state and out of it: animations, read from their triggers. -->
+    <StateMotionSection {control} stateName={selectedStateName} showEvents={false} />
+
     <PropertySection title="Advanced" icon={Wrench}>
       <PropertyCell label="Raw Patches" span={4} hint="Optional JSON editing for advanced state patch work.">
         <div class="advanced-header">
@@ -344,6 +355,9 @@
       {/if}
     </PropertySection>
   {/if}
+
+  <!-- Gestures with no duration belong to the control, not to a state: shown for Base too. -->
+  <StateMotionSection {control} />
 {/if}
 
 <style>

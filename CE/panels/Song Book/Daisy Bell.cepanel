@@ -1,0 +1,1350 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "64760704-50e9-4b00-8c5d-647607046476",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Daisy Bell",
+  "scriptId": "song_daisybell",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF9ED8F5",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1765456644000","controlType":"Label"},
+        "Transform": {"width":720,"height":405},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#8fd0f2"},{"position":100,"color":"#e6f6ff"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Hill","id":"ctrl_1765456644001","controlType":"Label"},
+        "Transform": {"x":-200,"y":250,"width":1120,"height":420},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":0,"stops":[{"position":0,"color":"#8bd16a"},{"position":70,"color":"#5aa83c"},{"position":100,"color":"#3f8a2a"}]}},"Border":{"enabled":false},"Corners":{"radius":560}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy1","id":"ctrl_1765456644002","controlType":"Label"},
+        "Transform": {"x":39,"y":371,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy2","id":"ctrl_1765456644003","controlType":"Label"},
+        "Transform": {"x":68,"y":360,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy3","id":"ctrl_1765456644004","controlType":"Label"},
+        "Transform": {"x":112,"y":335,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy4","id":"ctrl_1765456644005","controlType":"Label"},
+        "Transform": {"x":165,"y":318,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy5","id":"ctrl_1765456644006","controlType":"Label"},
+        "Transform": {"x":210,"y":334,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy6","id":"ctrl_1765456644007","controlType":"Label"},
+        "Transform": {"x":237,"y":342,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy7","id":"ctrl_1765456644008","controlType":"Label"},
+        "Transform": {"x":292,"y":361,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy8","id":"ctrl_1765456644009","controlType":"Label"},
+        "Transform": {"x":318,"y":340,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy9","id":"ctrl_1765456644010","controlType":"Label"},
+        "Transform": {"x":370,"y":322,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy10","id":"ctrl_1765456644011","controlType":"Label"},
+        "Transform": {"x":409,"y":344,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy11","id":"ctrl_1765456644012","controlType":"Label"},
+        "Transform": {"x":446,"y":343,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy12","id":"ctrl_1765456644013","controlType":"Label"},
+        "Transform": {"x":497,"y":373,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy13","id":"ctrl_1765456644014","controlType":"Label"},
+        "Transform": {"x":533,"y":328,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy14","id":"ctrl_1765456644015","controlType":"Label"},
+        "Transform": {"x":591,"y":373,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy15","id":"ctrl_1765456644016","controlType":"Label"},
+        "Transform": {"x":629,"y":323,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Daisy16","id":"ctrl_1765456644017","controlType":"Label"},
+        "Transform": {"x":659,"y":349,"width":26,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(0%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(36%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(72%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(108%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(144%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(180%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(216%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(252%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(288%2020%2020)%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%228%22%20rx%3D%223.5%22%20ry%3D%228%22%20transform%3D%22rotate(324%2020%2020)%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23f9c80e%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tandem","id":"ctrl_1765456644018","controlType":"Label"},
+        "Transform": {"x":-190,"y":236,"width":168,"height":90},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2264%22%20viewBox%3D%220%200%20120%2064%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%231b1b1b%22%20stroke-width%3D%223%22%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2248%22%20r%3D%2213%22%2F%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%2248%22%20r%3D%2213%22%2F%3E%3Cpath%20d%3D%22M16%2048%20L%2036%2030%20L%2082%2030%20L%20104%2048%20M36%2030%20L%2046%2048%20L%2060%2030%20L%2070%2048%20L%2082%2030%20M30%2022%20L%2040%2022%20M64%2022%20L%2074%2022%20M86%2020%20L%2092%2018%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M34%2022%20C%2034%2012%2040%206%2044%206%20C%2048%202%2052%206%2050%2010%20C%2048%2016%2044%2020%2042%2026%20Z%22%20fill%3D%22%231b1b1b%22%2F%3E%3Cpath%20d%3D%22M68%2022%20C%2068%2012%2074%206%2078%206%20C%2082%202%2086%206%2084%2010%20C%2082%2016%2078%2020%2076%2026%20Z%22%20fill%3D%22%231b1b1b%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1765456644019","controlType":"Label"},
+        "Transform": {"y":40,"width":720,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DAISY BELL","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":44,"letterSpacing":8}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Caption","id":"ctrl_1765456644020","controlType":"Label"},
+        "Transform": {"y":96,"width":720,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"1892","_children":{"Fill":{"colour":"FF3B6E8F"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":500,"size":16}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_daisybell",
+      "name": "Ride",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 6100,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_daisybell_1",
+          "controlId": "ctrl_1765456644018",
+          "target": "Transform",
+          "start": 200,
+          "length": 5200,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "at": 0.1,
+                "x": 100,
+                "y": -8.562305898749052
+              },
+              {
+                "at": 0.2,
+                "x": 200,
+                "y": -10.580134541264517
+              },
+              {
+                "at": 0.3,
+                "x": 300,
+                "y": -17.562305898749052
+              },
+              {
+                "at": 0.4,
+                "x": 400,
+                "y": -17.119017293312762
+              },
+              {
+                "at": 0.5,
+                "x": 500,
+                "y": -21
+              },
+              {
+                "at": 0.6,
+                "x": 600,
+                "y": -17.119017293312766
+              },
+              {
+                "at": 0.7,
+                "x": 700,
+                "y": -17.562305898749052
+              },
+              {
+                "at": 0.8,
+                "x": 800,
+                "y": -10.580134541264519
+              },
+              {
+                "at": 0.9,
+                "x": 900,
+                "y": -8.562305898749056
+              },
+              {
+                "at": 1,
+                "x": 1000,
+                "y": -2.204364238465236e-15
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_2",
+          "controlId": "ctrl_1765456644002",
+          "target": "Transform",
+          "start": 0,
+          "length": 1032,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_3",
+          "controlId": "ctrl_1765456644002",
+          "target": "Transform",
+          "start": 1032,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_4",
+          "controlId": "ctrl_1765456644003",
+          "target": "Transform",
+          "start": 0,
+          "length": 1253,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_5",
+          "controlId": "ctrl_1765456644003",
+          "target": "Transform",
+          "start": 1253,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_6",
+          "controlId": "ctrl_1765456644004",
+          "target": "Transform",
+          "start": 0,
+          "length": 1474,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_7",
+          "controlId": "ctrl_1765456644004",
+          "target": "Transform",
+          "start": 1474,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_8",
+          "controlId": "ctrl_1765456644005",
+          "target": "Transform",
+          "start": 0,
+          "length": 1695,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_9",
+          "controlId": "ctrl_1765456644005",
+          "target": "Transform",
+          "start": 1695,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_10",
+          "controlId": "ctrl_1765456644006",
+          "target": "Transform",
+          "start": 0,
+          "length": 1916,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_11",
+          "controlId": "ctrl_1765456644006",
+          "target": "Transform",
+          "start": 1916,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_12",
+          "controlId": "ctrl_1765456644007",
+          "target": "Transform",
+          "start": 0,
+          "length": 2137,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_13",
+          "controlId": "ctrl_1765456644007",
+          "target": "Transform",
+          "start": 2137,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_14",
+          "controlId": "ctrl_1765456644008",
+          "target": "Transform",
+          "start": 0,
+          "length": 2358,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_15",
+          "controlId": "ctrl_1765456644008",
+          "target": "Transform",
+          "start": 2358,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_16",
+          "controlId": "ctrl_1765456644009",
+          "target": "Transform",
+          "start": 0,
+          "length": 2579,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_17",
+          "controlId": "ctrl_1765456644009",
+          "target": "Transform",
+          "start": 2579,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_18",
+          "controlId": "ctrl_1765456644010",
+          "target": "Transform",
+          "start": 0,
+          "length": 2800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_19",
+          "controlId": "ctrl_1765456644010",
+          "target": "Transform",
+          "start": 2800,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_20",
+          "controlId": "ctrl_1765456644011",
+          "target": "Transform",
+          "start": 0,
+          "length": 3021,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_21",
+          "controlId": "ctrl_1765456644011",
+          "target": "Transform",
+          "start": 3021,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_22",
+          "controlId": "ctrl_1765456644012",
+          "target": "Transform",
+          "start": 0,
+          "length": 3242,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_23",
+          "controlId": "ctrl_1765456644012",
+          "target": "Transform",
+          "start": 3242,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_24",
+          "controlId": "ctrl_1765456644013",
+          "target": "Transform",
+          "start": 0,
+          "length": 3463,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_25",
+          "controlId": "ctrl_1765456644013",
+          "target": "Transform",
+          "start": 3463,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_26",
+          "controlId": "ctrl_1765456644014",
+          "target": "Transform",
+          "start": 0,
+          "length": 3684,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_27",
+          "controlId": "ctrl_1765456644014",
+          "target": "Transform",
+          "start": 3684,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_28",
+          "controlId": "ctrl_1765456644015",
+          "target": "Transform",
+          "start": 0,
+          "length": 3905,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_29",
+          "controlId": "ctrl_1765456644015",
+          "target": "Transform",
+          "start": 3905,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_30",
+          "controlId": "ctrl_1765456644016",
+          "target": "Transform",
+          "start": 0,
+          "length": 4126,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_31",
+          "controlId": "ctrl_1765456644016",
+          "target": "Transform",
+          "start": 4126,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_32",
+          "controlId": "ctrl_1765456644017",
+          "target": "Transform",
+          "start": 0,
+          "length": 4347,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 0.999,
+                "scale": 0,
+                "opacity": 0
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_33",
+          "controlId": "ctrl_1765456644017",
+          "target": "Transform",
+          "start": 4347,
+          "length": 420,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 0,
+                "rotate": -40,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "rotate": 0,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_daisybell_34",
+          "controlId": "ctrl_1765456644019",
+          "target": "Text",
+          "start": 300,
+          "length": 1100,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "stagger": 60,
+            "duration": 360,
+            "direction": "up"
+          }
+        }
+      ]
+    }
+  ]
+}

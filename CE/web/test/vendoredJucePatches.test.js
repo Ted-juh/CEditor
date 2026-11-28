@@ -119,10 +119,23 @@ test('the vendored JUCE Linux webview bridge still frames its messages in bytes'
     `sendCommand no longer loops the write until the whole message is out. ${REAPPLY}`);
 });
 
+// And reads them as UTF-8: String (const char*, size_t) takes each byte as a character, so "·" sent
+// as UTF-8 arrived as "Â·" (an exported panel's title on Linux, 2026-11-28).
+test('the vendored JUCE Linux webview bridge reads each message as UTF-8', () => {
+  const source = readFileSync(LINUX_BRIDGE, 'utf8');
+  const read = source.slice(source.indexOf('void tryNextRead ('));
+  const body = read.slice(0, read.indexOf('static void sendCommand ('));
+  assert.ok(body.includes('parseJSON (String::fromUTF8 (buffer.getData(), static_cast<int> (bufferLength.len)));'),
+    `tryNextRead no longer decodes the payload as UTF-8. ${REAPPLY}`);
+  assert.ok(!body.includes('parseJSON (String (buffer.getData()'),
+    `tryNextRead reads the payload's bytes as characters again. ${REAPPLY}`);
+});
+
 test('JUCE/VENDORED.md records the Linux bridge patch too', () => {
   const text = readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8');
   assert.ok(text.includes('juce_WebBrowserComponent_linux.cpp') && text.includes('getNumBytesAsUTF8'),
     'VENDORED.md must name the Linux bridge file and the byte-count fix');
+  assert.ok(text.includes('String::fromUTF8'), 'VENDORED.md must name the UTF-8 read too');
 });
 
 // Patch 4: the LV2 client's URI, name, vendor and version are read from the panel beside the

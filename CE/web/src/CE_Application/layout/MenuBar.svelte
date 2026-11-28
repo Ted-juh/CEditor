@@ -3,7 +3,7 @@
   // the editor-space list). Outside role="menubar", which may hold menu items and nothing else.
   let { children } = $props();
   import { get } from 'svelte/store';
-  import { closeActiveEditorTab, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActiveEditorDocument, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
+  import { closeActiveEditorTab, openAnimationDesigner, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActiveEditorDocument, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
   import { undoAvailable, redoAvailable } from '../stores/history.js';
   import { hasClipboardContent } from '../stores/clipboard.js';
   import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
@@ -47,7 +47,6 @@
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import { openPictureExport } from '../stores/pictureExport.js';
-  import { newPanelFromCtrlrPanel } from '../stores/ctrlrImportActions.js';
   import { createScreenDocument, openScreenDocumentFromFile } from '../stores/screenBuilder.js';
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
@@ -66,7 +65,7 @@
   const hasPanel = () => !!get(activePanel);
   const hasSelection = () => get(selectedComponentIds).size > 0;
   // A component open on its own is saved by exporting it (stores/componentExport.js): Save opens Export.
-  const canSave = () => ['script', 'component', 'screen'].includes(get(activeEditorTab)?.type) || hasPanel();
+  const canSave = () => ['script', 'component', 'screen', 'animation'].includes(get(activeEditorTab)?.type) || hasPanel();
   const saveFromMenu = (options = {}) => {
     if (get(activeEditorTab)?.type === 'component') openComponentExport();
     else saveActiveEditorDocument(options);
@@ -219,7 +218,9 @@
       { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
       // Somebody else's Ctrlr panel: its MIDI map as a device profile, its controls on a new panel,
       // its Lua kept in the notes to port (stores/ctrlrImportActions.js; what does not convert is said).
-      { label: 'New Panel from Ctrlr Panel...', action: () => newPanelFromCtrlrPanel() },
+      // Loaded when it is chosen: the Ctrlr reader, its Lua and its harvest are some 100 kB that
+      // every start used to parse for a menu item most sessions never pick (vite.config.js).
+      { label: 'New Panel from Ctrlr Panel...', action: async () => (await import('../stores/ctrlrImportActions.js')).newPanelFromCtrlrPanel() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
@@ -241,6 +242,8 @@
       { type: 'separator' },
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
+      // The panel in front's Animation Designer: its own tab (components/animationDesigner).
+      { label: 'Animation Designer', enabled: !!$activePanel, action: () => openAnimationDesigner() },
       // The CTRL49 keyboard's screens: pages of encoder assignments, saved as the .assignment.json
       // the native bridge loads (stores/screenBuilder.js). Reachable only from the start screen
       // before, and only while no document was open.

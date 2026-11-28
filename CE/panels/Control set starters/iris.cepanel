@@ -387,7 +387,7 @@
         "Transform": {"x":36,"y":112,"width":170,"height":170},
         "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
-          "_drawing": "8a3ef9cc"
+          "_drawing": "aca64dfe"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFC4A3FF"},"pointerCurrent":{"Background.Fill.colour":"FF2D3137"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFECBA68"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -399,7 +399,7 @@
         "Transform": {"x":228,"y":132,"width":112,"height":112},
         "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
-          "_drawing": "8a3ef9cc"
+          "_drawing": "aca64dfe"
         },
         "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFC4A3FF"},"pointerCurrent":{"Background.Fill.colour":"FF2D3137"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFECBA68"},"labelValue":{"Text.Fill.colour":"FFF7F4EC"}}}}}}
       },
@@ -449,7 +449,7 @@
             "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE0A43A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
-            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF4F6081"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5CC492"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
@@ -706,7 +706,7 @@
     }
   ],
   "drawings": {
-    "8a3ef9cc": {
+    "aca64dfe": {
       "_children": {
         "bodyHousing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF171C26"}}}}},
         "bodySkirt": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF161A21"}}}}},
@@ -725,7 +725,7 @@
         "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
         "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
         "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFE0A43A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
-        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF4F6081"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+        "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
         "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FF5CC492"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},

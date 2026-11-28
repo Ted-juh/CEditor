@@ -612,8 +612,24 @@ export const WRITTEN = {
   animateReverse: { code: 'ce.anim.reverse("Cutoff.value")   -- run back the way it came' },
   animateFinish: { code: 'ce.anim.finish("Cutoff.value")   -- jump to the destination now' },
   animatePlay: {
-    lua: `-- "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash")`,
-    js: `// "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash");`,
+    lua: `-- "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash")\n-- one name is a scene from the Animation Designer\nce.anim.play("Intro", { done = function(completed) log("intro", completed) end })`,
+    js: `// "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash");\n// one name is a scene from the Animation Designer\nce.anim.play("Intro", { done: (completed) => log("intro", completed) });`,
+  },
+  animateSeek: {
+    lua: `-- the Cover scene follows a knob: the script is its clock\nfunction onValueChange(value) ce.anim.seek("Cover", value / 127) end`,
+    js: `// the Cover scene follows a knob: the script is its clock\nfunction onValueChange(value) { ce.anim.seek("Cover", value / 127); }`,
+  },
+  animateEffect: {
+    lua: `ce.anim.effect("Lamp", "Pop")\nce.anim.effect("Title.Text", "Typewriter in", { duration = 1200 })\n-- the knob's ring runs round to full and settles on its value\nce.anim.effect("Cutoff", "Ring sweep")`,
+    js: `ce.anim.effect("Lamp", "Pop");\nce.anim.effect("Title.Text", "Typewriter in", { duration: 1200 });\n// the knob's ring runs round to full and settles on its value\nce.anim.effect("Cutoff", "Ring sweep");`,
+  },
+  animateSwap: {
+    lua: `-- the old words roll out, then the new ones roll in\nce.anim.swap("Readout", "Saw", "roll")`,
+    js: `// the old words roll out, then the new ones roll in\nce.anim.swap("Readout", "Saw", "roll");`,
+  },
+  animatePattern: {
+    lua: `ce.anim.pattern("Wave", { speed = 40, direction = 90 })`,
+    js: `ce.anim.pattern("Wave", { speed: 40, direction: 90 });`,
   },
 
   /* ------------------------------------------------------------------ ce.ui */

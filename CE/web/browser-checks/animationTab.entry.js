@@ -16,6 +16,9 @@ import { undo } from '../src/CE_Application/stores/history.js';
 import { debugDockState } from '../src/CE_Application/stores/debugDock.js';
 import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
+import { updateControlProperty } from '../src/CE_Application/stores/controls.js';
+import { animationPresetLibrary } from '../src/CE_Application/stores/animationPresetLibrary.js';
+import { editorTarget, activateEditorTarget } from '../src/CE_Application/stores/editorTarget.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -93,7 +96,28 @@ control._children.Animations = {
   },
 };
 
-panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control] }]);
+// A knob beside it, for the Value kind (step 6), which only a control that draws a value is offered.
+const knob = createControl('Knob');
+knob._children.Core.id = 'ctrl_knob';
+knob._children.Core.name = 'Cutoff';
+knob._children.Transform.x = 600;
+
+// A timed button: the Words kind from a key, and the hold trigger (2026-11-27).
+const timed = createControl('TimedButton');
+timed._children.Core.id = 'ctrl_timed';
+timed._children.Core.name = 'Erase';
+timed._children.Transform.x = 300;
+timed._children.Transform.y = 250;
+
+// A choice group: its options as parts, each a stagger after the last, and the trigger for a new list
+// of options (2026-11-27).
+const choice = createControl('RadioButtonGroup');
+choice._children.Core.id = 'ctrl_choice';
+choice._children.Core.name = 'Shape';
+choice._children.Transform.x = 600;
+choice._children.Transform.y = 250;
+
+panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [control, knob, timed, choice] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 
@@ -104,6 +128,55 @@ const live = () => get(panels)[0].controls[0];
 const animation = (name) => live()._children.Animations._children[name];
 
 window.__anim = {
+  kindLabels: () => [...document.querySelectorAll('[aria-label="Kind"] button')].map(textOf),
+  // The tab follows its own target, not the selection (stores/editorTarget.js): open it on the knob.
+  selectKnob: () => { selectedComponentIds.set(new Set(['ctrl_knob'])); activateEditorTarget('animation', 'ctrl_knob'); },
+  selectTimed: () => { selectedComponentIds.set(new Set(['ctrl_timed'])); activateEditorTarget('animation', 'ctrl_timed'); },
+  timedAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_timed')._children.Animations?._children?.[name] ?? null)),
+  selectChoice: () => { selectedComponentIds.set(new Set(['ctrl_choice'])); activateEditorTarget('animation', 'ctrl_choice'); },
+  choiceAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_choice')._children.Animations?._children?.[name] ?? null)),
+  /** Where a keyframe animation plays, from its pane's path bar: a place, or a part within one. */
+  playsOnOptions: () => [...document.querySelectorAll('.playson [data-step] select option')].map((o) => o.textContent.trim()),
+  playOn: (label) => {
+    for (const step of ['place', 'part']) {
+      const select = document.querySelector(`.playson [data-step="${step}"] select`);
+      const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+      if (!select || !option) continue;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
+  },
+  /** The rows a labelled row of the tab has, by label: true when it is there. */
+  hasRow: (label) => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab, label')) === label),
+  typeOptionStagger: (ms) => {
+    const input = document.querySelector('input[aria-label="ms later"]');
+    input.focus();
+    input.value = String(ms);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  },
+  segmentLabels: (label) => [...document.querySelectorAll(`[data-emit-animation] [aria-label="${label}"] button`)].map(textOf),
+  wordsField: () => !!document.querySelector('[data-emit-words] input'),
+  addAnimationNamed: (name) => {
+    const input = document.querySelector('input[aria-label="New animation name"]');
+    input.value = name;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  },
+  knobAnimation: (name) => JSON.parse(JSON.stringify(get(panels)[0].controls.find((c) => c._children.Core.id === 'ctrl_knob')._children.Animations?._children?.[name] ?? null)),
+  valueFrameRows: () => document.querySelectorAll('[data-value-animation] [data-value-frame]').length,
+  // The Words kind (keyframeAnimation.js EMIT) and the step trigger.
+  emitPane: () => !!document.querySelector('[data-emit-animation]'),
+  triggerOptions: () => [...document.querySelectorAll('select[aria-label="Keyframe trigger"] option')].map((option) => option.value),
+  chooseTrigger: (type) => {
+    const select = document.querySelector('select[aria-label="Keyframe trigger"]');
+    select.value = type;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  },
+  stepsCell: () => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab')) === 'Steps'),
+  stepBackRow: () => [...document.querySelectorAll('.r')].some((row) => textOf(row.querySelector('.lab')) === 'Step back'),
   head: () => textOf(document.querySelector('.who')),
   alarm: () => textOf(document.querySelector('.alarm')),
 
@@ -122,11 +195,12 @@ window.__anim = {
   },
   storedEnabled: (name) => animation(name).enabled,
 
-  targetPaths: () => [...document.querySelectorAll('.trow .what')].map(textOf),
+  // A row reads as a path (Body › Cap, Scale); the stored path it stands for is its data-path.
+  targetPaths: () => [...document.querySelectorAll('.trow .what')].map((what) => what.dataset.path),
   // The verdict without the "solid only" note a colour target carries beside it.
   targetVerdicts: () => [...document.querySelectorAll('.trow .does')].map((d) => textOf(d).replace(/\s*solid only$/, '')),
   targetNotes: () => [...document.querySelectorAll('.trow .does .note')].map((n) => n.getAttribute('title')),
-  deadRows: () => [...document.querySelectorAll('.trow.bad .what')].map(textOf),
+  deadRows: () => [...document.querySelectorAll('.trow.bad .what')].map((what) => what.dataset.path),
   targetCount: () => document.querySelectorAll('.trow').length,
   removeTarget: (index) => { document.querySelectorAll('.trow')[index]?.querySelector('.drop')?.click(); },
   storedTargets: (name) => animation(name).targets.map((t) => t.path),
@@ -139,8 +213,13 @@ window.__anim = {
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
   pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(`^${kind}$`, 'i').test(b.textContent.trim()))?.click(); },
-  changeOptions: () => [...document.querySelectorAll('[aria-label="What to change"] option')].map((o) => o.textContent.trim()),
-  partPickerDisabled: () => !!document.querySelector('[aria-label="Part"]')?.disabled,
+  // The add row's path bar (components/animation/PathBar.svelte), which replaced the "On" and
+  // "Change" lists on 2026-11-24: a Where step (the control itself, Background, Text, Channels, a
+  // part by its name), a Part step for a knob's role groups only, and the property.
+  changeOptions: () => [...document.querySelectorAll('.addbox [data-step="property"] option')].map((o) => o.textContent.trim()),
+  placeOptions: () => [...document.querySelectorAll('.addbox [data-step="place"] option')].map((o) => o.textContent.trim()),
+  partStepShown: () => !!document.querySelector('.addbox [data-step="part"] select'),
+  pathBarText: () => [...document.querySelectorAll('.addbox .pathbar .steps select')].map((s) => s.selectedOptions[0]?.textContent.trim() ?? ''),
   storedTargetPaths: (name) => animation(name).targets.map((t) => t.path),
   storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
   storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
@@ -222,17 +301,21 @@ window.__anim = {
   storedEasing: (name) => animation(name).easing,
 
   addOptions: () => [...document.querySelectorAll('.addbox select')].map((s) => [...s.options].map((o) => o.textContent.trim())),
+  /** Choose where a change lands: a Where entry, or a part within a role group. */
   choosePart: (label) => {
-    const select = document.querySelectorAll('.addbox select')[0];
-    const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
-    if (!select || !option) return false;
-    select.value = option.value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
+    for (const step of ['place', 'part']) {
+      const select = document.querySelector(`.addbox [data-step="${step}"] select`);
+      const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+      if (!select || !option) continue;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
   },
   addDisabledNow: () => document.querySelector('.addbtn')?.disabled === true,
   chooseChange: (label) => {
-    const select = document.querySelectorAll('.addbox select')[1];
+    const select = document.querySelector('.addbox [data-step="property"] select');
     const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
     if (!select || !option) return false;
     select.value = option.value;
@@ -244,6 +327,57 @@ window.__anim = {
 
   // --- making and unmaking ---------------------------------------------------------------
   storedNames: () => Object.keys(live()._children.Animations._children),
+
+  // --- animation presets (step 4) ------------------------------------------------------------
+  presetPanel: () => document.querySelector('[data-preset-library]')?.dataset.presetLibrary ?? null,
+  openSavePreset: () => document.querySelector('[data-save-preset]')?.click(),
+  typeSaveName: (value) => {
+    const input = document.querySelector('[aria-label="Preset name"]');
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  saveNeeds: () => textOf(document.querySelector('[data-needs]')),
+  clickSave: () => document.querySelector('.lib .go')?.click(),
+  linkCard: () => {
+    const card = document.querySelector('[data-preset-link]');
+    return card ? { text: textOf(card.querySelector('.what')), overrides: [...card.querySelectorAll('[data-override]')].map((row) => row.dataset.override) } : null;
+  },
+  editByHand: (name, key, value) => updateControlProperty(CONTROL_ID, `Animations.${name}.${key}`, value),
+  revertOverride: (key) => document.querySelector(`[data-override="${key}"] .rv`)?.click(),
+  openLibrary: () => document.querySelector('[data-library]')?.click(),
+  libraryRows: () => ({
+    mine: [...document.querySelectorAll('[data-preset] .nm')].map(textOf),
+    panel: [...document.querySelectorAll('[data-panel-preset] .nm')].map(textOf),
+  }),
+  libraryButton: (id, label) => [...(document.querySelector(`[data-preset="${id}"], [data-panel-preset="${id}"], [data-builtin-preset="${id}"]`)?.querySelectorAll('button') ?? [])]
+    .find((button) => textOf(button) === label)?.click(),
+  // The components' built-in presets: each component, its groups, and how many presets in all.
+  builtinRows: () => [...document.querySelectorAll('[data-builtin-component]')].map((section) => ({
+    component: section.dataset.builtinComponent,
+    groups: [...section.querySelectorAll('[data-builtin-group] b')].map(textOf),
+    count: section.querySelectorAll('[data-builtin-preset]').length,
+    first: textOf(section.querySelector('[data-builtin-preset] .nm')),
+  })),
+  importClick: () => document.querySelector('.lib .imp')?.click(),
+  adoptNotice: () => textOf(document.querySelector('[data-adopt]')),
+  clickAdopt: () => document.querySelector('[data-adopt] button')?.click(),
+  panelPresets: () => JSON.parse(JSON.stringify(get(panels)[0].animationPresets ?? [])),
+  libraryPresets: () => JSON.parse(JSON.stringify(get(animationPresetLibrary))),
+  addLoops: (n) => {
+    for (let i = 0; i < n; i += 1) {
+      updateControlProperty(CONTROL_ID, `Animations.loop${i}`, { _type: 'Animation', name: `loop${i}`, enabled: true, kind: 'keyframes',
+        trigger: { type: 'always' }, duration: 900, delay: 0, easing: 'linear', targets: [{ path: 'Transform' }], frames: [{ at: 0, opacity: 1 }, { at: 1, opacity: 0.9 }] });
+    }
+  },
+  dropLoops: () => panels.update((list) => list.map((panel) => ({ ...panel, controls: panel.controls.map((c) => {
+    if (c._children.Core.id !== CONTROL_ID) return c;
+    const kept = Object.fromEntries(Object.entries(c._children.Animations._children).filter(([key]) => !key.startsWith('loop')));
+    return { ...c, _children: { ...c._children, Animations: { ...c._children.Animations, _children: kept } } };
+  }) }))),
+  loopAlarm: () => textOf(document.querySelector('[data-loop-alarm]')),
+  clickLoopAlarm: () => document.querySelector('[data-loop-alarm]')?.click(),
+  target: () => JSON.parse(JSON.stringify(get(editorTarget) ?? null)),
+  carryPreset: (preset) => panels.update((list) => list.map((panel) => ({ ...panel, animationPresets: [...(panel.animationPresets ?? []), preset] }))),
   typeNewName: (value) => {
     const input = [...document.querySelectorAll('.newrow input')][0];
     if (!input) return false;
@@ -353,12 +487,24 @@ window.__anim = {
     return !!btn;
   },
   presetReport: () => textOf(document.querySelector('.strip .report')),
+  /** Give the knob a Label that shows its name, attached to it, as the editor's Add label does. */
+  addNameLabel: () => {
+    const label = createControl('Label');
+    label._children.Core.id = 'ctrl_name';
+    label._children.Core.name = 'Knob Name';
+    label._children.Core.attachedTo = CONTROL_ID;
+    label._children.Text.shows = 'name';
+    panels.update((list) => list.map((panel) => (panel.id === 'p1' ? { ...panel, controls: [...panel.controls, label] } : panel)));
+  },
+  storedLabel: () => {
+    const label = get(panels)[0].controls.find((entry) => entry._children?.Core?.id === 'ctrl_name');
+    return label ? JSON.parse(JSON.stringify({ shows: label._children.Text.shows, animations: label._children.Animations ?? null })) : null;
+  },
   storedState: (key) => JSON.parse(JSON.stringify(live()._children.States._children[key] ?? null)),
 
   clickDebug: () => document.querySelector('.dbg')?.click(),
   debugDock: () => get(debugDockState),
   tabRequest: () => get(displayTabRequest),
-  undo: () => undo(),
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

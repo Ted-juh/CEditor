@@ -44,6 +44,7 @@
   import { isEditorShortcutFocus } from '../utils/editorShortcutFocus.js';
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
+  import AnimationDesigner from '../components/animationDesigner/AnimationDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import ScreenBuilderEditor from '../sections/ScreenBuilderEditor.svelte';
   import { addGuide, deleteSelectedGuide, selectedGuide } from '../stores/guides.js';
@@ -1084,6 +1085,10 @@
         {/key}
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesignerV2 profileId={$activeEditorTab.id} />
+      {:else if $activeEditorTab?.type === 'animation'}
+        {#key $activeEditorTab.id}
+          <AnimationDesigner panelId={$activeEditorTab.id} />
+        {/key}
       {:else if $activeEditorTab?.type === 'script'}
         {#key $activeEditorTab.id}
           <BehaviorDesigner

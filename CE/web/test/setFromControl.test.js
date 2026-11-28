@@ -148,7 +148,7 @@ test('Settings › Control Sets holds every role and every family, grouped; lett
   const studio = getControlSet('graphite-studio');
   const roles = [...ROLE_GROUPS.flatMap((group) => group.roles), ...DERIVED_ROLE_GROUP.roles].map(([key]) => key);
   assert.equal(new Set(roles).size, roles.length, 'each role once');
-  assert.deepEqual([...roles].sort(), Object.keys(studio.tokens).sort(), 'all 55 of a set\'s roles, the derived ones apart');
+  assert.deepEqual([...roles].sort(), Object.keys(studio.tokens).sort(), 'all 56 of a set\'s roles, the derived ones apart');
   const families = groupedFamilies(studio).flatMap((group) => group.types);
   assert.deepEqual([...families].sort(), Object.keys(studio.families).sort(), 'every family, in a group');
   assert.equal(groupedFamilies(studio)[0].label, 'Knobs and sliders');

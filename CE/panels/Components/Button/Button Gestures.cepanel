@@ -1,0 +1,655 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "8dabd090-c0b5-4e1a-9f3d-8dabd0908dab",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Gestures",
+  "scriptId": "component_button-gestures",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FFC4C8CE",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "machined"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1736847504000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Gestures","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1736847504001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"what a gesture plays. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleFlash","id":"ctrl_1736847504002","description":"Double flash: blinks twice.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Mute"},
+        "Animations": {"_children":{"flash":{"_type":"Animation","name":"flash","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"opacity":1},{"at":0.25,"opacity":0.2},{"at":0.5,"opacity":1},{"at":0.75,"opacity":0.2},{"at":1,"opacity":1}],"duration":480,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:button:double-flash","revision":1,"from":"flash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleFlashCaption","id":"ctrl_1736847504003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Double flash","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleFlashHow","id":"ctrl_1736847504004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DoubleFlashWhat","id":"ctrl_1736847504005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"blinks twice","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Pop","id":"ctrl_1736847504006","description":"Pop: pops when the press is held.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Hold"},
+        "Animations": {"_children":{"pop":{"_type":"Animation","name":"pop","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"longPress"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.4,"scale":1.14},{"at":1,"scale":1}],"duration":360,"delay":0,"easing":"outBack","iterations":1,"direction":"normal","preset":{"id":"ce:button:pop","revision":1,"from":"pop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopCaption","id":"ctrl_1736847504007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Pop","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopHow","id":"ctrl_1736847504008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LONG PRESS","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PopWhat","id":"ctrl_1736847504009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"pops when the press is held","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Nudge","id":"ctrl_1736847504010","description":"Nudge: a small shake on each click.","controlType":"MomentaryButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Next"},
+        "Animations": {"_children":{"nudge":{"_type":"Animation","name":"nudge","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"click"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0},{"at":0.25,"x":-4},{"at":0.5,"x":3},{"at":0.75,"x":-2},{"at":1,"x":0}],"duration":340,"delay":0,"easing":"inOutQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:nudge","revision":1,"from":"nudge"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeCaption","id":"ctrl_1736847504011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Nudge","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeHow","id":"ctrl_1736847504012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NudgeWhat","id":"ctrl_1736847504013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small shake on each click","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spin","id":"ctrl_1736847504014","description":"Spin: a flick spins it round once.","controlType":"MomentaryButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Turn"},
+        "Animations": {"_children":{"spin":{"_type":"Animation","name":"spin","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"flick"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"rotate":0},{"at":1,"rotate":360}],"duration":700,"delay":0,"easing":"outCubic","iterations":1,"direction":"normal","preset":{"id":"ce:button:spin","revision":1,"from":"spin"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinCaption","id":"ctrl_1736847504015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Spin","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinHow","id":"ctrl_1736847504016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"FLICK","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpinWhat","id":"ctrl_1736847504017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a flick spins it round once","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WheelBump","id":"ctrl_1736847504018","description":"Wheel bump: bumps up or down the way the wheel turns.","controlType":"MomentaryButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Scroll"},
+        "Animations": {"_children":{"bumpUp":{"_type":"Animation","name":"bumpUp","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"wheelUp"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"y":0},{"at":0.4,"y":-5},{"at":1,"y":0}],"duration":220,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:wheel-bump","revision":1,"from":"bumpUp"}},"bumpDown":{"_type":"Animation","name":"bumpDown","enabled":true,"kind":"keyframes","trigger":{"type":"event","event":"wheelDown"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"y":0},{"at":0.4,"y":5},{"at":1,"y":0}],"duration":220,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:wheel-bump","revision":1,"from":"bumpDown"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WheelBumpCaption","id":"ctrl_1736847504019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wheel bump","_children":{"Fill":{"colour":"FF1B1D20"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WheelBumpHow","id":"ctrl_1736847504020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHEEL","_children":{"Fill":{"colour":"FF0A2540"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WheelBumpWhat","id":"ctrl_1736847504021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"bumps up or down the way the wheel turns","_children":{"Fill":{"colour":"FF2A2D31"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:double-flash",
+      "name": "Double flash",
+      "category": "Button",
+      "tags": [
+        "Gestures",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "flash": {
+          "_type": "Animation",
+          "name": "flash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.25,
+              "opacity": 0.2
+            },
+            {
+              "at": 0.5,
+              "opacity": 1
+            },
+            {
+              "at": 0.75,
+              "opacity": 0.2
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 480,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:pop",
+      "name": "Pop",
+      "category": "Button",
+      "tags": [
+        "Gestures",
+        "long press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "pop": {
+          "_type": "Animation",
+          "name": "pop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "longPress"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.4,
+              "scale": 1.14
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 360,
+          "delay": 0,
+          "easing": "outBack",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:nudge",
+      "name": "Nudge",
+      "category": "Button",
+      "tags": [
+        "Gestures",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "nudge": {
+          "_type": "Animation",
+          "name": "nudge",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0
+            },
+            {
+              "at": 0.25,
+              "x": -4
+            },
+            {
+              "at": 0.5,
+              "x": 3
+            },
+            {
+              "at": 0.75,
+              "x": -2
+            },
+            {
+              "at": 1,
+              "x": 0
+            }
+          ],
+          "duration": 340,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:spin",
+      "name": "Spin",
+      "category": "Button",
+      "tags": [
+        "Gestures",
+        "flick"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "spin": {
+          "_type": "Animation",
+          "name": "spin",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "flick"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "rotate": 0
+            },
+            {
+              "at": 1,
+              "rotate": 360
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:wheel-bump",
+      "name": "Wheel bump",
+      "category": "Button",
+      "tags": [
+        "Gestures",
+        "wheel"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bumpUp": {
+          "_type": "Animation",
+          "name": "bumpUp",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "wheelUp"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0
+            },
+            {
+              "at": 0.4,
+              "y": -5
+            },
+            {
+              "at": 1,
+              "y": 0
+            }
+          ],
+          "duration": 220,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "bumpDown": {
+          "_type": "Animation",
+          "name": "bumpDown",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "event",
+            "event": "wheelDown"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0
+            },
+            {
+              "at": 0.4,
+              "y": 5
+            },
+            {
+              "at": 1,
+              "y": 0
+            }
+          ],
+          "duration": 220,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

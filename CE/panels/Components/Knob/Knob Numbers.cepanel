@@ -1,0 +1,1716 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "a35c002a-c0b5-4e1a-9f3d-a35c002aa35c",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Knob Numbers",
+  "scriptId": "component_knob-numbers",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1140,
+  "height": 906,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF16181B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "FlyOut.value",
+      "label": "FlyOut",
+      "controlName": "FlyOut",
+      "path": "FlyOut.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Cutoff.value",
+      "label": "Cutoff",
+      "controlName": "Cutoff",
+      "path": "Cutoff.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Resonance.value",
+      "label": "Resonance",
+      "controlName": "Resonance",
+      "path": "Resonance.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "TipLabel.value",
+      "label": "TipLabel",
+      "controlName": "TipLabel",
+      "path": "TipLabel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "MaxStamp.value",
+      "label": "MaxStamp",
+      "controlName": "MaxStamp",
+      "path": "MaxStamp.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.9,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FromTheSynth.value",
+      "label": "FromTheSynth",
+      "controlName": "FromTheSynth",
+      "path": "FromTheSynth.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.4,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "NumberStream.value",
+      "label": "NumberStream",
+      "controlName": "NumberStream",
+      "path": "NumberStream.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Odometer.value",
+      "label": "Odometer",
+      "controlName": "Odometer",
+      "path": "Odometer.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Delta.value",
+      "label": "Delta",
+      "controlName": "Delta",
+      "path": "Delta.value",
+      "min": 0,
+      "max": 10,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Units.value",
+      "label": "Units",
+      "controlName": "Units",
+      "path": "Units.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "ms",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "BigNumber.value",
+      "label": "BigNumber",
+      "controlName": "BigNumber",
+      "path": "BigNumber.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ChoiceNames.value",
+      "label": "ChoiceNames",
+      "controlName": "ChoiceNames",
+      "path": "ChoiceNames.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "component_knob-numbers_1",
+      "name": "The synth",
+      "language": "javascript",
+      "source": "// Stands in for a synth sending this knob new values: a value from outside, which the\n// From the synth preset answers and a turn by hand does not.\nfunction send() {\n  set('FromTheSynth.normalizedValue', 0.15 + Math.random() * 0.7);\n  after(2500, send);\n}\nafter(1200, send);\n"
+    }
+  ],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "graphite-studio"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1740715562000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Knob · Numbers","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1740715562001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1080,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value and the name as text in motion. Each knob wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOut","id":"ctrl_1740715562002","description":"Fly-out: the value floats up off the pointer and fades.","controlType":"Knob"},
+        "Transform": {"x":67,"y":66,"width":196,"height":196},
+        "Behavior": {"circularDiameter":117,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "Animations": {"_children":{"flyOut":{"_type":"Animation","name":"flyOut","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"opacity":1,"y":0,"scale":1},{"at":0.2,"opacity":1,"y":-5,"scale":1.2},{"at":1,"opacity":0,"y":-34,"scale":1.45}],"duration":900,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:fly-out","revision":1,"from":"flyOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutCaption","id":"ctrl_1740715562003","controlType":"Label"},
+        "Transform": {"x":40,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fly-out","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutHow","id":"ctrl_1740715562004","controlType":"Label"},
+        "Transform": {"x":40,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FlyOutWhat","id":"ctrl_1740715562005","controlType":"Label"},
+        "Transform": {"x":44,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value floats up off the pointer and fades","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cutoff","id":"ctrl_1740715562006","description":"Name ↔ value: its name pushes over to the value, and types itself back.","controlType":"Knob"},
+        "Transform": {"x":367,"y":96,"width":136,"height":136}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffName","id":"ctrl_1740715562007","attachedTo":"ctrl_1740715562006","controlType":"Label"},
+        "Transform": {"x":325,"y":236,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1740715562006"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:name-value","revision":1,"from":"valueIn"}},"nameOut":{"_type":"Animation","name":"nameOut","enabled":true,"kind":"text","effect":"push","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":320,"direction":"right","trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:name-value","revision":1,"from":"nameOut"}},"valueOut":{"_type":"Animation","name":"valueOut","enabled":true,"kind":"text","effect":"crossfade","way":"out","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":220,"trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:name-value","revision":1,"from":"valueOut"}},"nameIn":{"_type":"Animation","name":"nameIn","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":150,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":300,"colour":"FFFFE3E3","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:name-value","revision":1,"from":"nameIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffCaption","id":"ctrl_1740715562008","controlType":"Label"},
+        "Transform": {"x":310,"y":264,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Name ↔ value","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffHow","id":"ctrl_1740715562009","controlType":"Label"},
+        "Transform": {"x":310,"y":286,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE TURNING","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CutoffWhat","id":"ctrl_1740715562010","controlType":"Label"},
+        "Transform": {"x":314,"y":304,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its name pushes over to the value, and types itself back","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Resonance","id":"ctrl_1740715562011","description":"Decode: the value while turning; let go, the name decodes back through glyphs.","controlType":"Knob"},
+        "Transform": {"x":637,"y":96,"width":136,"height":136}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceName","id":"ctrl_1740715562012","attachedTo":"ctrl_1740715562011","controlType":"Label"},
+        "Transform": {"x":595,"y":236,"width":220,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"JetBrains Mono","weight":"Medium","weightValue":600,"size":14}},"shows":"nameValue","showsControl":"ctrl_1740715562011"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"valueIn":{"_type":"Animation","name":"valueIn","enabled":true,"kind":"text","effect":"crossfade","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":160,"trigger":{"type":"textChange","from":["*"],"to":["value"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:decode","revision":1,"from":"valueIn"}},"decode":{"_type":"Animation","name":"decode","enabled":true,"kind":"text","effect":"reel","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":70,"duration":800,"spins":7,"glyphs":"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?","trigger":{"type":"textChange","from":["*"],"to":["name"]},"targets":[{"path":"Text"}],"preset":{"id":"ce:knob:decode","revision":1,"from":"decode"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceCaption","id":"ctrl_1740715562013","controlType":"Label"},
+        "Transform": {"x":580,"y":264,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Decode","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceHow","id":"ctrl_1740715562014","controlType":"Label"},
+        "Transform": {"x":580,"y":286,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ResonanceWhat","id":"ctrl_1740715562015","controlType":"Label"},
+        "Transform": {"x":584,"y":304,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value while turning; let go, the name decodes back through glyphs","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TipLabel","id":"ctrl_1740715562016","description":"Tip label: the value rides at the pointer's tip.","controlType":"Knob"},
+        "Transform": {"x":877,"y":66,"width":196,"height":196},
+        "Behavior": {"circularDiameter":117,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"labelCurrent":{"opacity":1}}}}}},
+        "Animations": {"_children":{"tipLabel":{"_type":"Animation","name":"tipLabel","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["dragging"],"reverse":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":160,"delay":0,"easing":"outCubic","preset":{"id":"ce:knob:tip-label","revision":1,"from":"tipLabel"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TipLabelCaption","id":"ctrl_1740715562017","controlType":"Label"},
+        "Transform": {"x":850,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Tip label","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TipLabelHow","id":"ctrl_1740715562018","controlType":"Label"},
+        "Transform": {"x":850,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE TURNING","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TipLabelWhat","id":"ctrl_1740715562019","controlType":"Label"},
+        "Transform": {"x":854,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value rides at the pointer's tip","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStamp","id":"ctrl_1740715562020","description":"MAX stamp: MAX or MIN stamps on in red.","controlType":"Knob"},
+        "Transform": {"x":67,"y":328,"width":196,"height":196},
+        "Behavior": {"defaultCurrentValue":0.9,"circularDiameter":117,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"AtMax":{"_type":"State","name":"AtMax","group":"interaction","description":"MAX stamp (animation preset).","enabled":true,"when":{},"rule":"valueNormalized >= 0.999","patches":{"component":{},"parts":{"labelCurrent":{"opacity":1,"Text.content":"MAX","Text.Fill.colour":"FFFF4D4D","Text.Font.size":16,"Text.Font.weightValue":800}}}},"AtMin":{"_type":"State","name":"AtMin","group":"interaction","description":"MAX stamp (animation preset).","enabled":true,"when":{},"rule":"valueNormalized <= 0.001","patches":{"component":{},"parts":{"labelCurrent":{"opacity":1,"Text.content":"MIN","Text.Fill.colour":"FFFF4D4D","Text.Font.size":16,"Text.Font.weightValue":800}}}}}},
+        "Animations": {"_children":{"stampMax":{"_type":"Animation","name":"stampMax","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["atmax"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":2.4,"opacity":0},{"at":0.6,"scale":0.92,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":320,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:max-stamp","revision":1,"from":"stampMax"}},"stampMin":{"_type":"Animation","name":"stampMin","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["atmin"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":2.4,"opacity":0},{"at":0.6,"scale":0.92,"opacity":1},{"at":1,"scale":1,"opacity":1}],"duration":320,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:max-stamp","revision":1,"from":"stampMin"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampCaption","id":"ctrl_1740715562021","controlType":"Label"},
+        "Transform": {"x":40,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MAX stamp","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampHow","id":"ctrl_1740715562022","controlType":"Label"},
+        "Transform": {"x":40,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AT AN END","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"MaxStampWhat","id":"ctrl_1740715562023","controlType":"Label"},
+        "Transform": {"x":44,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MAX or MIN stamps on in red","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynth","id":"ctrl_1740715562024","description":"From the synth: a value the synth sends flashes the arc; your own turns do not.","controlType":"Knob"},
+        "Transform": {"x":367,"y":358,"width":136,"height":136},
+        "Behavior": {"defaultCurrentValue":0.4},
+        "Animations": {"_children":{"fromSynth":{"_type":"Animation","name":"fromSynth","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized","origin":"external"},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"fill":"FFFFD23F","opacity":1},{"at":0.35,"fill":"FFFFD23F","opacity":1},{"at":1,"opacity":1}],"duration":700,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:from-the-synth","revision":1,"from":"fromSynth"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthCaption","id":"ctrl_1740715562025","controlType":"Label"},
+        "Transform": {"x":310,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"From the synth","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthHow","id":"ctrl_1740715562026","controlType":"Label"},
+        "Transform": {"x":310,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MIDI IN","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FromTheSynthWhat","id":"ctrl_1740715562027","controlType":"Label"},
+        "Transform": {"x":314,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a value the synth sends flashes the arc; your own turns do not","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStream","id":"ctrl_1740715562028","description":"Number stream: every step throws its value out along the pointer.","controlType":"Knob"},
+        "Transform": {"x":591,"y":312,"width":228,"height":228},
+        "Behavior": {"max":10,"defaultCurrentValue":5,"circularDiameter":117,"precision":1},
+        "Animations": {"_children":{"stream":{"_type":"Animation","name":"stream","enabled":true,"kind":"emit","trigger":{"type":"valueStep"},"targets":[],"shows":"value","from":"tip","direction":"pointer","travel":24,"size":12,"duration":650,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:knob:number-stream","revision":1,"from":"stream"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamCaption","id":"ctrl_1740715562029","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Number stream","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamHow","id":"ctrl_1740715562030","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NumberStreamWhat","id":"ctrl_1740715562031","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"every step throws its value out along the pointer","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Odometer","id":"ctrl_1740715562032","description":"Odometer: only the digits that changed roll, the way you turned.","controlType":"Knob"},
+        "Transform": {"x":877,"y":328,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "Animations": {"_children":{"odometer":{"_type":"Animation","name":"odometer","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":240,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:odometer","revision":1,"from":"odometer"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerCaption","id":"ctrl_1740715562033","controlType":"Label"},
+        "Transform": {"x":850,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Odometer","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerHow","id":"ctrl_1740715562034","controlType":"Label"},
+        "Transform": {"x":850,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OdometerWhat","id":"ctrl_1740715562035","controlType":"Label"},
+        "Transform": {"x":854,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"only the digits that changed roll, the way you turned","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Delta","id":"ctrl_1740715562036","description":"Delta: how far you turned it rises out of the dial, \"+2.4\", and fades.","controlType":"Knob"},
+        "Transform": {"x":97,"y":620,"width":136,"height":136},
+        "Behavior": {"max":10,"defaultCurrentValue":5,"precision":1},
+        "Animations": {"_children":{"delta":{"_type":"Animation","name":"delta","enabled":true,"kind":"emit","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[],"shows":"delta","from":"centre","direction":"up","travel":34,"size":18,"duration":1200,"delay":0,"easing":"outCubic","iterations":1,"preset":{"id":"ce:knob:delta","revision":1,"from":"delta"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaCaption","id":"ctrl_1740715562037","controlType":"Label"},
+        "Transform": {"x":40,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Delta","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaHow","id":"ctrl_1740715562038","controlType":"Label"},
+        "Transform": {"x":40,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LET GO","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DeltaWhat","id":"ctrl_1740715562039","controlType":"Label"},
+        "Transform": {"x":44,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how far you turned it rises out of the dial, \"+2.4\", and fades","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Units","id":"ctrl_1740715562040","description":"Units: the unit rolls in after the value.","controlType":"Knob"},
+        "Transform": {"x":337,"y":590,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0,"unit":"ms"},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "States": {"_children":{"Resting":{"_type":"State","name":"Resting","group":"interaction","description":"Units (animation preset).","enabled":true,"when":{"hover":false},"patches":{"component":{"Behavior.unit":""},"parts":{}}}}},
+        "Animations": {"_children":{"unitIn":{"_type":"Animation","name":"unitIn","enabled":true,"kind":"text","effect":"odometer","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":0,"duration":300,"direction":"up","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:units","revision":1,"from":"unitIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsCaption","id":"ctrl_1740715562041","controlType":"Label"},
+        "Transform": {"x":310,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Units","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsHow","id":"ctrl_1740715562042","controlType":"Label"},
+        "Transform": {"x":310,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"UnitsWhat","id":"ctrl_1740715562043","controlType":"Label"},
+        "Transform": {"x":314,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the unit rolls in after the value","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumber","id":"ctrl_1740715562044","description":"Big number: the value fills the dial while you hold it.","controlType":"Knob"},
+        "Transform": {"x":607,"y":590,"width":196,"height":196},
+        "Behavior": {"max":100,"step":1,"defaultCurrentValue":50,"circularDiameter":117,"showHandleLabels":true,"precision":0},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "States": {"_children":{"Pressed":{"patches":{"parts":{"pointerCurrent":{"opacity":0},"labelCurrent":{"opacity":1,"Text.Font.size":34,"Text.Font.weightValue":700}}}}}},
+        "Animations": {"_children":{"bigNumber":{"_type":"Animation","name":"bigNumber","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]},{"path":"Parts.pointerCurrent.opacity","properties":["opacity"]}],"duration":160,"delay":0,"easing":"outQuad","preset":{"id":"ce:knob:big-number","revision":1,"from":"bigNumber"}},"bigPop":{"_type":"Animation","name":"bigPop","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["pressed"]},"targets":[{"path":"Parts.labelCurrent"}],"frames":[{"at":0,"scale":0.55},{"at":1,"scale":1}],"duration":240,"delay":0,"easing":"outBack","iterations":1,"direction":"normal","preset":{"id":"ce:knob:big-number","revision":1,"from":"bigPop"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberCaption","id":"ctrl_1740715562045","controlType":"Label"},
+        "Transform": {"x":580,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Big number","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberHow","id":"ctrl_1740715562046","controlType":"Label"},
+        "Transform": {"x":580,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BigNumberWhat","id":"ctrl_1740715562047","controlType":"Label"},
+        "Transform": {"x":584,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value fills the dial while you hold it","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNames","id":"ctrl_1740715562048","description":"Choice names: a stepped knob: the next name pushes in the way you turned.","controlType":"Knob"},
+        "Transform": {"x":877,"y":590,"width":196,"height":196},
+        "Behavior": {"max":4,"step":1,"defaultCurrentValue":2,"circularDiameter":117,"showHandleLabels":true,"displayTable":["Saw","Square","Pulse","Triangle","Sine"]},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"_children":{"Text":{"_children":{"Font":{"size":14}}}},"anchor":"centre"}
+          }
+        },
+        "Animations": {"_children":{"choice":{"_type":"Animation","name":"choice","enabled":true,"kind":"text","effect":"push","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"whole","order":"forward","stagger":0,"duration":280,"direction":"turn","trigger":{"type":"valueStep"},"targets":[{"path":"Parts.labelCurrent"}],"preset":{"id":"ce:knob:choice-names","revision":1,"from":"choice"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesCaption","id":"ctrl_1740715562049","controlType":"Label"},
+        "Transform": {"x":850,"y":766,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice names","_children":{"Fill":{"colour":"FFE8EAED"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesHow","id":"ctrl_1740715562050","controlType":"Label"},
+        "Transform": {"x":850,"y":788,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"EACH STEP","_children":{"Fill":{"colour":"FF5AB4FF"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChoiceNamesWhat","id":"ctrl_1740715562051","controlType":"Label"},
+        "Transform": {"x":854,"y":806,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a stepped knob: the next name pushes in the way you turned","_children":{"Fill":{"colour":"FF9AA3AD"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:fly-out",
+      "name": "Fly-out",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "flyOut": {
+          "_type": "Animation",
+          "name": "flyOut",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1,
+              "y": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.2,
+              "opacity": 1,
+              "y": -5,
+              "scale": 1.2
+            },
+            {
+              "at": 1,
+              "opacity": 0,
+              "y": -34,
+              "scale": 1.45
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:name-value",
+      "name": "Name ↔ value",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "while turning"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "valueIn": {
+          "_type": "Animation",
+          "name": "valueIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "direction": "right",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "nameOut": {
+          "_type": "Animation",
+          "name": "nameOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 320,
+          "direction": "right",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "valueOut": {
+          "_type": "Animation",
+          "name": "valueOut",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "out",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 220,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "nameIn": {
+          "_type": "Animation",
+          "name": "nameIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 150,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 300,
+          "colour": "FFFFE3E3",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "nameValue"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:decode",
+      "name": "Decode",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "valueIn": {
+          "_type": "Animation",
+          "name": "valueIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "crossfade",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 160,
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "value"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        },
+        "decode": {
+          "_type": "Animation",
+          "name": "decode",
+          "enabled": true,
+          "kind": "text",
+          "effect": "reel",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 70,
+          "duration": 800,
+          "spins": 7,
+          "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=?",
+          "trigger": {
+            "type": "textChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "name"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Text.shows": "nameValue"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:tip-label",
+      "name": "Tip label",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "while turning"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "tipLabel": {
+          "_type": "Animation",
+          "name": "tipLabel",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "dragging"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {
+        "Dragging": {
+          "when": {
+            "dragging": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:max-stamp",
+      "name": "MAX stamp",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "at an end"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "stampMax": {
+          "_type": "Animation",
+          "name": "stampMax",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "atmax"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 2.4,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 0.92,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        },
+        "stampMin": {
+          "_type": "Animation",
+          "name": "stampMin",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "atmin"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 2.4,
+              "opacity": 0
+            },
+            {
+              "at": 0.6,
+              "scale": 0.92,
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "scale": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "AtMax": {
+          "when": {},
+          "rule": "valueNormalized >= 0.999",
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.content": "MAX",
+                "Text.Fill.colour": "FFFF4D4D",
+                "Text.Font.size": 16,
+                "Text.Font.weightValue": 800
+              }
+            }
+          }
+        },
+        "AtMin": {
+          "when": {},
+          "rule": "valueNormalized <= 0.001",
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.content": "MIN",
+                "Text.Fill.colour": "FFFF4D4D",
+                "Text.Font.size": 16,
+                "Text.Font.weightValue": 800
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:from-the-synth",
+      "name": "From the synth",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "MIDI in"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fromSynth": {
+          "_type": "Animation",
+          "name": "fromSynth",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized",
+            "origin": "external"
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FFFFD23F",
+              "opacity": 1
+            },
+            {
+              "at": 0.35,
+              "fill": "FFFFD23F",
+              "opacity": 1
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 700,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:number-stream",
+      "name": "Number stream",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "stream": {
+          "_type": "Animation",
+          "name": "stream",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [],
+          "shows": "value",
+          "from": "tip",
+          "direction": "pointer",
+          "travel": 24,
+          "size": 12,
+          "duration": 650,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:odometer",
+      "name": "Odometer",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "odometer": {
+          "_type": "Animation",
+          "name": "odometer",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 240,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:delta",
+      "name": "Delta",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "let go"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "delta": {
+          "_type": "Animation",
+          "name": "delta",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [],
+          "shows": "delta",
+          "from": "centre",
+          "direction": "up",
+          "travel": 34,
+          "size": 18,
+          "duration": 1200,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:units",
+      "name": "Units",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "unitIn": {
+          "_type": "Animation",
+          "name": "unitIn",
+          "enabled": true,
+          "kind": "text",
+          "effect": "odometer",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 300,
+          "direction": "up",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {
+        "Resting": {
+          "when": {
+            "hover": false
+          },
+          "patches": {
+            "component": {
+              "Behavior.unit": ""
+            },
+            "parts": {}
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:big-number",
+      "name": "Big number",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "press"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "bigNumber": {
+          "_type": "Animation",
+          "name": "bigNumber",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            },
+            {
+              "path": "Parts.pointerCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad"
+        },
+        "bigPop": {
+          "_type": "Animation",
+          "name": "bigPop",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 0.55
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 240,
+          "delay": 0,
+          "easing": "outBack",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1,
+                "Text.Font.size": 34,
+                "Text.Font.weightValue": 700
+              },
+              "pointerCurrent": {
+                "opacity": 0
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:choice-names",
+      "name": "Choice names",
+      "category": "Knob",
+      "tags": [
+        "Numbers",
+        "each step"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "choice": {
+          "_type": "Animation",
+          "name": "choice",
+          "enabled": true,
+          "kind": "text",
+          "effect": "push",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "whole",
+          "order": "forward",
+          "stagger": 0,
+          "duration": 280,
+          "direction": "turn",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.anchor": "centre"
+      }
+    }
+  ]
+}

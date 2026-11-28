@@ -1,0 +1,858 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "2874751f-c0b5-4e1a-9f3d-2874751f2874",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Knob Touch",
+  "scriptId": "component_knob-touch",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 870,
+  "height": 644,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1B1D20",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Lift.value",
+      "label": "Lift",
+      "controlName": "Lift",
+      "path": "Lift.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Grip.value",
+      "label": "Grip",
+      "controlName": "Grip",
+      "path": "Grip.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Glow.value",
+      "label": "Glow",
+      "controlName": "Glow",
+      "path": "Glow.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Readout.value",
+      "label": "Readout",
+      "controlName": "Readout",
+      "path": "Readout.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FocusRing.value",
+      "label": "FocusRing",
+      "controlName": "FocusRing",
+      "path": "FocusRing.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sheen.value",
+      "label": "Sheen",
+      "controlName": "Sheen",
+      "path": "Sheen.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "edge-light"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1748720799000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Knob · Touch","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1748720799001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":810,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how it answers the hand. Each knob wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lift","id":"ctrl_1748720799002","description":"Lift: the cap rises toward you.","controlType":"Knob"},
+        "Transform": {"x":97,"y":96,"width":136,"height":136},
+        "States": {"_children":{"Hover":{"patches":{"parts":{"bodyCap":{"Layout.scale":1.07}}}}}},
+        "Animations": {"_children":{"lift":{"_type":"Animation","name":"lift","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["hover"],"reverse":true},"targets":[{"path":"Parts.bodyCap.Layout.scale","properties":["transform"]}],"duration":160,"delay":0,"easing":"outCubic","preset":{"id":"ce:knob:lift","revision":1,"from":"lift"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftCaption","id":"ctrl_1748720799003","controlType":"Label"},
+        "Transform": {"x":40,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lift","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftHow","id":"ctrl_1748720799004","controlType":"Label"},
+        "Transform": {"x":40,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftWhat","id":"ctrl_1748720799005","controlType":"Label"},
+        "Transform": {"x":44,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap rises toward you","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Grip","id":"ctrl_1748720799006","description":"Grip: the cap squeezes under the finger.","controlType":"Knob"},
+        "Transform": {"x":367,"y":96,"width":136,"height":136},
+        "States": {"_children":{"Pressed":{"patches":{"parts":{"bodyCap":{"Layout.scale":0.93}}}}}},
+        "Animations": {"_children":{"grip":{"_type":"Animation","name":"grip","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Parts.bodyCap.Layout.scale","properties":["transform"]}],"duration":90,"delay":0,"easing":"outBack","preset":{"id":"ce:knob:grip","revision":1,"from":"grip"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripCaption","id":"ctrl_1748720799007","controlType":"Label"},
+        "Transform": {"x":310,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Grip","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripHow","id":"ctrl_1748720799008","controlType":"Label"},
+        "Transform": {"x":310,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripWhat","id":"ctrl_1748720799009","controlType":"Label"},
+        "Transform": {"x":314,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap squeezes under the finger","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glow","id":"ctrl_1748720799010","description":"Glow: the cap's rim lights and the arc breathes.","controlType":"Knob"},
+        "Transform": {"x":637,"y":96,"width":136,"height":136},
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyCap":{"Background.Border.enabled":true,"Background.Border.thickness":2.5,"Background.Border.colour":"{accent.hot}"}}}}}},
+        "Animations": {"_children":{"glow":{"_type":"Animation","name":"glow","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["dragging"]},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.5},{"at":1,"opacity":1}],"duration":720,"delay":0,"easing":"inOutQuad","iterations":"infinite","direction":"normal","preset":{"id":"ce:knob:glow","revision":1,"from":"glow"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowCaption","id":"ctrl_1748720799011","controlType":"Label"},
+        "Transform": {"x":580,"y":242,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Glow","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowHow","id":"ctrl_1748720799012","controlType":"Label"},
+        "Transform": {"x":580,"y":264,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE TURNING","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowWhat","id":"ctrl_1748720799013","controlType":"Label"},
+        "Transform": {"x":584,"y":282,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap's rim lights and the arc breathes","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Readout","id":"ctrl_1748720799014","description":"Readout: the value shows, and lingers a moment after.","controlType":"Knob"},
+        "Transform": {"x":67,"y":328,"width":196,"height":196},
+        "Behavior": {"circularDiameter":95,"showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"labelCurrent":{"opacity":1}}}}}},
+        "Animations": {"_children":{"readoutIn":{"_type":"Animation","name":"readoutIn","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["dragging"],"reverse":false},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":120,"delay":0,"easing":"outQuad","preset":{"id":"ce:knob:readout","revision":1,"from":"readoutIn"}},"readoutOut":{"_type":"Animation","name":"readoutOut","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":400,"delay":600,"easing":"inOutQuad","preset":{"id":"ce:knob:readout","revision":1,"from":"readoutOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutCaption","id":"ctrl_1748720799015","controlType":"Label"},
+        "Transform": {"x":40,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Readout","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutHow","id":"ctrl_1748720799016","controlType":"Label"},
+        "Transform": {"x":40,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE TURNING","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutWhat","id":"ctrl_1748720799017","controlType":"Label"},
+        "Transform": {"x":44,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value shows, and lingers a moment after","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRing","id":"ctrl_1748720799018","description":"Focus ring: its value arc breathes while it has the keys.","controlType":"Knob"},
+        "Transform": {"x":367,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"breathe":{"_type":"Animation","name":"breathe","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["focused"]},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.3},{"at":1,"opacity":1}],"duration":1400,"delay":0,"easing":"inOutQuad","iterations":"infinite","direction":"normal","preset":{"id":"ce:knob:focus-ring","revision":1,"from":"breathe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingCaption","id":"ctrl_1748720799019","controlType":"Label"},
+        "Transform": {"x":310,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Focus ring","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingHow","id":"ctrl_1748720799020","controlType":"Label"},
+        "Transform": {"x":310,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KEYBOARD FOCUS","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingWhat","id":"ctrl_1748720799021","controlType":"Label"},
+        "Transform": {"x":314,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its value arc breathes while it has the keys","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sheen","id":"ctrl_1748720799022","description":"Sheen: a glint crosses the cap.","controlType":"Knob"},
+        "Transform": {"x":637,"y":358,"width":136,"height":136},
+        "Animations": {"_children":{"sheen":{"_type":"Animation","name":"sheen","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Parts.bodyCap"}],"frames":[{"at":0,"shift":-100},{"at":1,"shift":100}],"duration":900,"delay":0,"easing":"inOutQuad","iterations":1,"direction":"normal","preset":{"id":"ce:knob:sheen","revision":1,"from":"sheen"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SheenCaption","id":"ctrl_1748720799023","controlType":"Label"},
+        "Transform": {"x":580,"y":504,"width":250,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Sheen","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SheenHow","id":"ctrl_1748720799024","controlType":"Label"},
+        "Transform": {"x":580,"y":526,"width":250,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SheenWhat","id":"ctrl_1748720799025","controlType":"Label"},
+        "Transform": {"x":584,"y":544,"width":242,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a glint crosses the cap","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:lift",
+      "name": "Lift",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lift": {
+          "_type": "Animation",
+          "name": "lift",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyCap.Layout.scale",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {
+        "Hover": {
+          "when": {
+            "hover": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "bodyCap": {
+                "Layout.scale": 1.07
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:grip",
+      "name": "Grip",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "grip": {
+          "_type": "Animation",
+          "name": "grip",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyCap.Layout.scale",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 90,
+          "delay": 0,
+          "easing": "outBack"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "bodyCap": {
+                "Layout.scale": 0.93
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:glow",
+      "name": "Glow",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "while turning"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "glow": {
+          "_type": "Animation",
+          "name": "glow",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "dragging"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.5
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 720,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {
+        "Dragging": {
+          "when": {
+            "dragging": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "bodyCap": {
+                "Background.Border.enabled": true,
+                "Background.Border.thickness": 2.5,
+                "Background.Border.colour": "{accent.hot}"
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:readout",
+      "name": "Readout",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "while turning"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "readoutIn": {
+          "_type": "Animation",
+          "name": "readoutIn",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "dragging"
+            ],
+            "reverse": false
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 120,
+          "delay": 0,
+          "easing": "outQuad"
+        },
+        "readoutOut": {
+          "_type": "Animation",
+          "name": "readoutOut",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 400,
+          "delay": 600,
+          "easing": "inOutQuad"
+        }
+      },
+      "states": {
+        "Dragging": {
+          "when": {
+            "dragging": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:focus-ring",
+      "name": "Focus ring",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "keyboard focus"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "breathe": {
+          "_type": "Animation",
+          "name": "breathe",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "focused"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.3
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 1400,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:knob:sheen",
+      "name": "Sheen",
+      "category": "Knob",
+      "tags": [
+        "Touch",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "sheen": {
+          "_type": "Animation",
+          "name": "sheen",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyCap"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "shift": -100
+            },
+            {
+              "at": 1,
+              "shift": 100
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

@@ -7,13 +7,15 @@
  * buttons knew this and wrote the state too, but REPLACED any state of that name, so pressing
  * "Scale" on a button threw away its own Pressed colour. These merge: an existing state keeps
  * everything it had and gains the one value the preset needs, unless it already sets that value,
- * in which case it is left alone — the author's number wins over the preset's.
+ * in which case it is left alone — the author's number wins over the preset's. A value still at what
+ * the control's type made the state with is nobody's choice, and gives way (authorsStateValue.js).
  *
  * Every preset is applied to every selected control in one undo step (the Animation tab does the
  * transaction; this file only builds patches and has no stores in it).
  */
 import { uniqueAnimationName, keyframeTargets } from './animationModel.js';
 import { readTrigger } from './interactionRuntime.js';
+import { setByAuthor } from './authorsStateValue.js';
 
 const transition = (name, trigger, targets, duration, easing) => ({
   _type: 'Animation', name, enabled: true, kind: 'transition', trigger, targets, duration, delay: 0, easing,
@@ -81,6 +83,16 @@ export const ANIMATION_PRESETS = [
         { path: `Parts.${part}.Layout.y`, properties: ['transform'] },
       ]), 160, 'outCubic'),
   },
+  {
+    // The Paint engine (utils/gradientPaint.js): every stop of the fill gradient slides from a whole
+    // width before to a whole width after, so a chrome highlight sweeps across and comes round again.
+    id: 'gradientSheen',
+    label: 'Gradient sheen',
+    summary: 'A sheen sweeps across the fill gradient, over and over, while the control stays where it is.',
+    needsGradient: true,
+    animation: (name) => keyframes(name, { type: 'always' },
+      [{ at: 0, shift: -100 }, { at: 1, shift: 100 }], 2400, { iterations: 'infinite' }),
+  },
 ];
 
 export const PRESET_BY_ID = Object.fromEntries(ANIMATION_PRESETS.map((preset) => [preset.id, preset]));
@@ -118,6 +130,12 @@ export function presetBlockedBecause(control, preset) {
     const already = existingPointerGlide(control);
     if (already) return `It already glides its pointer with ${already}; a second would only clash with it.`;
   }
+  if (preset.needsGradient) {
+    const fill = control._children?.Background?._children?.Fill;
+    if (!(fill?.gradientEnabled === true && fill?.gradient)) {
+      return 'It sweeps the fill gradient, and this control has none: switch on Gradient in its Background first.';
+    }
+  }
   if (preset.signal && !reachesSignal(control, preset.signal)) {
     return 'It plays while the control is checked, and this control is never checked.';
   }
@@ -143,7 +161,9 @@ export function presetPatch(control, presetId) {
     // A copy: the new state node must share nothing with the one it replaces, which undo keeps.
     const current = key ? JSON.parse(JSON.stringify(states[key])) : null;
     const component = { ...(current?.patches?.component ?? {}) };
-    if (preset.state.path && !(preset.state.path in component)) component[preset.state.path] = preset.state.value;
+    if (preset.state.path && !setByAuthor(control, key ?? preset.state.key, component, preset.state.path)) {
+      component[preset.state.path] = preset.state.value;
+    }
     // A state the control already has keeps its condition, group and part patches as they were.
     patch[`States.${key ?? preset.state.key}`] = current
       ? { ...current, patches: { ...(current.patches ?? {}), component } }

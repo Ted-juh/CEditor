@@ -28,6 +28,14 @@ import {
   resolveInteractiveControl,
 } from './interactionRuntime.js';
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
+import { TEXT_TRIGGER_TYPES, newTextEffectShape } from './textEffects.js';
+import { patternEntries, patternLabel } from './patternLayers.js';
+import { cleanValueFrames, VALUE_TARGET } from './sceneFormat.js';
+import { controlDrawsValue } from './valueDrawn.js';
+import { sliderWordsRefusal, isSliderFamily } from './anatomyWords.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
+import { METER_DEVICE_TYPES } from '../models/meterDeviceParts.js';
 import {
   KEYFRAME_TRIGGER_TYPES,
   FRAME_PROPERTIES,
@@ -57,7 +65,44 @@ export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic
  * different things and both stay: `keyframes` is CSS playing a shape on one part, `sequence` is
  * anime.js posing document values — which is what reaches a value channel or a filmstrip frame.
  */
-export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence'];
+// `text`: real text, whole or a piece at a time (utils/textEffects.js), step 2 of the Animation
+// Designer, 2026-11-24.
+export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence', 'text'];
+
+/**
+ * `value`: what a knob's or a slider's value draws — its arc, its pointer — moved for a moment, then
+ * handed back to the value (utils/valueDrawn.js; step 6 of the Animation Designer). Offered only on a
+ * control that draws a value, so it is not in the list every control gets.
+ */
+export const VALUE_KIND = 'value';
+/**
+ * `emit`: words thrown out from a knob's or a slider's pointer as its value steps — the value, or
+ * how far it moved (utils/keyframeAnimation.js EMIT). Drawn by the slider renderer, so offered on
+ * the knob and slider family. The Components showcase's Knob, phase 2, 2026-11-26. And from a
+ * button's key: words of its own, or a count (CanvasControl draws them); the Button, 2026-11-27.
+ */
+export const EMIT_KIND = 'emit';
+/**
+ * Whether a control throws words from its box rather than from a pointer: a button of any kind, from
+ * its key, or a meter (the Meter, phase 2: "OVER" as it clips). Neither has a pointer to throw from.
+ */
+export const throwsFromKey = (control) => {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  return BUTTON_DEVICE_TYPES.has(type) || METER_DEVICE_TYPES.has(type);
+};
+/** Whether a control is a meter, whose words thrown wait for it to clip unless told otherwise. */
+const isMeter = (control) => METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? ''));
+/**
+ * The kinds an animation on this control may be: a knob, a slider, a Macro or a meter has the value
+ * kind too; a slider, a button and a meter throw words.
+ */
+export function animationKindsFor(control) {
+  const value = controlDrawsValue(control) ? [VALUE_KIND] : [];
+  const emit = throwsFromKey(control) || (value.length && isSliderFamily(control)) ? [EMIT_KIND] : [];
+  return [...ANIMATION_KINDS, ...value, ...emit];
+}
+/** A new value animation's frames: the ring sweep — nothing, round to full, back to the value. */
+export const VALUE_SWEEP_FRAMES = Object.freeze([{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
 
 /** The kind whose targets are tracks. */
 export const SEQUENCE_KIND = 'sequence';
@@ -97,6 +142,9 @@ export const OFFERED_PROPERTIES = [
   { path: 'Background.Fill.colour', properties: ['background-color'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['color'], label: 'Text colour' },
   { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+  // A fill's gradient glides on the colour timing (utils/gradientPaint.js). Not a sequence's: a
+  // sequence moves a number or a colour along a track, and a gradient is neither.
+  { path: 'Background.Fill.gradient', properties: ['colour'], label: 'Gradient', sequence: false },
   { path: 'visible', properties: ['visibility'], label: 'Show / hide (fade)' },
 ];
 
@@ -108,14 +156,17 @@ export const OFFERED_ROOT_PROPERTIES = [
   { path: 'Background.Fill.colour', properties: ['colour'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['colour'], label: 'Text colour' },
   { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+  { path: 'Background.Fill.gradient', properties: ['colour'], label: 'Gradient', sequence: false },
 ];
 
 /**
- * What a working colour target cannot do. CSS fades one solid colour into another and nothing
- * else: a gradient, an image or a material swaps at the end of the duration instead. True of every
- * browser, so it is said on the row rather than discovered.
+ * What a working colour target cannot do. CSS fades one solid colour into another, and since the
+ * Paint engine (utils/gradientPaint.js, 2026-11-24) a gradient into the same gradient turned, moved
+ * or recoloured; an image or a material still swaps at the end of the duration, and so does a
+ * gradient that changes type or has more stops than are registered. Said on the row rather than
+ * discovered.
  */
-export const COLOUR_NOTE = 'A solid colour fades. A gradient, an image or a material switches at the end instead — CSS cannot blend between them.';
+export const COLOUR_NOTE = 'A solid colour fades, and a gradient glides: its angle, centre and stops, if it keeps its type and has at most twelve stops. An image or a material switches at the end instead.';
 
 /** The status of a target that works, with what it should know about the bucket it fills. */
 function working(buckets, part) {
@@ -230,6 +281,8 @@ export function describeAnimation(name, animation) {
       : (Number(animation?.iterations) >= 1 ? Math.round(Number(animation.iterations)) : defaultIterations(trigger.type)),
     direction: animation?.direction === 'alternate' ? 'alternate' : 'normal',
     frames: kind === 'keyframes' ? cleanFrames(animation?.frames) : [],
+    // Value animations only: where the value is drawn, frame by frame (sceneFormat.js).
+    valueFrames: kind === VALUE_KIND ? (cleanValueFrames(animation?.frames) ?? []) : [],
     animation,
   };
 }
@@ -250,6 +303,28 @@ export function animationsEnabled(control) {
  * A keyframe animation's target only says WHERE it plays — the frames say what moves — so the one
  * thing that can be wrong with it is a part that is not there.
  */
+/**
+ * A text effect plays on the control's own words ('Text') or a part's. On a knob or a slider, only
+ * where it draws words or marks of its own: its scale's numbers, its ticks, its handle labels
+ * (utils/anatomyWords.js).
+ */
+function textTargetStatus(target, partNames, control = null) {
+  const path = String(target?.path ?? '').trim();
+  const part = path.startsWith('Parts.') ? (path.split('.')[1] || '') : '';
+  if (part && partNames.length && !partNames.includes(part)) {
+    return { works: false, reason: 'missing part', part, detail: `This control has no part called "${part}", so the words it plays on are not there.` };
+  }
+  const refusal = control ? sliderWordsRefusal(control, part) : '';
+  if (refusal) return { works: false, reason: 'no words', part, detail: refusal };
+  return { works: true, animates: 'text', buckets: [], part };
+}
+
+/** A value animation plays on what the value draws, and nowhere else. */
+function valueTargetStatus(target) {
+  if (String(target?.path ?? '') === VALUE_TARGET) return { works: true, animates: 'value', buckets: [], part: '' };
+  return { works: false, reason: 'not the value', part: '', detail: 'A value animation moves what the value draws; it plays nowhere else.' };
+}
+
 function keyframeTargetStatus(target, partNames) {
   const part = keyframePart({ targets: [target] });
   if (part && partNames.length && !partNames.includes(part)) {
@@ -287,6 +362,9 @@ export function sequenceTargetStatus(target, partNames = [], { triggerType = 'st
       return { works: false, reason: 'feedback', animates: 'channel', detail: 'A sequence that follows the value cannot also drive it; it would chase itself.' };
     }
     return { works: true, animates: 'channel', buckets: ['channel'], part: '', channel: channel[1] };
+  }
+  if (path === 'Background.Fill.gradient' || path.endsWith('.Background.Fill.gradient')) {
+    return { works: false, reason: 'not a track', animates: 'colour', detail: 'A sequence moves a number or a colour along a track, and a gradient is neither. A transition glides it between states; a keyframe animation turns or shifts it.' };
   }
   if (sequenceOnlyBucket(path) === 'frame') {
     const partName = path.split('.')[1];
@@ -334,9 +412,16 @@ export function resolvedPartsOf(control) {
  * (`scope: 'control'`), so the Part picker does not apply to it.
  */
 export function offeredTargetsFor(control, kind = SEQUENCE_KIND, { onControl = false } = {}) {
-  const out = onControl
-    ? OFFERED_ROOT_PROPERTIES.map((entry) => ({ ...entry, scope: 'root' }))
-    : OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
+  const offered = (onControl ? OFFERED_ROOT_PROPERTIES : OFFERED_PROPERTIES)
+    .filter((entry) => kind !== SEQUENCE_KIND || entry.sequence !== false);
+  const out = offered.map((entry) => ({ ...entry, scope: onControl ? 'root' : 'part' }));
+  // Each pattern on the control's background (utils/patternLayers.js): its tint is the colour it is
+  // painted in, on the colour timing like a fill. Named by the pattern, so only where there is one.
+  if (onControl) {
+    for (const [name] of patternEntries(control?._children?.Background)) {
+      out.push({ path: `Background.Patterns.${name}.tint`, properties: ['colour'], label: `${patternLabel(name)} tint`, scope: 'root', pattern: name });
+    }
+  }
   if (kind !== SEQUENCE_KIND) return out;
   const channels = control?._children?.ValueChannels?._children ?? {};
   for (const [name, channel] of Object.entries(channels)) {
@@ -370,13 +455,17 @@ export function baseValueAt(control, path) {
   return value === undefined || value === null || typeof value === 'object' ? undefined : value;
 }
 
-/** Each target with its status attached, ready to list. */
-export function describeTargets(row, partNames = []) {
+/** Each target with its status attached, ready to list. `control`, where given, lets a knob say where it draws words. */
+export function describeTargets(row, partNames = [], { control = null } = {}) {
   const keyframes = row?.kind === 'keyframes';
   const sequence = row?.kind === SEQUENCE_KIND;
+  const words = row?.kind === 'text';
+  const drawn = row?.kind === VALUE_KIND;
   const context = { triggerType: String(row?.triggerType ?? row?.trigger?.type ?? 'stateChange') };
   const statusOf = (target) => {
+    if (drawn) return valueTargetStatus(target);
     if (keyframes) return keyframeTargetStatus(target, partNames);
+    if (words) return textTargetStatus(target, partNames, control);
     if (sequence) return sequenceTargetStatus(target, partNames, context);
     return sequenceOnlyStatus(target, String(row?.kind ?? 'transition')) ?? targetStatus(target, partNames);
   };
@@ -390,8 +479,8 @@ export function describeTargets(row, partNames = []) {
 }
 
 /** How many of an animation's targets do nothing. */
-export function deadTargetCount(row, partNames = []) {
-  return describeTargets(row, partNames).filter((entry) => !entry.status.works).length;
+export function deadTargetCount(row, partNames = [], options = {}) {
+  return describeTargets(row, partNames, options).filter((entry) => !entry.status.works).length;
 }
 
 // --- Triggers ---------------------------------------------------------------
@@ -482,6 +571,14 @@ export function triggersTie(a, b) {
     return `both answer a change of ${a.source}`;
   }
   if (a.type !== 'stateChange') return '';
+  // A leaving animation answers a state being left, an entering one a state being entered: they
+  // never claim the same change by the same rule. Two leaving ones tie on a state they both leave.
+  if ((a.leaving === true) !== (b.leaving === true)) return '';
+  if (a.leaving === true) {
+    if (isAnyList(a.from) || isAnyList(b.from)) return isAnyList(a.from) && isAnyList(b.from) ? 'both answer leaving any state' : '';
+    const left = a.from.filter((state) => b.from.includes(state));
+    return left.length ? `both answer leaving ${left.join(', ')}` : '';
+  }
   const aAny = isAnyList(a.to);
   if (aAny !== isAnyList(b.to)) return '';
   if (!fromListsMeet(a.from, b.from)) return '';
@@ -511,7 +608,7 @@ function landings(row, partNames) {
  * transitions.
  */
 export function findClashes(rows, partNames = []) {
-  const live = (rows ?? []).filter((row) => row?.enabled !== false && !['keyframes', SEQUENCE_KIND].includes(row?.kind ?? 'transition'));
+  const live = (rows ?? []).filter((row) => row?.enabled !== false && !['keyframes', SEQUENCE_KIND, 'text'].includes(row?.kind ?? 'transition'));
   const placed = live.map((row) => ({ row, at: landings(row, partNames), trigger: row.trigger ?? readTrigger(row.animation) }));
   const clashes = [];
   for (let i = 0; i < placed.length; i += 1) {
@@ -555,14 +652,24 @@ export const KEYFRAME_TRIGGER_LABELS = {
   always: 'All the time',
   stateChange: 'In a state',
   valueChange: 'When the value changes',
+  valueStep: 'On each step of the value',
   beat: 'On the beat',
   script: 'When a script plays it',
+  event: 'On a click or gesture',
+  hold: 'While held to confirm',
+  optionsChange: 'When its options change',
+  clip: 'When it clips',
+  level: 'When it crosses a level',
 };
 
 /** Where a keyframe animation plays, as a targets list: a part, or the control itself. */
 export function keyframeTargets(partName) {
   return [{ path: partName ? `Parts.${partName}` : 'Transform' }];
 }
+
+/** A text effect's own fields, kept when switching kind and back. */
+const TEXT_FIELDS = ['effect', 'way', 'split', 'order', 'stagger', 'direction', 'scatter', 'scale', 'colour'];
+const pick = (source, keys) => Object.fromEntries(keys.filter((key) => source?.[key] !== undefined).map((key) => [key, source[key]]));
 
 /**
  * What switching an animation's kind writes, as one patch.
@@ -575,6 +682,19 @@ export function keyframeTargets(partName) {
 export function kindPatch(row, kind, control = null) {
   const animation = row?.animation ?? {};
   const trigger = animation.trigger ?? {};
+  if (kind === 'text') {
+    // A text effect: a typewriter on the control's own words, keeping a trigger a text effect
+    // answers (anything a keyframe animation answers, and a change of words), else "from a script".
+    const shape = newTextEffectShape(animation.name ?? row?.name ?? '', animation.effect ?? 'typewriter', animation.way ?? 'in');
+    const type = TEXT_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'script';
+    const patch = { ...shape, ...pick(animation, TEXT_FIELDS), kind: 'text', trigger: { ...trigger, type } };
+    delete patch._type;
+    delete patch.name;
+    delete patch.enabled;
+    const keepTarget = (animation.targets ?? []).find((target) => /^(Text$|Parts\.)/.test(String(target?.path ?? '')));
+    patch.targets = [{ path: keepTarget ? (String(keepTarget.path).startsWith('Parts.') ? `Parts.${String(keepTarget.path).split('.')[1]}` : 'Text') : 'Text' }];
+    return patch;
+  }
   if (kind === SEQUENCE_KIND) {
     // A length for the axis (a transition's 120 ms is a blink, not a sequence: under 200 ms it
     // becomes a second), hold on, and for every target with no track yet one keyframe at 0
@@ -595,8 +715,51 @@ export function kindPatch(row, kind, control = null) {
     if (!(Number(animation.duration) >= 200)) patch.duration = 1000;
     return patch;
   }
+  if (kind === VALUE_KIND) {
+    // What the value draws: the frames it had as a value animation, or the ring sweep; a trigger a
+    // keyframe animation answers, except "all the time", which would never let the value be seen —
+    // that, and anything else, becomes "entering Hover".
+    const frames = animation.kind === VALUE_KIND ? cleanValueFrames(animation.frames) : null;
+    const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) && trigger.type !== 'always' ? trigger.type : null;
+    const patch = {
+      kind: VALUE_KIND,
+      frames: frames ?? VALUE_SWEEP_FRAMES.map((frame) => ({ ...frame })),
+      trigger: type ? { ...trigger, type } : { type: 'stateChange', from: ['*'], to: ['hover'] },
+      targets: [{ path: VALUE_TARGET }],
+      iterations: 1,
+    };
+    if (!(Number(animation.duration) >= 200)) patch.duration = 1200;
+    if (!animation.easing || animation.kind !== VALUE_KIND) patch.easing = 'inOutCubic';
+    return patch;
+  }
+  if (kind === EMIT_KIND) {
+    // Words thrown from the pointer: the value, from its tip, along it, on each step — or on a
+    // trigger a keyframe animation answers, except "all the time", which would throw nothing.
+    const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) && trigger.type !== 'always' ? trigger.type : null;
+    // A button has no value to throw: words of its own ("+1" until it is given others), or a count.
+    const key = throwsFromKey(control);
+    const shows = key ? (['words', 'count'].includes(animation.shows) ? animation.shows : 'words')
+      : (['value', 'delta', 'words', 'count'].includes(animation.shows) ? animation.shows : 'value');
+    const patch = {
+      kind: EMIT_KIND,
+      shows,
+      ...(shows === 'words' && !String(animation.words ?? '').trim() ? { words: '+1' } : {}),
+      from: ['tip', 'centre'].includes(animation.from) ? animation.from : 'tip',
+      direction: ['pointer', 'up'].includes(animation.direction) ? animation.direction : 'pointer',
+      travel: Number(animation.travel) > 0 ? Number(animation.travel) : 36,
+      size: Number(animation.size) > 0 ? Number(animation.size) : 12,
+      trigger: type ? { ...trigger, type } : (isMeter(control) ? { type: 'clip' } : key ? { type: 'event', event: 'click' } : { type: 'valueStep' }),
+      targets: [],
+      iterations: 1,
+    };
+    if (key && !['tip', 'centre'].includes(animation.from)) patch.from = 'centre';
+    if (key) patch.direction = 'up';
+    if (!(Number(animation.duration) >= 200)) patch.duration = 700;
+    return patch;
+  }
   if (kind === 'keyframes') {
-    const frames = cleanFrames(animation.frames);
+    // A value animation's frames are not shapes: switching from one starts from a pulse.
+    const frames = animation.kind === VALUE_KIND ? [] : cleanFrames(animation.frames);
     const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'always';
     const patch = {
       kind: 'keyframes',
@@ -698,17 +861,30 @@ export function buildTarget(partName, offered) {
 // fires. Animations that answer the same change start together, so the bars say what the separate
 // Delay and Duration boxes could not: what runs after what, and what overlaps.
 
+/** A gesture's id as a trigger summary says it (stateMotion.js MOTION_EVENTS). */
+const EVENT_WORDS = {
+  click: 'click', doubleClick: 'double-click', longPress: 'long press', flick: 'flick', wheelUp: 'wheel up', wheelDown: 'wheel down',
+};
+
 /** "entering pressed", "on the beat" — an animation's trigger in a few words. */
 export function triggerSummary(row) {
   const t = row?.trigger ?? {};
-  if (row?.kind === 'keyframes') {
+  if (row?.kind === 'text' && t.type === 'textChange') {
+    const to = (t.to ?? []).filter((state) => state !== '*');
+    return to.length ? `when the ${to.join(' or ')} arrives` : 'when its words change';
+  }
+  if (t.type === 'valueStep') return t.steps ? `on each of ${t.steps} steps` : 'on each step';
+  if (row?.kind === 'keyframes' || row?.kind === 'text' || row?.kind === VALUE_KIND || row?.kind === EMIT_KIND) {
     if (t.type === 'always') return 'all the time';
     if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
     if (t.type === 'script') return 'from a script';
+    if (t.type === 'event') return `on ${EVENT_WORDS[t.event] ?? 'a gesture'}`;
+    if (t.type === 'hold') return 'while held to confirm';
   }
   if (t.type === 'valueChange') return `when ${t.source} changes`;
+  if (t.leaving === true) return `leaving ${!t.from?.length || t.from.includes('*') ? 'any state' : t.from.join(', ')}`;
   const to = !t.to?.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
-  return row?.kind === 'keyframes' && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
+  return (row?.kind === 'keyframes' || row?.kind === VALUE_KIND) && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
 }
 
 /** The smallest of 1, 2 or 5 times a power of ten that is at least `ms`. */
@@ -880,6 +1056,24 @@ export function newAnimationShape(name) {
     easing: 'outQuad',
   };
 }
+
+/**
+ * The patch that writes animations onto a control: one key per animation where it has an Animations
+ * section, else the whole section. A Label has none to begin with, and a write to
+ * `Animations.<name>` there landed nowhere — the tree writer does not make a section up — so the
+ * Animation tab's New did nothing on one, and a text effect could not be put on the Label whose
+ * words it plays on. Found building the text swap, 2026-11-24.
+ */
+export function animationsPatch(control, nodes) {
+  if (control?._children?.Animations) {
+    return Object.fromEntries(Object.entries(nodes).map(([name, node]) => [`Animations.${name}`, node]));
+  }
+  const section = deepCloneSection(SECTION_DEFAULTS.Animations);
+  section._children = { ...nodes };
+  return { Animations: section };
+}
+
+const deepCloneSection = (value) => JSON.parse(JSON.stringify(value ?? { _type: 'Animations', enabled: true, _children: {} }));
 
 /** Animation names are object keys, so they have to be usable as a path segment. */
 export function cleanAnimationName(wanted) {

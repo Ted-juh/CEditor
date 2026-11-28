@@ -1,0 +1,402 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "d7f21f31-f11d-4fe5-a5e5-d7f21f31d7f2",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Jaws",
+  "scriptId": "film_jaws",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF041019",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Sky","id":"ctrl_1722969137000","controlType":"Label"},
+        "Transform": {"width":720,"height":250},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#01060c"},{"position":100,"color":"#0a2235"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Sea","id":"ctrl_1722969137001","controlType":"Label"},
+        "Transform": {"y":250,"width":720,"height":155},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#0b3350"},{"position":100,"color":"#020b14"}]}},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FF2C6E9A","opacity":70,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":24,"direction":180,"flipX":false,"flipY":false},"pattern2":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FF1B4F73","opacity":80,"blend":"normal","scale":1.6,"repeat":"both","align":"center","offsetX":0,"offsetY":10,"place":"behind","speed":14,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Fin","id":"ctrl_1722969137002","controlType":"Label"},
+        "Transform": {"y":200,"width":64,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2264%22%20height%3D%2260%22%20viewBox%3D%220%200%2064%2060%22%3E%3Cpath%20d%3D%22M4%2060%20C%2022%2044%2034%2018%2038%202%20C%2044%2022%2052%2044%2060%2060%20Z%22%20fill%3D%22%233b4652%22%2F%3E%3Cpath%20d%3D%22M38%202%20C%2044%2022%2052%2044%2060%2060%20L%2049%2060%20C%2045%2040%2041%2022%2038%202%20Z%22%20fill%3D%22%2326303a%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1722969137003","controlType":"Label"},
+        "Transform": {"x":160,"y":108,"width":400,"height":150},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FF2C6E9A","opacity":100,"blend":"normal","scale":1.4,"repeat":"x","align":"end","offsetX":0,"offsetY":0,"place":"front","speed":40,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"JAWS","_children":{"Fill":{"colour":"FFE8EEF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":124}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Crest","id":"ctrl_1722969137004","controlType":"Label"},
+        "Transform": {"y":238,"width":720,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"builtin:sine","tint":"FF3F86B5","opacity":95,"blend":"normal","scale":1,"repeat":"x","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":50,"direction":180,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_jaws",
+      "name": "Approach",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 7600,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_jaws_1",
+          "controlId": "ctrl_1722969137002",
+          "target": "Transform",
+          "start": 0,
+          "length": 3000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": -80,
+                "y": 0
+              },
+              {
+                "at": 0.25,
+                "x": 140,
+                "y": -4
+              },
+              {
+                "at": 0.5,
+                "x": 330,
+                "y": 3
+              },
+              {
+                "at": 0.75,
+                "x": 520,
+                "y": -3
+              },
+              {
+                "at": 0.92,
+                "x": 610,
+                "y": 2,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "x": 640,
+                "y": 40,
+                "opacity": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jaws_2",
+          "controlId": "ctrl_1722969137001",
+          "target": "Patterns.pattern1",
+          "start": 0,
+          "length": 3000,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.18,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.33,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.46,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.57,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.66,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.74,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.8,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.85,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.89,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.93,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 0.96,
+                "scale": 1,
+                "opacity": 0.7
+              },
+              {
+                "at": 0.98,
+                "scale": 1.22,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "scale": 1,
+                "opacity": 0.7
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jaws_3",
+          "controlId": "ctrl_1722969137003",
+          "target": "Text",
+          "start": 3000,
+          "length": 1700,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "in",
+            "iterations": 1,
+            "split": "letter",
+            "order": "random",
+            "stagger": 260,
+            "duration": 520,
+            "direction": "up"
+          }
+        },
+        {
+          "id": "cl_jaws_4",
+          "controlId": "ctrl_1722969137003",
+          "target": "Transform",
+          "start": 4700,
+          "length": 900,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "inOutQuad",
+            "iterations": 2,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 0
+              },
+              {
+                "at": 0.5,
+                "y": -3
+              },
+              {
+                "at": 1,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_jaws_5",
+          "controlId": "ctrl_1722969137003",
+          "target": "Text",
+          "start": 6600,
+          "length": 900,
+          "effect": {
+            "kind": "text",
+            "effect": "roll",
+            "way": "out",
+            "iterations": 1,
+            "split": "letter",
+            "order": "random",
+            "stagger": 120,
+            "duration": 420,
+            "direction": "down"
+          }
+        }
+      ]
+    }
+  ]
+}

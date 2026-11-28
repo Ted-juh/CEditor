@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8548ff77",
+  "fingerprint": "950c4807",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -57,8 +57,8 @@
       "control.tick.minor": "881B1D20",
       "accent": "FFE8590C",
       "accent.hot": "FF7CFF6B",
-      "text.primary": "FF1B1D20",
-      "text.label": "FF1B1D20",
+      "text.primary": "FF141518",
+      "text.label": "FF141518",
       "text.muted": "FF2E3238",
       "text.focus": "FF000000",
       "text.inverse": "FF1B1D20",
@@ -71,6 +71,7 @@
       "display.screen": "FF101214",
       "display.backlight": "FF2D2E30",
       "panel.surface": "FF9DA3AA",
+      "control.readout": "{text.label}",
       "section.surface": "FFBFC3C8"
     },
     "lamp": {
@@ -1837,7 +1838,7 @@
           "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "FF15171A",
+          "TabContainer.activeLabelColour": "{text.primary}",
           "Background.Fill.gradientEnabled": false,
           "Effects.Bevel.enabled": false,
           "Background.Effects.Material.enabled": true,
@@ -3625,7 +3626,7 @@
       "Shape": {
         "component": {
           "Shape.fillColour": "{section.surface}",
-          "Shape.strokeColour": "FF424549",
+          "Shape.strokeColour": "FF3D4044",
           "Shape.strokeWidth": 1.5,
           "Shape.cornerRadius": 3,
           "Shape.strokeStyle": "solid"

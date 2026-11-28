@@ -15,6 +15,7 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { extname, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -88,7 +89,9 @@ check('and a target that works names what it animates — colour among them now'
 const notes = await ev(() => window.__anim.targetNotes());
 check('and a colour target says what a fade cannot do', () => {
   assert.equal(notes.length, 1, notes.join(' | '));
-  assert.match(notes[0], /gradient, an image or a material switches/);
+  // Since the Paint engine (gradientPaint.js) a gradient glides; an image or a material still switches.
+  assert.match(notes[0], /a gradient glides/);
+  assert.match(notes[0], /An image or a material switches/);
 });
 
 const alarm = await ev(() => window.__anim.alarm());
@@ -472,7 +475,7 @@ check('each working target says what it costs the browser, and a dead one says n
 });
 
 check('every preset is a button in the strip, and says what it does before you add it', async () => {});
-assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide']);
+assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide', 'Gradient sheen', 'Name \u2194 value', 'Library\u2026']);
 assert.match(await ev(() => window.__anim.presetHint('Hover lift')), /Grows a little under the pointer/);
 await ev(() => window.__anim.addPreset('Hover lift'));
 await settle();
@@ -487,6 +490,25 @@ assert.match(await ev(() => window.__anim.presetReport()), /Hover lift added to 
 assert.equal(await ev(() => window.__anim.selectedAnimation()), 'hoverLift', 'and the new animation is selected');
 await ev(() => window.__anim.removeAnimation('hoverLift'));
 await settle();
+
+// The name <-> value swap is a recipe, not a preset: it writes the knob's name Label, not the knob.
+await ev(() => window.__anim.addPreset('Name \u2194 value'));
+await settle();
+check('Name <-> value on a knob with no name Label says what to make first, and writes nothing', async () => {});
+assert.match(await ev(() => window.__anim.presetReport()), /has no name Label to swap/);
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'pressEcho']);
+await ev(() => window.__anim.addNameLabel());
+await settle();
+await ev(() => window.__anim.addPreset('Name \u2194 value'));
+await settle();
+const swapped = await ev(() => window.__anim.storedLabel());
+check('with one, it writes the four swap effects onto the Label, which a Label has no section for', () => {
+  assert.equal(swapped.shows, 'nameValue');
+  assert.deepEqual(Object.keys(swapped.animations._children), ['valueIn', 'nameOut', 'valueOut', 'nameIn']);
+  assert.ok(Object.values(swapped.animations._children).every((entry) => entry.kind === 'text'));
+});
+assert.match(await ev(() => window.__anim.presetReport()), /Knob Name now shows the name, and the value while Big Knob is touched/);
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'pressEcho'], 'and the knob itself is untouched');
 
 // --- Debug --------------------------------------------------------------------------------------
 // (The strip that laid every animation on one axis left the tab with the redesign; its arithmetic,
@@ -532,13 +554,15 @@ assert.deepEqual(await rowOrder(), beforeKeys);
 // The Part picker used to list parts and nothing else, so a control with no parts of its own had a
 // dead Add button and no way to animate at all. The control itself is a choice now.
 
-const partChoices = (await ev(() => window.__anim.addOptions()))[0];
-check('the Part picker ends with the control itself', () => {
-  assert.equal(partChoices.at(-1), 'The control itself', partChoices.join(' | '));
+// Since 2026-11-24 the row is a path bar, and the control itself is its first Where entry.
+const partChoices = await ev(() => window.__anim.placeOptions());
+check('the path bar\'s Where step starts with the control itself, then the control\'s parts by name', () => {
+  assert.equal(partChoices[0], 'Whole control', partChoices.join(' | '));
+  for (const part of ['background', 'track', 'fill', 'handle', 'label']) assert.ok(partChoices.includes(part), partChoices.join(' | '));
 });
-await ev(() => window.__anim.choosePart('The control itself'));
+await ev(() => window.__anim.choosePart('Whole control'));
 await settle();
-const ownChoices = (await ev(() => window.__anim.addOptions()))[1];
+const ownChoices = await ev(() => window.__anim.changeOptions());
 check('and the Change list becomes the control\'s own properties', () => {
   assert.deepEqual(ownChoices.slice(0, 3), ['Scale', 'Rotation', 'Opacity'], ownChoices.join(' | '));
   assert.ok(!ownChoices.includes('Width'), 'the panel owns a control\'s size');
@@ -707,17 +731,25 @@ await page.waitForTimeout(500);
 check('a double-click on a keyframe is the one way to send the playhead to it from a row', async () => {});
 assert.equal(await playheadMs(), landed);
 
-const options = await ev(() => window.__anim.changeOptions());
-check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
-  assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));
+// The Change list used to end with "Channel: Knob Value"; in the path bar a value channel is its
+// own place, Channels › Knob Value.
+const options = await ev(() => window.__anim.placeOptions());
+check('for a sequence the path bar offers the control\'s value channels as a place of their own', () => {
+  assert.ok(options.includes('Channels'), options.join(' | '));
 });
-await ev(() => window.__anim.chooseChange('Channel: Knob Value'));
+await ev(() => window.__anim.choosePart('Channels'));
+await page.waitForTimeout(300);
+const channelChoices = await ev(() => window.__anim.changeOptions());
+check('under it, each channel by its label', () => {
+  assert.ok(channelChoices.includes('Knob Value'), channelChoices.join(' | '));
+});
+await ev(() => window.__anim.chooseChange('Knob Value'));
 await page.waitForTimeout(300);
 const channelWarning = await ev(() => window.__anim.addWarning());
-const pickerOff = await ev(() => window.__anim.partPickerDisabled());
-check('a channel is a whole path: the part picker steps aside and nothing warns', () => {
+const partStep = await ev(() => window.__anim.partStepShown());
+check('a channel is a whole path: there is no part step, and nothing warns', () => {
   assert.equal(channelWarning, '', channelWarning);
-  assert.equal(pickerOff, true);
+  assert.equal(partStep, false);
 });
 await ev(() => window.__anim.add());
 await page.waitForTimeout(400);
@@ -727,6 +759,9 @@ assert.ok(pathsNow.includes('ValueChannels.mainValue'), pathsNow.join(', '));
 assert.deepEqual((await ev(() => window.__anim.storedKeyframes('seqDemo'))).at(-1), [[0, 0.5]]);
 
 // Many tracks: the list scrolls inside its own box, the ruler stays, and the tab does not move.
+// Back to a part first: the path bar stays where it was last put, which was Channels.
+await ev(() => window.__anim.choosePart(window.__anim.firstPart()));
+await page.waitForTimeout(200);
 for (const label of ['Rotation', 'Opacity', 'Fill colour', 'Text colour', 'Width', 'Height', 'X position']) {
   await ev((l) => window.__anim.chooseChange(l), label);
   await page.waitForTimeout(200);
@@ -751,6 +786,291 @@ assert.equal((await ev(() => window.__anim.storedKeyframes('seqDemo')))[0].lengt
 assert.equal(await ev(() => window.__anim.overlay()), null, 'no pose once the animation is no longer a sequence');
 await ev(() => window.__anim.removeAnimation('seqDemo'));
 await settle();
+
+// --- Animation presets (step 4) --------------------------------------------------------------
+
+await ev(() => window.__anim.selectAnimation('pressEcho'));
+await settle();
+await ev(() => window.__anim.openSavePreset());
+await settle();
+check('Save as preset opens the form, which says what the preset needs before it is saved', async () => {});
+assert.equal(await ev(() => window.__anim.presetPanel()), 'save');
+// pressEcho is a hover scale on the component's own part by now (the checks above changed it), so it
+// needs that state and that part, and goes on a custom component that has one — said before saving.
+const needs = await ev(() => window.__anim.saveNeeds());
+assert.match(needs, /Needs the state Hover and the part background/, needs);
+assert.match(needs, /a custom component with the same parts/, needs);
+await ev(() => window.__anim.typeSaveName('Echo press'));
+await settle();
+await ev(() => window.__anim.clickSave());
+await settle();
+const savedPreset = (await ev(() => window.__anim.panelPresets()))[0];
+check('saved: the panel carries it, your library keeps it, and the animation follows it', () => {
+  assert.equal(savedPreset.name, 'Echo press');
+  assert.deepEqual(Object.keys(savedPreset.animations), ['pressEcho']);
+  assert.ok(savedPreset.states.Hover, 'with the state it plays on');
+});
+assert.equal((await ev(() => window.__anim.libraryPresets()))[0].id, savedPreset.id);
+assert.equal(await ev(() => window.__anim.presetPanel()), null, 'the form closes');
+assert.match((await ev(() => window.__anim.linkCard())).text, /Follows Echo press/);
+assert.match(await ev(() => window.__anim.presetReport()), /Echo press saved to your library/);
+
+await ev(() => window.__anim.editByHand('pressEcho', 'duration', 333));
+await settle();
+check('a setting changed here is an override, marked, with Revert', async () => {});
+assert.deepEqual((await ev(() => window.__anim.linkCard())).overrides, ['duration']);
+await ev(() => window.__anim.revertOverride('duration'));
+await settle();
+assert.deepEqual((await ev(() => window.__anim.linkCard())).overrides, []);
+assert.equal((await ev(() => window.__anim.storedAnimation('pressEcho'))).duration, 600, 'back to the preset\'s');
+
+await ev(() => window.__anim.openLibrary());
+await settle();
+check('the library lists it in Mine and in This panel, and Apply puts a linked copy on the control', async () => {});
+assert.deepEqual(await ev(() => window.__anim.libraryRows()), { mine: ['Echo press'], panel: ['Echo press'] });
+await ev((id) => window.__anim.libraryButton(id, 'Apply'), savedPreset.id);
+await settle();
+const copy = await ev(() => window.__anim.storedAnimation('pressEcho2'));
+assert.equal(copy.preset.id, savedPreset.id);
+assert.match(await ev(() => window.__anim.presetReport()), /on 1 control, linked/);
+
+check('the Knob\'s, the Slider\'s, the Button\'s, the Choice group\'s and the Meter\'s built-in presets are listed under them, by group; one applies linked, one that needs a cap is refused', async () => {});
+assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
+  component: 'Knob', groups: ['Numbers', 'Ticks', 'Touch', 'Turning', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
+}, {
+  component: 'Slider', groups: ['Numbers', 'Ticks', 'Touch', 'Moving', 'Attention', 'Gestures', 'Words'], count: 49, first: 'Fly-out let go',
+}, {
+  component: 'Button', groups: ['Press', 'Attention', 'Gestures', 'Light', 'Switch', 'Words', 'Signals', 'Thrown', 'Hold'], count: 52, first: 'Sink press',
+}, {
+  component: 'Choice group', groups: ['Attention', 'Choosing', 'Thumb', 'The chosen', 'Appear', 'Hover', 'New options'], count: 30, first: 'Pulse always',
+}, {
+  component: 'Meter', groups: ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments', 'Words'], count: 41, first: 'Pulse always',
+}]);
+await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
+await settle();
+assert.match(await ev(() => window.__anim.presetReport()), /not on 1: It moves a part this control does not have: bodyCap/);
+await ev(() => window.__anim.libraryButton('ce:knob:pop', 'Apply'));
+await settle();
+assert.equal((await ev(() => window.__anim.storedAnimation('pop'))).preset.id, 'ce:knob:pop');
+assert.ok((await ev(() => window.__anim.panelPresets())).some((preset) => preset.id === 'ce:knob:pop'), 'the panel carries it');
+assert.equal(await ev(() => window.__anim.adoptNotice()), '', 'and nobody is offered to adopt a built-in');
+await ev(() => window.__anim.removeAnimation('pop'));
+await settle();
+
+const [download] = await Promise.all([
+  page.waitForEvent('download'),
+  ev((id) => window.__anim.libraryButton(id, 'Export…'), savedPreset.id),
+]);
+const exported = JSON.parse(readFileSync(await download.path(), 'utf8'));
+check('Export writes a .ceanim file of it', () => {
+  assert.equal(download.suggestedFilename(), 'Echo press.ceanim');
+  assert.equal(exported.format, 'ceditor-animation-preset');
+  assert.equal(exported.id, savedPreset.id);
+});
+
+const imported = { ...exported, id: 'ap_fromafriend', name: 'From a file', revision: 1 };
+const [chooser] = await Promise.all([page.waitForEvent('filechooser'), ev(() => window.__anim.importClick())]);
+await chooser.setFiles({ name: 'From a file.ceanim', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported)) });
+await page.waitForFunction(() => window.__anim.libraryPresets().some((preset) => preset.id === 'ap_fromafriend'));
+check('Import brings a .ceanim file into your library', async () => {});
+assert.deepEqual((await ev(() => window.__anim.libraryRows())).mine, ['Echo press', 'From a file']);
+assert.match(await ev(() => window.__anim.presetReport()), /From a file added in your library/);
+
+await ev((preset) => window.__anim.carryPreset(preset), { ...exported, id: 'ap_sharedpanel', name: 'Came with the panel' });
+await settle();
+check('a panel that carries a preset you lack offers it, and adds it when asked', async () => {});
+assert.match(await ev(() => window.__anim.adoptNotice()), /carries 1 preset you do not have/);
+await ev(() => window.__anim.clickAdopt());
+await settle();
+assert.ok((await ev(() => window.__anim.libraryPresets())).some((preset) => preset.id === 'ap_sharedpanel'));
+assert.equal(await ev(() => window.__anim.adoptNotice()), '');
+await ev(() => window.__anim.openLibrary());
+await settle();
+await ev(() => window.__anim.removeAnimation('pressEcho2'));
+await settle();
+
+// --- The loop budget ----------------------------------------------------------------------------
+
+check('ten loops is within the budget: no chip', async () => {});
+await ev(() => window.__anim.addLoops(10));
+await settle();
+assert.equal(await ev(() => window.__anim.loopAlarm()), '');
+await ev(() => window.__anim.addLoops(11));
+await settle();
+check('eleven is over it: the tab says so, and the chip goes to a loop', async () => {});
+assert.equal(await ev(() => window.__anim.loopAlarm()), 'Panel: 11 loops');
+await ev(() => window.__anim.clickLoopAlarm());
+await settle();
+assert.deepEqual(await ev(() => window.__anim.tabRequest()), { tab: 'animation' });
+const target = await ev(() => window.__anim.target());
+assert.equal(target.kind, 'animation');
+// The tab takes the focus it was handed and selects that animation: a loop.
+assert.match(await ev(() => window.__anim.selectedAnimation()), /^loop\d+$/);
+await ev(() => window.__anim.dropLoops());
+await settle();
+assert.equal(await ev(() => window.__anim.loopAlarm()), '');
+
+// --- The Value kind (step 6): only on a control that draws a value ------------------------------
+
+const customKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.selectKnob());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('sweep'));
+await settle();
+const knobKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.pickKind('value'));
+await settle();
+const sweepNode = await ev(() => window.__anim.knobAnimation('sweep'));
+const sweepRows = await ev(() => window.__anim.valueFrameRows());
+check('a knob is offered the Value kind, and picking it makes a ring sweep on what its value draws', () => {
+  assert.ok(!customKinds.includes('Value'), `not on a custom component: ${customKinds.join(', ')}`);
+  assert.ok(knobKinds.includes('Value'), knobKinds.join(', '));
+  assert.equal(sweepNode.kind, 'value');
+  assert.deepEqual(sweepNode.targets, [{ path: 'Value' }]);
+  assert.deepEqual(sweepNode.frames, [{ at: 0, value: 0 }, { at: 0.55, value: 1 }, { at: 1 }]);
+  assert.equal(sweepNode.trigger.type, 'stateChange');
+  assert.equal(sweepRows, 3, 'its frames, in the value editor');
+});
+
+// --- The Words kind and the step trigger (2026-11-26) --------------------------------------------
+
+await ev(() => window.__anim.addAnimationNamed('stream'));
+await settle();
+await ev(() => window.__anim.pickKind('words'));
+await settle();
+const streamKept = await ev(() => window.__anim.knobAnimation('stream'));
+const streamPane = await ev(() => window.__anim.emitPane());
+const streamTriggers = await ev(() => window.__anim.triggerOptions());
+await ev(() => window.__anim.chooseTrigger('valueStep'));
+await settle();
+const streamNode = await ev(() => window.__anim.knobAnimation('stream'));
+const streamSteps = await ev(() => window.__anim.stepsCell());
+const streamStepBack = await ev(() => window.__anim.stepBackRow());
+await ev(() => window.__anim.clickSegment('Shows', 'How far it moved'));
+await settle();
+const deltaNode = await ev(() => window.__anim.knobAnimation('stream'));
+await ev(() => window.__anim.chooseTrigger('event'));
+await settle();
+const noSteps = await ev(() => window.__anim.stepsCell());
+check('a knob is offered the Words kind: words thrown on each step, the value or how far it moved', () => {
+  assert.ok(knobKinds.includes('Words'), knobKinds.join(', '));
+  assert.ok(!customKinds.includes('Words'), 'not on a custom component: it has no pointer to throw them from');
+  assert.equal(streamKept.kind, 'emit');
+  assert.equal(streamKept.trigger.type, 'stateChange', 'the trigger it had is kept, as the Value kind keeps it');
+  assert.equal(streamNode.trigger.type, 'valueStep');
+  assert.deepEqual([streamNode.shows, streamNode.from, streamNode.direction], ['value', 'tip', 'pointer']);
+  assert.ok(streamPane, 'its own pane');
+  assert.ok(streamTriggers.includes('valueStep') && !streamTriggers.includes('always'), streamTriggers.join(', '));
+  assert.ok(streamSteps, 'a step trigger says how many steps');
+  assert.equal(deltaNode.shows, 'delta');
+  assert.ok(!noSteps, 'and only a step trigger');
+  assert.ok(!streamTriggers.includes('hold'), 'a knob is never held to confirm');
+  assert.ok(!streamStepBack, 'words thrown have a way of their own, not a mirror');
+});
+
+// --- A keyframe animation that follows the turn (2026-11-27) -------------------------------------
+
+await ev(() => window.__anim.addAnimationNamed('lean'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+await ev(() => window.__anim.chooseTrigger('valueStep'));
+await settle();
+const leanOffered = await ev(() => window.__anim.stepBackRow());
+await ev(() => window.__anim.clickSegment('On a step back', 'Mirrored'));
+await settle();
+const leanNode = await ev(() => window.__anim.knobAnimation('lean'));
+await ev(() => window.__anim.chooseTrigger('valueChange'));
+await settle();
+const leanOnChange = await ev(() => window.__anim.stepBackRow());
+check('a keyframe animation on Each step can be mirrored on a step back; on no other trigger', () => {
+  assert.ok(leanOffered, 'Step back, under Steps');
+  assert.equal(leanNode.kind, 'keyframes');
+  assert.equal(leanNode.followTurn, true);
+  assert.ok(!leanOnChange, 'On change does not know which way it went');
+});
+
+// --- A button's words, and a timed button's hold (2026-11-27) ------------------------------------
+
+await ev(() => window.__anim.selectTimed());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('thrown'));
+await settle();
+const timedKinds = await ev(() => window.__anim.kindLabels());
+await ev(() => window.__anim.pickKind('words'));
+await settle();
+const thrownNode = await ev(() => window.__anim.timedAnimation('thrown'));
+const thrownShows = await ev(() => window.__anim.segmentLabels('Shows'));
+const thrownFrom = await ev(() => window.__anim.segmentLabels('From'));
+const wordsField = await ev(() => window.__anim.wordsField());
+await ev(() => window.__anim.clickSegment('Shows', 'A count'));
+await settle();
+const countNode = await ev(() => window.__anim.timedAnimation('thrown'));
+const countField = await ev(() => window.__anim.wordsField());
+check('a button is offered the Words kind: "+1", rising from the key; words of its own or a count', () => {
+  assert.ok(timedKinds.includes('Words'), `kinds: ${timedKinds.join(', ')}`);
+  assert.deepEqual([thrownNode.kind, thrownNode.shows, thrownNode.words, thrownNode.from, thrownNode.direction], ['emit', 'words', '+1', 'centre', 'up']);
+  assert.equal(thrownNode.trigger.type, 'stateChange', 'the trigger it had is kept, as on a knob');
+  assert.deepEqual(thrownShows, ['Words', 'A count'], 'no value to throw');
+  assert.deepEqual(thrownFrom, ['The key', 'Above it']);
+  assert.ok(wordsField, 'the words, to write');
+  assert.equal(countNode.shows, 'count');
+  assert.ok(!countField, 'a count has no words to write');
+});
+
+await ev(() => window.__anim.addAnimationNamed('filling'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+const holdTriggers = await ev(() => window.__anim.triggerOptions());
+await ev(() => window.__anim.chooseTrigger('hold'));
+await settle();
+const holdNode = await ev(() => window.__anim.timedAnimation('filling'));
+check('a timed button is offered the hold: a keyframe animation that plays while it is held to confirm', () => {
+  assert.ok(holdTriggers.includes('hold'), `triggers: ${holdTriggers.join(', ')}`);
+  assert.equal(holdNode.trigger.type, 'hold');
+});
+
+// --- A choice group's options as parts (2026-11-27) ----------------------------------------------
+
+const knobTriggers = holdTriggers;
+await ev(() => window.__anim.selectChoice());
+await settle();
+await ev(() => window.__anim.addAnimationNamed('cascade'));
+await settle();
+await ev(() => window.__anim.pickKind('keyframes'));
+await settle();
+const choiceTriggers = await ev(() => window.__anim.triggerOptions());
+const choiceParts = await ev(() => window.__anim.playsOnOptions());
+const wholeStagger = await ev(() => window.__anim.hasRow('Each option'));
+assert.ok(await ev(() => window.__anim.playOn('Every option')), `plays on: ${choiceParts.join(' | ')}`);
+await settle();
+const optionStagger = await ev(() => window.__anim.hasRow('Each option'));
+const orderBefore = await ev(() => window.__anim.hasRow('Order'));
+await ev(() => window.__anim.typeOptionStagger(90));
+await settle();
+const orderAfter = await ev(() => window.__anim.hasRow('Order'));
+await ev(() => window.__anim.clickSegment('Option order', 'Out from the chosen'));
+await settle();
+await ev(() => window.__anim.chooseTrigger('optionsChange'));
+await settle();
+const cascadeNode = await ev(() => window.__anim.choiceAnimation('cascade'));
+check('a choice group\'s options are places a keyframe animation plays on: the thumb, the chosen, every option and label', () => {
+  for (const label of ['Thumb', 'Chosen option', 'Every option', 'Chosen label', 'Every label']) assert.ok(choiceParts.includes(label), choiceParts.join(' | '));
+});
+check('on every option it can take them one after another, in an order; not on the whole group', () => {
+  assert.ok(!wholeStagger, 'the whole group is one thing');
+  assert.ok(optionStagger, 'Each option, so many ms later');
+  assert.ok(!orderBefore && orderAfter, 'an order once there is a stagger to order');
+  assert.deepEqual(cascadeNode.targets, [{ path: 'Parts.option' }]);
+  assert.equal(cascadeNode.optionStagger, 90);
+  assert.equal(cascadeNode.optionOrder, 'fromChosen');
+});
+check('"when its options change" is offered on a choice group, and on nothing else', () => {
+  assert.ok(choiceTriggers.includes('optionsChange'), choiceTriggers.join(', '));
+  assert.equal(cascadeNode.trigger.type, 'optionsChange');
+  assert.ok(!knobTriggers.includes('optionsChange'), `a timed button: ${knobTriggers.join(', ')}`);
+});
 
 // --- The rules --------------------------------------------------------------------------------
 

@@ -30,6 +30,10 @@ export const LABEL_SHOWS = Object.freeze([
   ['', 'Its own text'],
   ['value', 'Value of'],
   ['name', 'Name of'],
+  // The name, and the value while the control is pressed or dragged: one Label where the two swap,
+  // as on a hardware synth's display. Its text change is what a text swap animates
+  // (utils/textEffects.js, `trigger.type: 'textChange'`). 2026-11-24.
+  ['nameValue', 'Name, value while touched, of'],
   ['text', 'Text of'],
   ['min', 'Min of'],
   ['max', 'Max of'],
@@ -44,6 +48,7 @@ export const LABEL_SHOWS = Object.freeze([
  */
 export const SHOWN_PART = Object.freeze({
   name: 'labelTitle',
+  nameValue: 'labelTitle',
   value: 'labelValue',
   min: 'labelMin',
   max: 'labelMax',
@@ -59,6 +64,7 @@ export const SHOWN_PART = Object.freeze({
  */
 export const SHOWN_LETTERING = Object.freeze({
   name: { size: 11, weight: 700, colour: '{text.muted}' },
+  nameValue: { size: 11, weight: 700, colour: '{text.muted}' },
   value: { size: 12, weight: 700, colour: '{text.label}' },
   min: { size: 11, weight: 600, colour: '{text.label}' },
   max: { size: 11, weight: 600, colour: '{text.label}' },

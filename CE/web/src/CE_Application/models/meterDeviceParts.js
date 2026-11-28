@@ -142,6 +142,34 @@ export function createMeterDeviceParts() {
   };
 }
 
+/**
+ * Every lamp of a row, as a part an animation plays on (the Meter, phase 2): not a part of its own in
+ * the document, but each cell a part that lights cells draws (an indicator in `light` motion), one
+ * after another if the animation staggers them (utils/optionStagger.js), as a choice group's options.
+ */
+export const METER_CELL_PART = 'cell';
+
+/** The parts an animation can play on in a meter beyond its own: every lamp. */
+export function meterPartNames(control) {
+  return METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? '')) ? [METER_CELL_PART] : [];
+}
+
+/**
+ * How many LED segments a meter drawn plain lights (editor/MeterRenderer.svelte, `Meter.segments`):
+ * the lamps `Parts.cell` plays on there. 0, a continuous bar. Whether it is drawn plain (no form, no
+ * parts) is the caller's to say: utils/animationPresetModel.js asks the forms.
+ */
+export function meterPlainLamps(control) {
+  const n = Math.round(Number(control?._children?.Meter?.segments));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Whether a meter as its set draws it lights cells, so has lamps for `Parts.cell` to play on. */
+export function meterDrawsCells(drawn) {
+  if (!meterDeviceDrawn(drawn)) return false;
+  return Object.values(drawn?._children?.Parts?._children ?? {}).some((part) => part?.visible === true && String(part?.motion ?? '') === 'light');
+}
+
 export function isMeterDevicePart(name) {
   return PART_SET.has(String(name));
 }

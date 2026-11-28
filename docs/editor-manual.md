@@ -294,7 +294,13 @@ tree lists them under it. Selected with the knob for **Create Component from Sel
 in too, the value as a layer that follows the knob's value.
 
 The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
-on its Labels tab.
+on its Labels tab. On a knob, **Sits** puts the value's label **At the tip** of its pointer, riding
+it round, or **In the cap**, still, in the middle of the dial; there a line or bar pointer becomes a
+tick at the rim, so the number is not struck through. On a vertical slider the label starts just past
+its cap, or past its scale where the ticks and their numbers reach further, and reads away from it.
+A slider's or a knob's value label is drawn in its set's **Fader and knob readout** colour, which reads
+on the set's panel (Settings → Control Sets, among the controls' colours). A knob's label that sits in
+the cap is lettered to read on the knob instead. A colour you give the label yourself is kept.
 
 A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
 at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,
@@ -450,6 +456,18 @@ Colours** is drawn flat while they are on, since its colour changes with the rea
 so, and keeps its rendered fields for when they are off.
 While
 the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
+
+Two things move a meter by itself, under **Motion** on its **Meter** tab. **Rise** and **Fall** say
+how long its drawing takes to reach a new level going up and coming back, and **Overshoot** how far
+past it the needle swings first: a VU meter's 300 ms with a little overshoot, a PPM's quick rise
+and slow fall. Both at 0, it jumps to each level, as before. Only the drawing waits: its reading,
+a Label showing it, and what its animations hear are the level as it arrives. A **Needle** effect
+moves through the same ballistics: a self-test on a lazy needle never quite catches its sweep, and
+hands back to the level without a jump. **Test signal** moves
+a meter in Preview while nothing else gives it a level: **Programme** (a beat and a phrase that
+reaches the top), **Sweep** (up and down in six seconds) or **Bursts** (quiet, with a burst to the
+top every 2.4 seconds). Every meter on one signal moves as one. An exported plug-in never plays it:
+there a meter shows what it is sent.
 
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,
 size and position, effects and icon — so you can often work without the properties panel.
@@ -662,6 +680,43 @@ puts the images inside.
 
 The dock's **Assets** tool manages the images of custom components, including **filmstrips**: one
 image holding every frame of a knob or switch, one after another.
+
+### Patterns
+
+A pattern is one small picture — a wave, dots, lines — repeated across a control and painted in a
+colour you choose, behind the control's text or in front of it. A control can have several. On the
+control's **Background** tab, press **Add a pattern** under **Patterns**; each pattern then has its
+own section:
+
+- **Tile** — the picture: a sine, triangle, saw or square wave, dots, stripes, a grid, checks,
+  chevrons or scan lines; or **Your image**, which reads a picture into the panel, so it travels with
+  it. Its opaque pixels are painted in the tint, so a one-colour PNG works best.
+- **Tint** and **Opacity** — its colour (with its own see-through amount) and how strongly it shows.
+- **Size** — 1 is the tile as drawn, 2 twice as large.
+- **Repeat** — everywhere, along **One row** or down **One column**; **Sits** puts a row at the top,
+  middle or bottom (a column at the left, centre or right), and **Offset** moves it from there.
+- **Place** — **Behind the content**, over the fill, or **In front of the content**, over the text.
+  A part's pattern goes in front of the part's own words and picture the same way, clipped to the
+  part's shape.
+- A state can change a pattern (its tint, **Opacity**, **Size** or **Speed**, on its **States** tab),
+  and with a colour animation on the control the change eases on its timing: the pattern fades,
+  grows and speeds up or slows down, keeping its place as it moves.
+- **Speed** and **Direction** — set a speed, in pixels a second, and the pattern moves on its own:
+  right, left, up, down or at any angle. A row moves only left or right, and a column only up or
+  down. A moving pattern plays in Preview, on the Animation tool's stage and in the exported plugin;
+  on the design canvas it is drawn still, and it stops when the computer is set to reduce motion.
+- **Blend**, **Flip** and **Show** — how it mixes with what is under it, mirrored, or switched off.
+
+A pattern's tint can be animated like a fill colour: in the **Animation** tool it is
+**Background › Pattern 1 tint**.
+
+A moving pattern costs the computer a little every frame, and so does every animation that loops. A
+panel can keep up to ten things moving (a gradient that turns or sweeps counts as two, and a looping
+scene counts each of its clips); over that,
+the status bar shows the count in amber, the **Animation** tool shows **Panel: … loops**, and the
+**Export** tab says so above **Export Plugin** — the plugin still builds. Click any of them to go to
+the loops one by one. In the **Export** tab, **Patterns at 30 fps** makes moving patterns in the
+exported plugin step thirty times a second: about 40% lighter, and most look the same.
 
 ### Shapes
 
@@ -1206,19 +1261,153 @@ you hover over it, a light that pulses with the beat. Animations are edited in t
 **Animation** tool. Select a control and press **Edit the selected control's animations**; the tool
 stays on that control until you choose another.
 
-There are three kinds:
+There are four kinds, and two more for what a value draws:
 
 - **Transition** — eases from one state to another, for example from normal to hover. Choose
-  **From** and **To**, the **Duration**, and under **What it eases** which property changes: scale,
-  rotation, position, size, opacity, or a fill, text or border colour.
+  **From** and **To**, the **Duration**, and what it eases: scale, rotation, position, size,
+  opacity, a fill, text or border colour, a pattern's tint, or the fill's **Gradient** — its angle,
+  centre and stops glide from one state's gradient to the next, as long as it keeps its type and has
+  no more than twelve stops.
 - **Keyframes** — a little loop of poses, played all the time, in a state, when the value changes,
-  on the beat, or when a script asks for it.
+  on each step of the value, on the beat, on a gesture, or when a script asks for it; on a timed
+  button, also **While held to confirm**, which plays once over exactly as long as the button must be
+  held and stops if it is let go early: a lamp that fills as you hold; on a choice group, also
+  **When its options change**, for a group whose options follow another group's choice: it plays
+  over the new ones; on a meter, also **When it clips**, as its level reaches the level its clip
+  lamp lights at (else where its top colour zone starts, else full scale), and **When it crosses a
+  level**, a line of your own, going up, down or either way. A meter's level is the value its
+  animations hear, so **When the value changes** and **On each step of the value** play on it too;
+  it is only heard, and nothing is ever sent. On a meter that lights lamps, **Every lamp** plays on
+  each of them, and **Each lamp** sets them off one after another: along the row, from the top
+  down, out from the level, or **Scattered**. A plain meter's LED segments are lamps too (give it
+  **Segments** on its **Meter** tab); one drawn as a single bar has none. A text effect plays on the
+  words a meter draws itself: its legend ("LEVEL", "VU", or its reading in figures), a letter, a
+  word or a figure at a time, and its scale's numbers, a number at a time. A key's legend plays a
+  letter or a word at a time too. Those words keep their part's colour, its colour frames included,
+  while an effect plays, and a **Reel** spins each letter in a window of its own. **On each step
+  of the value** plays once each time the value comes to another step, while it is turned too: as
+  many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
+  or the number under **Steps**. A detent felt as you turn. With **Step back** set to
+  **Mirrored**, a step back plays it mirrored side for side: a choice group leaning toward the
+  option chosen, whichever side it is. Besides the poses, a frame can **turn**
+  the fill's gradient (degrees) and **shift** its stops (percent), so a sheen sweeps across or a
+  conic gradient spins while the control stays put. Where the fill has an image, a frame can also
+  **pan** it across or down (percent of the box), **zoom** it and **spin** it, inside its clip: a
+  slow push into a photograph, or a dial face turning behind the knob. **Image drift** and **Image
+  spin** in the Animation Designer's **Paint** effects are ready-made ones.
 - **Sequence** — a timeline of keyframes on several tracks, which you can scrub with a playhead.
+- **Text** — an effect on the control's words themselves: **Typewriter**, **Explode**, **Roll**,
+  **Push**, **Wipe**, **Crossfade**, **Shimmer**, **Part**, **Reel**, **Odometer**, **Fly** and
+  **Fan**, each **In** or **Out**. An **Odometer** rolls only the letters that changed since the
+  words before, as a counter's digits do (0.44 to 0.45 rolls the last one). **Fly** brings each piece
+  in from where it starts: on a knob's scale, from the dial's centre out along its own line, and out
+  along it, away; on a Label, up from just below. **Fan** turns a knob's ticks into place round the
+  dial from the first one, as a fan opens. On a step trigger, **Direction** can be **The way it
+  turned**: a push or a wipe brings the next word in from the right as the value rises and from the
+  left as it falls, a roll or an odometer rolls up or down. **Part**
+  opens the words down their middle like a pair of doors, each half into the edge of the box (in,
+  they close). **Reel** rolls each letter up through a column of other glyphs to the letter, like a
+  slot machine or a code breaking; its **Spins** say how many glyphs it passes, and **Through**
+  gives it glyphs of its own. Each is cut into letters, words
+  or lines that start one after another (**ms apart**), forwards, backwards, from the centre or in
+  a random order. It can wait for the words to change: to the value, or to the name. A knob or a
+  slider has no words of its own (its name and value are Labels beside it), so on one it plays on
+  what it draws itself, picked under **Plays on**: the **Numbers** round its scale, its **Ticks**, or
+  the labels on its handles. On a scale each number or tick is one piece, round the dial in order:
+  a typewriter writes 0 2 4 6 8 10 one after another, and **Whole** plays them together. Ticks
+  drawn as lines or dots take it too, so a scale can light a tick at a time. A text effect dropped
+  on a knob in the Animation Designer goes to its numbers, else its numeral ticks, its handle
+  labels or its ticks, whichever it shows. A knob drawn as a form (picked under its form, not
+  converted to parts) prints no numbers: there a text effect plays on its readout, whole, and on
+  the ring of ticks the pointer, halo, skirt, vernier and scalloped forms have, a tick at a time.
+  A knob carried in a component's part takes an effect on that part on its own words, as above.
+  Two effects on the same marks at once (the ticks flying away, and back) take turns, each in its
+  own time.
+- **Value** (knobs, sliders, the Macro and meters) — moves what the value draws, its arc, ring, pointer, needle or bar, then hands
+  back to the value: a new one is a ring sweep, round to full and back. It plays on the same
+  triggers as **Keyframes** except **all the time**, and with **Loop** it repeats while its state
+  holds (a wiggle while the pointer is over the knob). Each frame is the value itself, a point of
+  the range, or so far from the value. Only the drawing moves: the value, its readout and what it
+  sends stay as they are, and while you turn the knob it shows where you turned it to. A looping
+  one counts two against the panel's ten loops.
+- **Words** (knobs, sliders and buttons) — throws words out each time it plays, which fly and
+  fade, several in the air at once: **The value**, as the readout prints it, **How far it moved**
+  since the last word, signed ("+2.4"), **Words** of your own ("+1", "SENT"), or **A count** of how
+  many times it has played. From **The pointer's tip** or **The centre**, **Along the pointer** or
+  **Up**, so many px, at a **Size**. On each step of the value it is a stream of numbers as the knob
+  turns; when the knob is let go, how far it was turned. The words fly within the knob's own box,
+  as its readout does: give it room round the dial. A button has no value to throw, so it throws
+  words or a count, rising from **The key** or from **Above it**, past its box.
+
+What an animation changes is picked as a path — **Knob01 › Body › Cap › Scale** — by stepping through
+the levels, typing (`text col`), or **Browse**, which shows them side by side.
+
+A choice group's options are places of their own: **Thumb**, the mark of the choice (a strip's
+thumb, the chosen key's face, the radio's dot, the lit lamp, the tab's underline); **Chosen
+option** and **Chosen label**, the option just chosen and its word; and **Every option** and
+**Every label**. Anything played on the **Thumb** draws it apart, so a new choice sends it across to
+the option chosen instead of moving it at once. A transition on its **x** eases the edge ahead as
+it travels and one on its **width** the edge behind: give the width the longer time and the thumb
+stretches toward the new option, then draws in after it. On **Every option** or **Every label**,
+**Each option** starts each one so many ms after the last, **In order**, **Last first** or **Out from
+the chosen**, each waiting unseen until its turn: options that cascade in as the panel opens, or
+words typed one label after another. A state can move one option: in its options patch, a
+**scale** and an **opacity** for the option and a **scale** for its word, eased by a transition on
+**Every option** or **Every label**. Hover moves the option under the pointer; a state with **Other
+hovered** switched on (a choice group's own toggle in the **States** tab) moves every other one, so
+the rest can dim.
 
 Below the editor, **Easing** sets the feel of the movement (linear, smooth in and out, overshooting
 "back" curves, a custom curve, or a spring), and **Presets** add ready-made animations: **Hover
-lift**, **Press squish**, **Fade when disabled**, **Blink while on**, **Beat pulse** and **Value
-glide**. Shift+click a preset to add it to every selected control at once.
+lift**, **Press squish**, **Fade when disabled**, **Blink while on**, **Beat pulse**, **Value
+glide** and **Gradient sheen**. Shift+click a preset to add it to every selected control at once.
+**Name ↔ value** goes on a knob's name label: it shows the knob's name, and its value while the knob
+is touched, the value pushed in and the name typed back when you let go.
+
+Your own **animation presets**: **Save as preset…** (beside **Debug**) saves the selected animation,
+or all of the control's as a recipe, with a name, a category and tags, in **My library** or in
+**This panel only**, keeping its colours or leaving colour to the control it goes on. It takes the
+state changes the animation eases with it, and says before you save what it needs (a state, a part)
+and which kinds of control it goes on. **Library…** at the end of the presets lists **Mine** and
+**This panel**, each with **Apply**, **Export…** and **Remove**, and **Import…** for a `.ceanim`
+file; a preset with a keyframe, text or value animation previews it while you point at it. A preset is applied linked: the animation follows it. Change a setting on the animation and it
+is an override, marked with a blue bar in the card above **Kind**, with **Revert**; **Apply to
+preset** makes your change the preset's, for every animation that follows it; **Clear overrides**
+and **Detach** work as they do for a control set. A panel carries the presets it uses, so it plays
+on another computer and in the exported plugin; open one that carries presets you do not have, and
+the library offers to add them to yours.
+
+Below them are the presets each kind of control comes with, under its name: **Knob**, by group —
+**Numbers**, **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words** — and
+**Slider**, the same groups read for a fader (**Moving** for **Turning**), with a few of its own:
+**Unfold** slides the ticks up out of the bottom one, **Throw** sends the cap past where a flick
+left it and back, **Lift** and **Grip** lift and squeeze the fader cap. **Choice group** has
+**Attention** and **Choosing**, which move the whole group (**Lean** leans the way the choice went),
+and **Thumb**, **The chosen**, **Appear**, **Hover** and **New options**, which play on its options.
+**Meter** has **Attention**; **Needle**, which moves what the level draws (a sweep, a kick, a shiver)
+and hands it back to the level, the reading never changing; **Readout**, which goes on the Label
+that shows the meter's reading and plays on each new one; **Parts**, on its own parts (a clip lamp
+that flares, a face that warms, a needle that burns bright, a glint on its cover, a scale that lights
+up); **Level**, as the level clips or crosses a line (a flash, a shudder, a red wash, "OVER" thrown);
+**Ballistics**, how its needle moves (VU, PPM, Bouncy, Lazy, Sticky peak), which are settings and
+not animations, so they are set rather than linked; **Segments**, on every lamp of a row, one
+after another; and **Words**, on the words it draws itself (Type on, Shimmer, Shatter, Roll call, and
+Numbers in turn, which turns its scale's numbers on). A meter has no states, so what a hand plays there, a click or a double-click plays.
+Each row
+says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
+the selected controls, linked, as one of yours. A few need something the control may not show: a
+preset on the scale's numbers is refused on a knob whose numbers are off, and one on a key's lamp
+on a button whose set draws no lamp, each with the reason. **Glide**,
+**Snap** and **Spring** take the place of the knob's own glide rather than adding a second one.
+**Name ↔ value** and **Decode** go on the control's name Label, not on the control. The
+**Components** showcase (below) shows every one of them on a knob, a fader, a button, a choice
+group or a meter. They come with
+CEditor, so a panel that uses one never asks you to add it to your library.
+
+The **States** tab has a **Motion** section for the state you are editing: **Entering** (mouse over,
+for Hover), **While in** and **Leaving** (mouse exit), each showing the animations that fill it and
+**New** to make one. Under it, **Events** plays an animation on a click, a double-click, a long
+press, a flick or a turn of the wheel: keyframes, a text effect, a value effect, or words thrown.
 
 The **Preview** side of the tool is a small stage where you can hover, press and drag the control
 and watch the animation, with **0.25×** slow motion. Animations also play in Preview mode and in the
@@ -1226,6 +1415,208 @@ exported plugin. The tool warns when an animation changes something that is not 
 nothing"), or when two animations fight over the same property ("clashes").
 
 A new transition changes nothing until you add something under **What it eases**.
+
+### The Animation Designer
+
+The dock's **Animation** tool edits one control. The **Animation Designer** shows the whole panel:
+a **scene** is several controls' animations on one timeline, such as the panel's name typing itself
+in while the knobs fade up one after another. It opens in a tab of its own, "Animation · <panel>", in
+three ways:
+
+- **File › Animation Designer**, for the panel in front;
+- **+** at the end of the tabs › **Animation Designer**;
+- the **⤢** button at the top of the dock's **Animation** tool.
+
+There is one Designer per panel, and it closes with its panel.
+
+- **Library** (left). Effects by kind (**Text**, **Swap**, **Move**, **Paint**, **Pattern**,
+  **Value**) and **Mine**, your own presets. Drag one onto a control on the stage or onto a track,
+  or pick a control and click the effect. Each card shows the effect on a small stand-in while you
+  point at it: a box that moves or is painted, the word "Text", a framed pattern, a knob's ring. A
+  scene preset's card plays on one stand-in for each control it uses, or on three for one that
+  repeats over every knob. With reduced motion turned on, they stay still.
+
+  **Pattern** effects (fades in or out, rises in, a pulse, a flicker) play on one of the control's
+  patterns, the first unless you drop one on another pattern's track. The pattern moves and fades
+  as a whole while its own scroll goes on underneath. A pattern takes moves and fades only; a control
+  with no pattern says so. Any move or fade from **Move** can go on a pattern too: choose it under
+  **Plays on**. A part's patterns are there as well, named by the part (**band › Pattern › Pattern 1**),
+  so a component's stripe can pulse while the component stays still; a Pattern effect goes on a
+  part's first pattern when the control has none of its own. A knob's, a button's or a meter's own
+  parts are not offered: the control draws those itself, and a clip cannot reach them.
+
+  **Value** effects move what a knob's or a slider's value draws (its arc, ring, pointer or fill)
+  for a moment, then hand back to the value: **Ring sweep** runs round to full and settles on the
+  value, and there are also **Rise to value**, **Fall to value**, **Reach full and back** and
+  **Wiggle**. Only the drawing moves: the value, its readout and what it sends stay as they are.
+  A clip always ends on the value, wherever the value went meanwhile, and while you turn the
+  knob it shows where you turned it to. Each frame of a value clip is the value itself, a point
+  of the range, or so far from the value. They play on knobs, on sliders with one value, on the
+  Macro (its ring, its knob and its lanes' bars; its numbers keep reading the Macro's value), and
+  on meters and progress bars (the needle or the bar: a power-up sweep). A
+  knob's own **Value** animations (the Animation tool's fifth kind) show under **Controls' own**,
+  and **Save as preset** keeps a value clip in your library, to drop on any knob, slider, Macro or meter.
+- **Stage** (middle). The panel as it looks, posed at the playhead. Click a control to pick it.
+  Nothing on the stage reaches the synth. **Try a trigger** holds **Hover** or **Press** for a
+  moment, so you can see a control's state animations.
+- **Clip** (right). The picked clip's settings:
+  - where it plays (the whole control, its text, or one of its parts);
+  - **Start** and **Length**;
+  - **Each piece**, for text effects;
+  - **Easing**;
+  - the effect itself, in the same editors the Animation tool uses.
+
+  **Save as preset** keeps the effect in your library.
+- **Scenes** (bottom left). **+ Scene** makes one. Give it a name, choose what starts it, and tick
+  **Loop** to repeat it:
+  - **Panel opens**: when the plugin's window opens, and each time you start Preview;
+  - **A control enters a state**: pick the control and the state, such as **Hover** (the pointer
+    over it), **Pressed**, a state of its own, or **Back to Base** (when no state holds any more);
+  - **A gesture on a control**: a click, double-click, long press, flick or wheel turn;
+  - **The beat**: every so many beats while the transport runs;
+  - **MIDI in**: a note (one, or any), a note let go, a controller going past a point (a sustain
+    pedal pressed: once as it goes down, not again while it is held), or a program change, on one
+    channel or any. A note and its letting go make a pair: one scene lights a key, the other puts
+    it out, so it stays lit as long as the key is held. It hears what the panel's MIDI input
+    brings, in Preview and in the plugin;
+  - **A script asks**: `ce.anim.play("Intro")` from a script.
+
+  **Driven by** can hand the scene's playhead to a control instead of time. The scene then sits
+  at its start until the control moves it, and never starts or loops by itself:
+  - **A control's value**: the scene is as far along as the value is, so a knob at half way holds
+    it half way;
+  - **A drag on a control**: dragging the given number of pixels, in the given direction, plays the
+    whole scene. Let go, it **stays**, **goes back** to the start, or **carries on** with the drag's
+    speed. Dragging a knob still turns it, and the scene follows along;
+  - **The wheel on a control**: the given number of notches plays the whole scene;
+  - **The pointer across** or **down a control**: the scene follows the pointer over it. When the
+    pointer leaves, the scene stays or goes back.
+
+  **Heard on** narrows a drag, the wheel or the pointer to one part of the control, such as a
+  button's key: a press on its margin then moves nothing, and the pointer is measured across that
+  part alone.
+
+  **Follows** says how closely: **Exactly**, **Smoothly** (a little behind), or **On a spring**.
+  With "reduce motion" on, a driven scene follows exactly and does not carry on after you let go.
+
+  **Save as preset** keeps the whole scene, to put on other controls or another panel. **Library ›
+  Scenes** has yours and two built in: **Knobs sweep in** and **Labels type in**. Click one, then:
+  - **On one I choose**: pick a control for each part of it; the Designer offers one of the same
+    kind first, and only controls that can play it (a value effect wants a knob or a slider, a text
+    effect a control with words);
+  - **On every … that fits**, for a preset of one control that nothing on a control starts: every
+    control that can take it, left to right, each so many milliseconds after the last. A ring sweep
+    over every knob, 0.15 s apart, is **Knobs sweep in**.
+
+  Either way it becomes a new scene, which you edit like any other.
+
+  A scene preset is also a file of its own, **.cescene**. **Export…** saves the one you clicked, to
+  send to someone or keep; **Import…**, at the top of **Scenes**, brings one into yours. **Carry on
+  this panel** keeps a copy in the panel itself, so it travels with the panel file. Whoever opens
+  that panel sees it under **Scenes** as **This panel**, can use it straight away, and can **Keep in
+  my library** to have it for every panel. A panel needs no copy to play the scenes it already has;
+  carrying one is for handing the preset on.
+
+  Under
+  **Controls' own** is every animation the controls already have, each shown as a scene of one
+  clip. It is the same animation, not a copy: move or stretch it here and the control's animation
+  changes.
+- **Timeline** (bottom). A track for each place a scene plays on.
+  - Drag the ruler to scrub.
+  - **+ Marker** (by the scene's name) puts a marker on the ruler at the playhead: a flag at a moment
+    that calls one of your scripts' actions as a play passes it, in Preview and the plug-in. Click its
+    flag to name the action under **Calls** (the actions your scripts register with
+    `ce.core.action` are offered) or to change its time; drag the flag to move it; **Delete** takes
+    it out. A loop calls it every time round, and a scene driven by a control calls it as the hand
+    moves the scene forward past it; with reduced motion the scene jumps to its end and calls them
+    all. A grey flag has no action yet.
+  - Drag a clip to move it, Alt+drag to copy it, or drag its right edge to make it longer.
+  - The arrow keys nudge a clip, and Delete removes it.
+  - **Snap** sets the grid.
+
+**Play scene** plays the scene at **1×**, **0.5×** or **0.25×**. The stage only moves under the
+playhead. While you are designing, a scene does not start by itself. Undo (Ctrl+Z) in the Designer
+undoes the Designer's own changes. Scenes are saved in the panel, and Ctrl+S in the Designer saves it.
+
+In Preview and in the exported plugin, a scene plays by itself when what it waits for happens:
+
+- **A scene that ends holds its last frame** until something starts it again.
+- **A trigger that comes again while the scene plays** starts it again from the beginning.
+- **A looping scene** starts again each time its length has passed.
+- **With your system's "reduce motion" setting on**, a scene goes straight to its last frame.
+
+On the design canvas nothing moves by itself, and in the Designer a scene moves only under the
+playhead.
+
+A script can do the same:
+- `ce.anim.play("Intro")` plays a scene by its name.
+- `ce.anim.seek("Cover", 0.5)` holds a scene at a point, which lets a script be its clock. On a
+  driven scene it moves the scene there until the control moves it again.
+- `ce.anim.effect("Lamp", "Pop")` plays one effect from the library, or one of the panel's presets,
+  without a scene. `ce.anim.effect("Cutoff", "Ring sweep")` sweeps a knob's ring.
+- `ce.anim.swap("Readout", "Saw", "roll")` changes a control's words with a transition.
+- `ce.anim.pattern("Wave", { speed = 40 })` changes a pattern while it moves.
+
+The scripting manual has the details.
+
+#### Showcases
+
+CEditor installs six folders of example panels next to the **Control set starters**, in
+`CE/panels/`. Each panel shows off something the Designer can do. Open one with **File › Open**,
+then choose **Preview** to play it, or open the **Animation Designer** to see how it is made.
+
+- **Film Festival:** title sequences in the manner of well-known films.
+- **Song Book:** panels named after songs, acting out what each is about.
+- **Mechanisms:** gears, a tape machine, a music box, a domino run and a clock.
+- **Gallery:** art movements set moving.
+- **Animated Synths:** working panels for a Moog Subsequent 37, a Roland JU-06A, a Korg minilogue
+  xd and a Yamaha YC61, every control bound to the instrument's profile. They move with what you
+  play and turn: the Moog's signal path glows with its mix and sends each note down it, the JU-06A
+  lights its keys and steps out each note's echoes, the minilogue's screen names what you touched,
+  and the YC61 draws the wave its drawbars make and turns its rotary speaker at the speeds it is set
+  to, ramping between slow and fast.
+- **Components:** a folder for each kind of control, with a panel for each group of the presets it
+  comes with. Every control wears one preset, captioned with its name, what plays it and what it
+  does, and each panel is in a control set of its own. **Knob** is the first: **Knob Numbers**,
+  **Ticks**, **Touch**, **Turning**, **Attention**, **Gestures** and **Words**, and **Knob
+  Together**, whose scenes play one effect along a row of knobs. **Slider** is the second, on
+  faders: **Slider Numbers**, **Ticks**, **Touch**, **Moving**, **Attention**, **Gestures** and
+  **Words**, and **Slider Together**, a mixing desk's row. **Button** is the third, each key drawn as
+  its set draws one: **Button Press**, **Attention** and **Gestures**, which move the whole key;
+  **Light**, **Switch**, **Words** and **Signals**, which play on the key's own parts (its lamp,
+  the key, its legend and caption); **Thrown**, words rising from the key; **Hold**, a timed button
+  held to confirm; and **Button Together**, a row of keys that pop in, rise in turn, pass a press
+  along when you click the first, and chase a light along their bars. **Choice group** is the
+  fourth, in its five styles: **Choice group Attention** and **Choosing**, which move the whole
+  group; **Thumb**, the mark of the choice travelling to the next; **The chosen**; **Appear**, the
+  options arriving one after another; **Hover**; **New options**, three groups that take a new list
+  when you choose another section above them; and **Choice group Together**, rows of groups that
+  cascade in, rise in turn, and pass a pulse along when you choose on the first. **Meter** is the
+  fifth, each meter drawn as its set draws one: **Meter Attention**; **Needle**, a valve VU's needle
+  sweeping, kicking and trembling; **Readout**, readings that roll, spin and push as the level moves;
+  and **Meter Together**, rows of lamps that power on in turn, move like an analyser, chase a peak
+  and bounce on the beat; then **Meter Parts**, **Meter Level**, **Meter Ballistics** (five needles
+  on one signal, each moving its own way), **Meter Segments** and **Meter Words**, each meter on a test
+  signal of its own so it moves in Preview with nothing plugged in.
+
+Most of them play by themselves. A few wait for you:
+
+- **Blue Monday** and **Tape Machine** follow the transport: press Play.
+- **Every Breath You Take** follows the pointer, and **Gear Train** turns with its knob.
+- **Domino Run**, **Clockwork**, the **minilogue xd** and the **YC61** run scripts of their own. A
+  panel opened from a file runs no script until you trust it, so choose **Enable scripts for this
+  session** in the bar at the foot of the window. Until then, a marker that calls one of the
+  scripts' actions says so in the script console.
+- The **Animated Synths** answer MIDI from the synth or a keyboard, and the minilogue's step lamps
+  and the JU-06A's beat lamp follow the transport.
+- Most of the **Components** knobs, faders, buttons and choice groups wait for your hand: hover,
+  press, turn or move, let go, flick, a turn of the wheel, a double-click or a long press, or a
+  choice, as each caption says. Nothing is plugged into **Meter Readout**, so a small script moves
+  its meters; trust its scripts for the readings to change.
+  **Focus nod** nods when Tab reaches it: click the panel, then press Tab. **Numbers** and
+  **Attention** run a small script each (a synth sending new values; a "look here"), as do
+  **Button Light** (a synth switching a toggle) and **Button Signals** (an alert); **Beat pulse**
+  and **Beat blink** follow the transport.
 
 ## 9. Scripts
 
@@ -1256,7 +1647,12 @@ you let go of a handle; and the points of an envelope (`ce.anim.envelope`) have 
 their row, with each point to drag, a double-click to add one and **Remove** to take one out,
 written when you let go. A row that names one of the panel's controls, by its name or in a path,
 has **Select**: the control is selected on the panel when you go back to its tab, and the code is
-left as it is. A stroke's dash is drawn in its row as the line it makes.
+left as it is. A stroke's dash is drawn in its row as the line it makes. An animation effect's name
+(`ce.anim.effect`, and a swap's in `ce.anim.swap`) is shown in its row on a small stand-in, and with
+the caret in it the library's effects and the panel's presets are under the row as cards that play
+while you point at them; a click on one writes its name. Where an effect plays is a dropdown of the
+control's places, named as the Animation Designer's timeline names them, and a scene's name
+(`ce.anim.play`, `ce.anim.seek`) a dropdown of the panel's scenes.
 The lists are in the code as well: with the caret inside a
 value that has one, such as a curve's name, **Ctrl+Space** shows its choices with the one written
 selected, and the one you choose replaces the whole value. A property path is completed one part
@@ -1812,6 +2208,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Discover Device (MIDI-CI)...** | | Starts a new profile by asking a connected MIDI 2.0 device to describe itself. |
 | **New Script Workspace** | | Opens the scripts of the active panel in the Behavior Designer. |
 | **Open Script Workspace** | | Opens a saved script workspace file. |
+| **Animation Designer** | | Opens the panel in front's scenes and animations on one timeline, in a tab of its own; see [The Animation Designer](#the-animation-designer). |
 | **New CTRL49 Screen** | | Opens a new screen in the Screen Builder. |
 | **Open CTRL49 Screen...** | | Opens a saved screen (a `.assignment.json` file). |
 | **Save** | Ctrl+S | Saves the panel (or the script workspace or CTRL49 screen in front); with a component's own tab in front, opens **Export**. |
@@ -1940,7 +2337,7 @@ These are the components you can insert, in the groups the icon rail and the Ins
 |---|---|
 | **Momentary Button** | A button that is on only while it is held down. |
 | **Toggle Button** | A button that switches on with one click and off with the next. |
-| **Radio Button Group** | A row of buttons of which exactly one is on — for choosing one setting out of a few. |
+| **Radio Button Group** | A few settings side by side, one of them chosen (or several, if you allow it): a strip, a row of keys, rings, lamps or tabs. |
 | **Cyclic Button** | A single button that steps through a list of settings each time it is clicked. |
 | **Combobox** | A drop-down list for choosing one setting out of many. |
 | **Listbox** | A list that shows several settings at once, one of which is chosen. |
@@ -1996,6 +2393,25 @@ These are the components you can insert, in the groups the icon rail and the Ins
 | **Setlist (scenes on a footswitch)** | A list of scenes you step through during a performance, for example with a footswitch. |
 | **Transport (master clock)** | The panel's master clock: tempo, play and stop. |
 | **Panic button** | A button that silences every stuck note on every channel. |
+
+### A Radio Button Group's looks
+
+A **Radio Button Group** has five looks, chosen with **Style** on the Behavior tab:
+
+- **Segmented**: one strip, with the chosen option filled. The strip is the control's Background.
+- **Buttons**: a key for each option, each painted with the Background.
+- **Radio**: a ring beside each label, with a dot in the chosen one.
+- **LED**: the control set's button lamp beside each label, lit for the chosen one.
+- **Tabs**: a line under the chosen option.
+
+Radio, LED and tabs sit on the panel: the Background draws nothing, and the labels take the panel's
+text colour. **Widths** sizes the options: on **auto** they are equal while every label fits, and
+otherwise as wide as their labels need. The pointer lights the option it is over, and the
+**Segments** tab styles each option, and each option in each state, on its own.
+
+In Preview and in the plugin the group is one Tab stop. The arrow keys move the choice (in a group
+that allows several choices they move the focus, and Space or Enter chooses), and a screen reader
+reads each option as a radio button. Scripts hear every change.
 
 ## Keyboard shortcuts and mouse
 

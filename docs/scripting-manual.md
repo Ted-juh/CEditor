@@ -874,6 +874,8 @@ Raised by the control the script belongs to.
 | `onActiveHandleChanged(info)` | A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
 | `onClick(mouse)` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
 | `onDoubleClick(mouse)` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
+| `onLongPress(mouse)` | The control was pressed and held without moving, for half a second. `mouse.x` and `mouse.y` say where, `mouse.held` how long in ms. Only while the panel is open. |
+| `onFlick(flick)` | The mouse was let go while moving fast across the control, as when flicking a card away. `flick.direction` is "left", "right", "up" or "down", `flick.speed` how fast in pixels a second, and `flick.x` and `flick.y` where it was let go. A drag that turns the control and ends fast is a flick too. Only while the panel is open. |
 | `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held. |
 | `onPointerMove(mouse)` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
 | `onPointerUp(mouse)` | The mouse button was released. |
@@ -1199,7 +1201,7 @@ Example: `defineAction("randomize", fn)` lets any script call fn with `run("rand
 
 Good to know:
 
-- The panel offers it wherever a control can trigger an action.
+- The panel offers it wherever a control can trigger an action, and an Animation Designer scene's marker calls it as the scene passes the marker.
 - A name this script defined: replaced. One another script defined: this one is ignored, with a console error.
 - Returns nothing. A name or a function left out: nothing is defined, without a word.
 
@@ -4862,21 +4864,124 @@ Good to know:
 
 *Short name: `animateFinish`.*
 
-#### `ce.anim.play(control, animation)`
+#### `ce.anim.play(control, animation) | animatePlay(scene [, opts])`
 
-Play one of a control's keyframe animations from its first frame.
+Play one of a control's keyframe animations, text effects or value animations from its start; or, given one name, a panel scene.
 
-Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation.
+Example: `animatePlay("Lamp", "flash")` plays Lamp's flash animation; `animatePlay("Intro")` plays the panel's Intro scene.
 
-- `control` (text, required): The control's name.
-- `animation` (text, required): The animation's name, as in the Animation tab. Not case-sensitive.
+- `control` (text, required): The control's name; or, alone, the scene's name, as in the Animation Designer. Not case-sensitive.
+- `animation` (text, optional): The animation's name, as in the Animation tab. Not case-sensitive.<br>Left out: the first argument is a scene.
+- `opts` (options, optional): For a scene: the options below.
 
 Good to know:
 
-- Returns true if the control has a keyframe animation of that name. Already playing: restarts.
-- A transition cannot be played this way: rejected with a console error listing the keyframe animations.
+- Returns true if the control has a keyframe animation, a text effect or a value animation (a knob's ring sweep) of that name. Already playing: restarts.
+- A transition cannot be played this way: rejected with a console error listing the animations it can play.
+- One name is a scene from the Animation Designer, whatever starts it there. Already playing: starts again from the beginning, and the run it cut short reports done(false).
+- A scene that ends holds its last frame. With the panel's window closed: returns false, and nothing waits.
 
 *Short name: `animatePlay` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | What it is |
+|---|---|---|
+| `done` | function | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
+
+#### `ce.anim.seek(scene, position)`
+
+Hold a panel scene at a point of its length, still: a script that is the scene's clock.
+
+Example: `animateSeek("Cover", 0.5)` holds the Cover scene halfway.
+
+- `scene` (text, required): The scene's name, as in the Animation Designer. Not case-sensitive.
+- `position` (number, required): Where: 0 its start, 1 its end.<br>Outside 0 ↔ 1: clamped.
+
+Good to know:
+
+- Returns true if the panel has the scene. It stays there, paused, until it is played or sought again; a run it interrupts reports done(false).
+- With the panel's window closed: returns false.
+
+*Short name: `animateSeek` · Panel window only.*
+
+#### `ce.anim.effect(target, effect [, opts])`
+
+Play a library effect or one of the panel's animation presets on a control, its words or a part, without a scene.
+
+Example: `animateEffect("Lamp", "Pop")` pops the Lamp; `animateEffect("Title.Text", "Typewriter in")` types its words in.
+
+- `target` (text, required): Where: "Lamp", "Title.Text", "Knob01.bodyCap", "Cutoff.Value", "Wave.Patterns.pattern1", "Strip.band.Patterns.pattern1".
+- `effect` (text, required): The effect or preset's name.<br>Not found: rejected with a console error listing them.<br>A value effect on a control that draws no value: rejected with a console error.
+- `opts` (options, optional): The options below.
+
+Good to know:
+
+- The effects are the Animation Designer's library ("Fade in", "Pop", "Typewriter in", "Gradient sheen"…) and the presets the panel carries, by name, any case.
+- A target is a control's name, then .Text for its words, a part's name, or .Patterns.<name> for one of its patterns (.<part>.Patterns.<name> for one of a part's); the control alone is its whole box, or its words for a text effect (a knob's are the numbers round its scale, else its ticks or its handle labels), or its first pattern for a Pattern effect ("Pattern pulse"), a part's first when it has none of its own.
+- A value effect ("Ring sweep", "Rise to value", "Wiggle"…) moves what a value draws — a knob's or a slider's, the Macro's ring, a meter's needle or bar — then hands back to the value: the control alone is that, or name it as .Value. It moves the drawing only; the value, and what it sends, stay as they are.
+- A new effect on the same place replaces the last, which reports done(false). An effect that ends holds its last frame; a value effect ends on the value.
+- With the panel's window closed: returns false.
+
+*Short name: `animateEffect` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `duration` | number | the effect's own | How long the effect takes, in milliseconds.<br>Left out: the effect's own; a text effect's, for its words, each a little after the last. |
+| `delay` | number (milliseconds) | 0 | Wait before the start.<br>Range: ≥ 0.<br>Below 0, or invalid: no wait. |
+| `done` | function | — | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
+
+#### `ce.anim.swap(target, text [, effect [, opts]])`
+
+Change a control's words with a transition: the old ones leave, the new ones arrive.
+
+Example: `animateSwap("Readout", "Saw", "roll")` rolls the old words out and "Saw" in.
+
+- `target` (text, required): The control whose words change.
+- `text` (text, required): The new words.
+- `effect` (text, optional): The transition.<br>Left out: crossfade.
+- `opts` (options, optional): The options below.
+
+Good to know:
+
+- The effect is a text effect's name: roll, push, wipe, crossfade, typewriter, explode, shimmer, part, reel, odometer, fly, fan. Its "out" plays on the old words, its "in" on the new.
+- The new words are written when the old ones have left. Cut short by another effect on the same words: done(false), and they are not written.
+- With the panel's window closed: returns false and the words are not changed; set them with set().
+
+*Short name: `animateSwap` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | What it is |
+|---|---|---|
+| `done` | function | Callback at the end: done(completed).<br>completed: true after the last run or `ce.anim.finish()`; false after `ce.anim.stop()` or replacement.<br>List: called once, after the last entry; true only if every entry completed.<br>Invalid: no callback. |
+
+#### `ce.anim.pattern(target, opts)`
+
+Change a pattern layer's tint, opacity, speed or direction while it plays.
+
+Example: `animatePattern("Wave", { speed = 40, direction = 90 })` sends Wave's pattern down, faster.
+
+- `target` (text, required): The pattern, or the control or part whose patterns.
+- `opts` (options, required): What changes: any of the fields below.
+
+Good to know:
+
+- A target is a control, then a part, then a pattern's name: "Wave", "Wave.Pattern 1", "Knob01.bodyCap.Pattern 1". Without a pattern's name: all of them there.
+- Returns true if it changed a pattern. The change is the control's, as set() would make it.
+
+*Short name: `animatePattern` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `tint` | colour | unchanged | The colour the pattern is drawn in.<br>Left out: unchanged. |
+| `opacity` | number | unchanged | How strongly it is drawn, as on the Background tab.<br>Left out: unchanged. |
+| `speed` | number | unchanged | How fast it moves, in pixels a second; 0 stands it still.<br>Left out: unchanged. |
+| `direction` | number | unchanged | Which way it moves, in degrees: 0 to the right, 90 down.<br>Left out: unchanged. |
 
 ## Commands: The panel itself
 

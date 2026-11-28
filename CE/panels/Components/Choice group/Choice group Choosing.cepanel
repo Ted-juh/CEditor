@@ -1,0 +1,510 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "50456d81-c0b5-4e1a-9f3d-50456d815045",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Choice group Choosing",
+  "scriptId": "component_choice-choosing",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 290,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1F1A18",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Lean.value",
+      "label": "Lean",
+      "controlName": "Lean",
+      "path": "Lean.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "-2",
+        "-1",
+        "0",
+        "+1",
+        "+2"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Blink.value",
+      "label": "Blink",
+      "controlName": "Blink",
+      "path": "Blink.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Square",
+        "Tri",
+        "Sine"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Tick.value",
+      "label": "Tick",
+      "controlName": "Tick",
+      "path": "Tick.value",
+      "min": 0,
+      "max": 5,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "ember"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1786727297000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice group · Choosing","_children":{"Fill":{"colour":"FFFFF6EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1786727297001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the group answering a new choice. Each group wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFC8B6A2"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lean","id":"ctrl_1786727297002","description":"Lean: leans toward the side of the option chosen, and back.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_3","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"-2","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"-1","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"0","internalValue":"opt_3","sendValue":2,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"+1","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_5","displayText":"+2","internalValue":"opt_5","sendValue":4,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"lean":{"_type":"Animation","name":"lean","enabled":true,"kind":"keyframes","trigger":{"type":"valueStep"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0,"rotate":0},{"at":0.35,"x":5,"rotate":1.5},{"at":0.7,"x":-1,"rotate":-0.4},{"at":1,"x":0,"rotate":0}],"duration":420,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","followTurn":true,"preset":{"id":"ce:choice:lean","revision":1,"from":"lean"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LeanCaption","id":"ctrl_1786727297003","controlType":"Label"},
+        "Transform": {"x":40,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lean","_children":{"Fill":{"colour":"FFFFF6EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LeanHow","id":"ctrl_1786727297004","controlType":"Label"},
+        "Transform": {"x":40,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FFF08A24"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LeanWhat","id":"ctrl_1786727297005","controlType":"Label"},
+        "Transform": {"x":44,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"leans toward the side of the option chosen, and back","_children":{"Fill":{"colour":"FFC8B6A2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Blink","id":"ctrl_1786727297006","description":"Blink: blinks once at every new choice, from the hand or from outside.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Square","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"Sine","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"blink":{"_type":"Animation","name":"blink","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"opacity":1},{"at":0.35,"opacity":0.35},{"at":1,"opacity":1}],"duration":300,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:blink","revision":1,"from":"blink"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BlinkCaption","id":"ctrl_1786727297007","controlType":"Label"},
+        "Transform": {"x":360,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Blink","_children":{"Fill":{"colour":"FFFFF6EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BlinkHow","id":"ctrl_1786727297008","controlType":"Label"},
+        "Transform": {"x":360,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FFF08A24"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BlinkWhat","id":"ctrl_1786727297009","controlType":"Label"},
+        "Transform": {"x":364,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"blinks once at every new choice, from the hand or from outside","_children":{"Fill":{"colour":"FFC8B6A2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tick","id":"ctrl_1786727297010","description":"Tick: a small knock at each new choice, as a detent clicks.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":690,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"1","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"2","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"3","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"4","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_5","displayText":"5","internalValue":"opt_5","sendValue":4,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_6","displayText":"6","internalValue":"opt_6","sendValue":5,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"tick":{"_type":"Animation","name":"tick","enabled":true,"kind":"keyframes","trigger":{"type":"valueStep"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"y":0,"scale":1},{"at":0.3,"y":2,"scale":0.985},{"at":1,"y":0,"scale":1}],"duration":160,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:choice:tick","revision":1,"from":"tick"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TickCaption","id":"ctrl_1786727297011","controlType":"Label"},
+        "Transform": {"x":680,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Tick","_children":{"Fill":{"colour":"FFFFF6EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TickHow","id":"ctrl_1786727297012","controlType":"Label"},
+        "Transform": {"x":680,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CHOOSE","_children":{"Fill":{"colour":"FFF08A24"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TickWhat","id":"ctrl_1786727297013","controlType":"Label"},
+        "Transform": {"x":684,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a small knock at each new choice, as a detent clicks","_children":{"Fill":{"colour":"FFC8B6A2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:lean",
+      "name": "Lean",
+      "category": "Choice group",
+      "tags": [
+        "Choosing",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lean": {
+          "_type": "Animation",
+          "name": "lean",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0,
+              "rotate": 0
+            },
+            {
+              "at": 0.35,
+              "x": 5,
+              "rotate": 1.5
+            },
+            {
+              "at": 0.7,
+              "x": -1,
+              "rotate": -0.4
+            },
+            {
+              "at": 1,
+              "x": 0,
+              "rotate": 0
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal",
+          "followTurn": true
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:blink",
+      "name": "Blink",
+      "category": "Choice group",
+      "tags": [
+        "Choosing",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "blink": {
+          "_type": "Animation",
+          "name": "blink",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.35,
+              "opacity": 0.35
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 300,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:tick",
+      "name": "Tick",
+      "category": "Choice group",
+      "tags": [
+        "Choosing",
+        "choose"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "tick": {
+          "_type": "Animation",
+          "name": "tick",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueStep"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "y": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.3,
+              "y": 2,
+              "scale": 0.985
+            },
+            {
+              "at": 1,
+              "y": 0,
+              "scale": 1
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

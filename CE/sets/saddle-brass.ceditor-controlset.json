@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "64c5d22d",
+  "fingerprint": "11d33680",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -71,6 +71,7 @@
       "display.screen": "FF1A1208",
       "display.backlight": "FF352E26",
       "panel.surface": "FFB3873A",
+      "control.readout": "FF000000",
       "section.surface": "FFCEB17F"
     },
     "lamp": {

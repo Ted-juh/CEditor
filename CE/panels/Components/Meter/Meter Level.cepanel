@@ -1,0 +1,590 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "4b71a2cf-c0b5-4e1a-9f3d-4b71a2cf4b71",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Level",
+  "scriptId": "component_meter-level",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 574,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF282D2E",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1705738447000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Level","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1705738447001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"as the level clips or crosses a line: heard, never sent. Each meter wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipFlash","id":"ctrl_1705738447002","description":"Clip flash: its lamps flash white-hot as the level clips.","controlType":"Meter"},
+        "Transform": {"x":86,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"clipFlash":{"_type":"Animation","name":"clipFlash","enabled":true,"kind":"keyframes","trigger":{"type":"clip"},"targets":[{"path":"Parts.indicator"}],"frames":[{"at":0.12,"fill":"FFFFF4DC"}],"duration":500,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:clip-flash","revision":1,"from":"clipFlash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipFlashCaption","id":"ctrl_1705738447003","controlType":"Label"},
+        "Transform": {"x":40,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Clip flash","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipFlashHow","id":"ctrl_1705738447004","controlType":"Label"},
+        "Transform": {"x":40,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AS IT CLIPS","_children":{"Fill":{"colour":"FFFFB547"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipFlashWhat","id":"ctrl_1705738447005","controlType":"Label"},
+        "Transform": {"x":44,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its lamps flash white-hot as the level clips","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipShake","id":"ctrl_1705738447006","description":"Clip shake: the meter shudders as the level clips.","controlType":"Meter"},
+        "Transform": {"x":406,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"clipShake":{"_type":"Animation","name":"clipShake","enabled":true,"kind":"keyframes","trigger":{"type":"clip"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"x":0},{"at":0.15,"x":-4},{"at":0.35,"x":4},{"at":0.55,"x":-3},{"at":0.75,"x":2},{"at":1,"x":0}],"duration":420,"delay":0,"easing":"linear","iterations":1,"direction":"normal","preset":{"id":"ce:meter:clip-shake","revision":1,"from":"clipShake"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipShakeCaption","id":"ctrl_1705738447007","controlType":"Label"},
+        "Transform": {"x":360,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Clip shake","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipShakeHow","id":"ctrl_1705738447008","controlType":"Label"},
+        "Transform": {"x":360,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AS IT CLIPS","_children":{"Fill":{"colour":"FFFFB547"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ClipShakeWhat","id":"ctrl_1705738447009","controlType":"Label"},
+        "Transform": {"x":364,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the meter shudders as the level clips","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RedWash","id":"ctrl_1705738447010","description":"Red wash: its case washes red and fades back.","controlType":"Meter"},
+        "Transform": {"x":726,"y":96,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"redWash":{"_type":"Animation","name":"redWash","enabled":true,"kind":"keyframes","trigger":{"type":"clip"},"targets":[{"path":"Parts.housing"}],"frames":[{"at":0.15,"fill":"FFB3261E"}],"duration":1000,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:red-wash","revision":1,"from":"redWash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RedWashCaption","id":"ctrl_1705738447011","controlType":"Label"},
+        "Transform": {"x":680,"y":238,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Red wash","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RedWashHow","id":"ctrl_1705738447012","controlType":"Label"},
+        "Transform": {"x":680,"y":260,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AS IT CLIPS","_children":{"Fill":{"colour":"FFFFB547"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"RedWashWhat","id":"ctrl_1705738447013","controlType":"Label"},
+        "Transform": {"x":684,"y":278,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its case washes red and fades back","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakFlare","id":"ctrl_1705738447014","description":"Peak flare: the meter swells as the level goes past 80%.","controlType":"Meter"},
+        "Transform": {"x":86,"y":330,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"peakFlare":{"_type":"Animation","name":"peakFlare","enabled":true,"kind":"keyframes","trigger":{"type":"level","at":0.8,"way":"up"},"targets":[{"path":"Transform"}],"frames":[{"at":0,"scale":1},{"at":0.25,"scale":1.06},{"at":1,"scale":1}],"duration":520,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:meter:peak-flare","revision":1,"from":"peakFlare"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakFlareCaption","id":"ctrl_1705738447015","controlType":"Label"},
+        "Transform": {"x":40,"y":472,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Peak flare","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakFlareHow","id":"ctrl_1705738447016","controlType":"Label"},
+        "Transform": {"x":40,"y":494,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVEL PAST 80%","_children":{"Fill":{"colour":"FFFFB547"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PeakFlareWhat","id":"ctrl_1705738447017","controlType":"Label"},
+        "Transform": {"x":44,"y":512,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the meter swells as the level goes past 80%","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverThrown","id":"ctrl_1705738447018","description":"\"OVER\" thrown: \"OVER\" rises from the meter as the level clips.","controlType":"Meter"},
+        "Transform": {"x":406,"y":330,"width":208,"height":130},
+        "Meter": {"value":0.6,"testSignal":"bursts"},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"over":{"_type":"Animation","name":"over","enabled":true,"kind":"emit","trigger":{"type":"clip"},"targets":[],"shows":"words","from":"centre","direction":"up","travel":34,"size":14,"duration":900,"delay":0,"easing":"outCubic","iterations":1,"words":"OVER","colour":"FFFF6A5E","preset":{"id":"ce:meter:over-thrown","revision":1,"from":"over"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverThrownCaption","id":"ctrl_1705738447019","controlType":"Label"},
+        "Transform": {"x":360,"y":472,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"\"OVER\" thrown","_children":{"Fill":{"colour":"FFEDEFF0"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverThrownHow","id":"ctrl_1705738447020","controlType":"Label"},
+        "Transform": {"x":360,"y":494,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"AS IT CLIPS","_children":{"Fill":{"colour":"FFFFB547"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"OverThrownWhat","id":"ctrl_1705738447021","controlType":"Label"},
+        "Transform": {"x":364,"y":512,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"\"OVER\" rises from the meter as the level clips","_children":{"Fill":{"colour":"FFB9C0C2"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:clip-flash",
+      "name": "Clip flash",
+      "category": "Meter",
+      "tags": [
+        "Level",
+        "as it clips"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "clipFlash": {
+          "_type": "Animation",
+          "name": "clipFlash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "clip"
+          },
+          "targets": [
+            {
+              "path": "Parts.indicator"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0.12,
+              "fill": "FFFFF4DC"
+            }
+          ],
+          "duration": 500,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:clip-shake",
+      "name": "Clip shake",
+      "category": "Meter",
+      "tags": [
+        "Level",
+        "as it clips"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "clipShake": {
+          "_type": "Animation",
+          "name": "clipShake",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "clip"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "x": 0
+            },
+            {
+              "at": 0.15,
+              "x": -4
+            },
+            {
+              "at": 0.35,
+              "x": 4
+            },
+            {
+              "at": 0.55,
+              "x": -3
+            },
+            {
+              "at": 0.75,
+              "x": 2
+            },
+            {
+              "at": 1,
+              "x": 0
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "linear",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:red-wash",
+      "name": "Red wash",
+      "category": "Meter",
+      "tags": [
+        "Level",
+        "as it clips"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "redWash": {
+          "_type": "Animation",
+          "name": "redWash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "clip"
+          },
+          "targets": [
+            {
+              "path": "Parts.housing"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0.15,
+              "fill": "FFB3261E"
+            }
+          ],
+          "duration": 1000,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:peak-flare",
+      "name": "Peak flare",
+      "category": "Meter",
+      "tags": [
+        "Level",
+        "level past 80%"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "peakFlare": {
+          "_type": "Animation",
+          "name": "peakFlare",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "level",
+            "at": 0.8,
+            "way": "up"
+          },
+          "targets": [
+            {
+              "path": "Transform"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.25,
+              "scale": 1.06
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 520,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:over-thrown",
+      "name": "\"OVER\" thrown",
+      "category": "Meter",
+      "tags": [
+        "Level",
+        "as it clips"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "over": {
+          "_type": "Animation",
+          "name": "over",
+          "enabled": true,
+          "kind": "emit",
+          "trigger": {
+            "type": "clip"
+          },
+          "targets": [],
+          "shows": "words",
+          "from": "centre",
+          "direction": "up",
+          "travel": 34,
+          "size": 14,
+          "duration": 900,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "words": "OVER",
+          "colour": "FFFF6A5E"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

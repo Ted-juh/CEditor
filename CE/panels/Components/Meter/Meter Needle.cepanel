@@ -1,0 +1,686 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "c763bbba-c0b5-4e1a-9f3d-c763bbbac763",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Needle",
+  "scriptId": "component_meter-needle",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 550,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF4A321F",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "valve"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1715202106000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Needle","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1715202106001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"what the level draws, moved and handed back to the level. Each meter wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SelfTest","id":"ctrl_1715202106002","description":"Self-test: sweeps to full scale and back, as a meter does at power-on.","controlType":"Meter"},
+        "Transform": {"x":85,"y":96,"width":210,"height":118},
+        "Meter": {"value":0.55},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"selfTest":{"_type":"Animation","name":"selfTest","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"value":0},{"at":0.5,"value":1},{"at":1}],"duration":1600,"delay":300,"easing":"inOutCubic","iterations":1,"preset":{"id":"ce:meter:self-test","revision":1,"from":"selfTest"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SelfTestCaption","id":"ctrl_1715202106003","controlType":"Label"},
+        "Transform": {"x":40,"y":226,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Self-test","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SelfTestHow","id":"ctrl_1715202106004","controlType":"Label"},
+        "Transform": {"x":40,"y":248,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SelfTestWhat","id":"ctrl_1715202106005","controlType":"Label"},
+        "Transform": {"x":44,"y":266,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"sweeps to full scale and back, as a meter does at power-on","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WakeUp","id":"ctrl_1715202106006","description":"Wake up: rises from nothing to the level.","controlType":"Meter"},
+        "Transform": {"x":405,"y":96,"width":210,"height":118},
+        "Meter": {"value":0.7},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"wakeUp":{"_type":"Animation","name":"wakeUp","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0,"value":0},{"at":1}],"duration":1200,"delay":300,"easing":"outCubic","iterations":1,"preset":{"id":"ce:meter:wake-up","revision":1,"from":"wakeUp"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WakeUpCaption","id":"ctrl_1715202106007","controlType":"Label"},
+        "Transform": {"x":360,"y":226,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Wake up","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WakeUpHow","id":"ctrl_1715202106008","controlType":"Label"},
+        "Transform": {"x":360,"y":248,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"WakeUpWhat","id":"ctrl_1715202106009","controlType":"Label"},
+        "Transform": {"x":364,"y":266,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"rises from nothing to the level","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatKick","id":"ctrl_1715202106010","description":"Beat kick: kicks up on each beat and falls back to the level.","controlType":"Meter"},
+        "Transform": {"x":725,"y":96,"width":210,"height":118},
+        "Meter": {"value":0.45},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"beatKick":{"_type":"Animation","name":"beatKick","enabled":true,"kind":"value","trigger":{"type":"beat","every":1},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.12,"by":0.22},{"at":1}],"duration":460,"delay":0,"easing":"outQuad","iterations":1,"preset":{"id":"ce:meter:beat-kick","revision":1,"from":"beatKick"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatKickCaption","id":"ctrl_1715202106011","controlType":"Label"},
+        "Transform": {"x":680,"y":226,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat kick","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatKickHow","id":"ctrl_1715202106012","controlType":"Label"},
+        "Transform": {"x":680,"y":248,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BeatKickWhat","id":"ctrl_1715202106013","controlType":"Label"},
+        "Transform": {"x":684,"y":266,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"kicks up on each beat and falls back to the level","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapSweep","id":"ctrl_1715202106014","description":"Tap sweep: a click sweeps it to full and back.","controlType":"Meter"},
+        "Transform": {"x":85,"y":318,"width":210,"height":118},
+        "Meter": {"value":0.4},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"tapSweep":{"_type":"Animation","name":"tapSweep","enabled":true,"kind":"value","trigger":{"type":"event","event":"click"},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.45,"value":1},{"at":1}],"duration":900,"delay":0,"easing":"inOutSine","iterations":1,"preset":{"id":"ce:meter:tap-sweep","revision":1,"from":"tapSweep"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapSweepCaption","id":"ctrl_1715202106015","controlType":"Label"},
+        "Transform": {"x":40,"y":448,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Tap sweep","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapSweepHow","id":"ctrl_1715202106016","controlType":"Label"},
+        "Transform": {"x":40,"y":470,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CLICK","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TapSweepWhat","id":"ctrl_1715202106017","controlType":"Label"},
+        "Transform": {"x":44,"y":488,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a click sweeps it to full and back","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Shiver","id":"ctrl_1715202106018","description":"Shiver: trembles about the level, as a live needle does.","controlType":"Meter"},
+        "Transform": {"x":405,"y":318,"width":210,"height":118},
+        "Meter": {"value":0.62},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"shiver":{"_type":"Animation","name":"shiver","enabled":true,"kind":"value","trigger":{"type":"always"},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.2,"by":0.03},{"at":0.4,"by":-0.02},{"at":0.6,"by":0.025},{"at":0.8,"by":-0.03},{"at":1}],"duration":900,"delay":0,"easing":"inOutSine","iterations":"infinite","preset":{"id":"ce:meter:shiver","revision":1,"from":"shiver"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShiverCaption","id":"ctrl_1715202106019","controlType":"Label"},
+        "Transform": {"x":360,"y":448,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Shiver","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShiverHow","id":"ctrl_1715202106020","controlType":"Label"},
+        "Transform": {"x":360,"y":470,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ShiverWhat","id":"ctrl_1715202106021","controlType":"Label"},
+        "Transform": {"x":364,"y":488,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"trembles about the level, as a live needle does","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropOut","id":"ctrl_1715202106022","description":"Drop out: falls to nothing and climbs back to the level.","controlType":"Meter"},
+        "Transform": {"x":725,"y":318,"width":210,"height":118},
+        "Meter": {"value":0.66},
+        "Animations": {"_type":"Animations","enabled":true,"debug":false,"_children":{"dropOut":{"_type":"Animation","name":"dropOut","enabled":true,"kind":"value","trigger":{"type":"event","event":"doubleClick"},"targets":[{"path":"Value"}],"frames":[{"at":0},{"at":0.3,"value":0},{"at":1}],"duration":1100,"delay":0,"easing":"inOutCubic","iterations":1,"preset":{"id":"ce:meter:drop-out","revision":1,"from":"dropOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropOutCaption","id":"ctrl_1715202106023","controlType":"Label"},
+        "Transform": {"x":680,"y":448,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Drop out","_children":{"Fill":{"colour":"FFF6E7C8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropOutHow","id":"ctrl_1715202106024","controlType":"Label"},
+        "Transform": {"x":680,"y":470,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"DOUBLE-CLICK","_children":{"Fill":{"colour":"FFE3C67A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropOutWhat","id":"ctrl_1715202106025","controlType":"Label"},
+        "Transform": {"x":684,"y":488,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"falls to nothing and climbs back to the level","_children":{"Fill":{"colour":"FFD9C7A6"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:self-test",
+      "name": "Self-test",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "selfTest": {
+          "_type": "Animation",
+          "name": "selfTest",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "value": 0
+            },
+            {
+              "at": 0.5,
+              "value": 1
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1600,
+          "delay": 300,
+          "easing": "inOutCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:wake-up",
+      "name": "Wake up",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "wakeUp": {
+          "_type": "Animation",
+          "name": "wakeUp",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "value": 0
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1200,
+          "delay": 300,
+          "easing": "outCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:beat-kick",
+      "name": "Beat kick",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "transport beat"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "beatKick": {
+          "_type": "Animation",
+          "name": "beatKick",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "beat",
+            "every": 1
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.12,
+              "by": 0.22
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 460,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:tap-sweep",
+      "name": "Tap sweep",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "tapSweep": {
+          "_type": "Animation",
+          "name": "tapSweep",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "event",
+            "event": "click"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.45,
+              "value": 1
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:shiver",
+      "name": "Shiver",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "always"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "shiver": {
+          "_type": "Animation",
+          "name": "shiver",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.2,
+              "by": 0.03
+            },
+            {
+              "at": 0.4,
+              "by": -0.02
+            },
+            {
+              "at": 0.6,
+              "by": 0.025
+            },
+            {
+              "at": 0.8,
+              "by": -0.03
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 900,
+          "delay": 0,
+          "easing": "inOutSine",
+          "iterations": "infinite"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:meter:drop-out",
+      "name": "Drop out",
+      "category": "Meter",
+      "tags": [
+        "Needle",
+        "double-click"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "dropOut": {
+          "_type": "Animation",
+          "name": "dropOut",
+          "enabled": true,
+          "kind": "value",
+          "trigger": {
+            "type": "event",
+            "event": "doubleClick"
+          },
+          "targets": [
+            {
+              "path": "Value"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0
+            },
+            {
+              "at": 0.3,
+              "value": 0
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 1100,
+          "delay": 0,
+          "easing": "inOutCubic",
+          "iterations": 1
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

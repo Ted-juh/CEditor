@@ -1,0 +1,680 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "9e3628b6-c0b5-4e1a-9f3d-9e3628b69e36",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Button Switch",
+  "scriptId": "component_button-switch",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 840,
+  "height": 552,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF24262A",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Kick.value",
+      "label": "Kick",
+      "controlName": "Kick",
+      "path": "Kick.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "KeyLights.value",
+      "label": "KeyLights",
+      "controlName": "KeyLights",
+      "path": "KeyLights.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "HousingFlash.value",
+      "label": "HousingFlash",
+      "controlName": "HousingFlash",
+      "path": "HousingFlash.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "GuardGlow.value",
+      "label": "GuardGlow",
+      "controlName": "GuardGlow",
+      "path": "GuardGlow.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CaptionTurns.value",
+      "label": "CaptionTurns",
+      "controlName": "CaptionTurns",
+      "path": "CaptionTurns.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "bakelite"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1744349494000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Button · Switch","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1744349494001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":780,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a toggle going over. Each button wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Kick","id":"ctrl_1744349494002","description":"Kick: the key kicks as it goes over.","controlType":"ToggleButton"},
+        "Transform": {"x":60,"y":96,"width":200,"height":100},
+        "Text": {"content":"Bypass"},
+        "Animations": {"_children":{"kick":{"_type":"Animation","name":"kick","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.key"}],"frames":[{"at":0,"scale":1},{"at":0.35,"scale":1.12},{"at":1,"scale":1}],"duration":280,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:kick","revision":1,"from":"kick"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KickCaption","id":"ctrl_1744349494003","controlType":"Label"},
+        "Transform": {"x":40,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Kick","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KickHow","id":"ctrl_1744349494004","controlType":"Label"},
+        "Transform": {"x":40,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH","_children":{"Fill":{"colour":"FFF08A3C"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KickWhat","id":"ctrl_1744349494005","controlType":"Label"},
+        "Transform": {"x":44,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the key kicks as it goes over","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyLights","id":"ctrl_1744349494006","description":"Key lights: the key takes the accent colour while on, eased.","controlType":"ToggleButton"},
+        "Transform": {"x":320,"y":96,"width":200,"height":100},
+        "Text": {"content":"Hold"},
+        "Behavior": {"defaultValue":true},
+        "States": {"_children":{"Selected":{"patches":{"parts":{"key":{"Background.Fill.colour":"{accent}"}}}}}},
+        "Animations": {"_children":{"keyLights":{"_type":"Animation","name":"keyLights","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["selected"],"reverse":true},"targets":[{"path":"Parts.key.Background.Fill.colour","properties":["colour"]}],"duration":320,"delay":0,"easing":"inOutSine","preset":{"id":"ce:button:key-lights","revision":1,"from":"keyLights"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyLightsCaption","id":"ctrl_1744349494007","controlType":"Label"},
+        "Transform": {"x":300,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Key lights","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyLightsHow","id":"ctrl_1744349494008","controlType":"Label"},
+        "Transform": {"x":300,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ON","_children":{"Fill":{"colour":"FFF08A3C"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"KeyLightsWhat","id":"ctrl_1744349494009","controlType":"Label"},
+        "Transform": {"x":304,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the key takes the accent colour while on, eased","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HousingFlash","id":"ctrl_1744349494010","description":"Housing flash: the plate it sits in flashes as it goes over.","controlType":"ToggleButton"},
+        "Transform": {"x":580,"y":96,"width":200,"height":100},
+        "Text": {"content":"Mute"},
+        "Animations": {"_children":{"housingFlash":{"_type":"Animation","name":"housingFlash","enabled":true,"kind":"keyframes","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Parts.housing"}],"frames":[{"at":0,"fill":"FF8A6A48"},{"at":1}],"duration":520,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:button:housing-flash","revision":1,"from":"housingFlash"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HousingFlashCaption","id":"ctrl_1744349494011","controlType":"Label"},
+        "Transform": {"x":560,"y":206,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Housing flash","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HousingFlashHow","id":"ctrl_1744349494012","controlType":"Label"},
+        "Transform": {"x":560,"y":228,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH","_children":{"Fill":{"colour":"FFF08A3C"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"HousingFlashWhat","id":"ctrl_1744349494013","controlType":"Label"},
+        "Transform": {"x":564,"y":246,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the plate it sits in flashes as it goes over","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuardGlow","id":"ctrl_1744349494014","description":"Guard glow: the guard round the key lights as the pointer comes near.","controlType":"ToggleButton"},
+        "Transform": {"x":60,"y":312,"width":200,"height":100},
+        "Text": {"content":"Arm"},
+        "States": {"_children":{"Hover":{"patches":{"parts":{"guard":{"Background.Fill.colour":"{accent}"}}}}}},
+        "Animations": {"_children":{"guardGlow":{"_type":"Animation","name":"guardGlow","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["hover"],"reverse":true},"targets":[{"path":"Parts.guard.Background.Fill.colour","properties":["colour"]}],"duration":220,"delay":0,"easing":"outQuad","preset":{"id":"ce:button:guard-glow","revision":1,"from":"guardGlow"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuardGlowCaption","id":"ctrl_1744349494015","controlType":"Label"},
+        "Transform": {"x":40,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Guard glow","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuardGlowHow","id":"ctrl_1744349494016","controlType":"Label"},
+        "Transform": {"x":40,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FFF08A3C"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GuardGlowWhat","id":"ctrl_1744349494017","controlType":"Label"},
+        "Transform": {"x":44,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the guard round the key lights as the pointer comes near","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CaptionTurns","id":"ctrl_1744349494018","description":"Caption turns: the caption rolls over with the key.","controlType":"ToggleButton"},
+        "Transform": {"x":320,"y":312,"width":200,"height":100},
+        "Text": {"content":"Loop"},
+        "Animations": {"_children":{"captionTurns":{"_type":"Animation","name":"captionTurns","enabled":true,"kind":"text","effect":"roll","way":"in","delay":0,"easing":"outQuad","iterations":1,"duration":360,"direction":"up","trigger":{"type":"valueChange","source":"value.normalized"},"targets":[{"path":"Text"}],"preset":{"id":"ce:button:caption-turns","revision":1,"from":"captionTurns"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CaptionTurnsCaption","id":"ctrl_1744349494019","controlType":"Label"},
+        "Transform": {"x":300,"y":422,"width":240,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Caption turns","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CaptionTurnsHow","id":"ctrl_1744349494020","controlType":"Label"},
+        "Transform": {"x":300,"y":444,"width":240,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"SWITCH","_children":{"Fill":{"colour":"FFF08A3C"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CaptionTurnsWhat","id":"ctrl_1744349494021","controlType":"Label"},
+        "Transform": {"x":304,"y":462,"width":232,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the caption rolls over with the key","_children":{"Fill":{"colour":"FFBDB8AC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:kick",
+      "name": "Kick",
+      "category": "Button",
+      "tags": [
+        "Switch",
+        "switch"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "kick": {
+          "_type": "Animation",
+          "name": "kick",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.key"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.35,
+              "scale": 1.12
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 280,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:key-lights",
+      "name": "Key lights",
+      "category": "Button",
+      "tags": [
+        "Switch",
+        "on"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "keyLights": {
+          "_type": "Animation",
+          "name": "keyLights",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "selected"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.key.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "inOutSine"
+        }
+      },
+      "states": {
+        "Selected": {
+          "when": {
+            "checked": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "key": {
+                "Background.Fill.colour": "{accent}"
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:housing-flash",
+      "name": "Housing flash",
+      "category": "Button",
+      "tags": [
+        "Switch",
+        "switch"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "housingFlash": {
+          "_type": "Animation",
+          "name": "housingFlash",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Parts.housing"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "fill": "FF8A6A48"
+            },
+            {
+              "at": 1
+            }
+          ],
+          "duration": 520,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:guard-glow",
+      "name": "Guard glow",
+      "category": "Button",
+      "tags": [
+        "Switch",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "guardGlow": {
+          "_type": "Animation",
+          "name": "guardGlow",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.guard.Background.Fill.colour",
+              "properties": [
+                "colour"
+              ]
+            }
+          ],
+          "duration": 220,
+          "delay": 0,
+          "easing": "outQuad"
+        }
+      },
+      "states": {
+        "Hover": {
+          "when": {
+            "hover": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "guard": {
+                "Background.Fill.colour": "{accent}"
+              }
+            }
+          }
+        }
+      },
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:button:caption-turns",
+      "name": "Caption turns",
+      "category": "Button",
+      "tags": [
+        "Switch",
+        "switch"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "captionTurns": {
+          "_type": "Animation",
+          "name": "captionTurns",
+          "enabled": true,
+          "kind": "text",
+          "effect": "roll",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "duration": 360,
+          "direction": "up",
+          "trigger": {
+            "type": "valueChange",
+            "source": "value.normalized"
+          },
+          "targets": [
+            {
+              "path": "Text"
+            }
+          ]
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

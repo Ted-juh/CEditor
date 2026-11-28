@@ -1,0 +1,868 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "1f91cdb2-c0b5-4e1a-9f3d-1f91cdb21f91",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Slider Touch",
+  "scriptId": "component_slider-touch",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1440,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1B1D20",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Lift.value",
+      "label": "Lift",
+      "controlName": "Lift",
+      "path": "Lift.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Grip.value",
+      "label": "Grip",
+      "controlName": "Grip",
+      "path": "Grip.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Glow.value",
+      "label": "Glow",
+      "controlName": "Glow",
+      "path": "Glow.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Readout.value",
+      "label": "Readout",
+      "controlName": "Readout",
+      "path": "Readout.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FocusRing.value",
+      "label": "FocusRing",
+      "controlName": "FocusRing",
+      "path": "FocusRing.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Nod.value",
+      "label": "Nod",
+      "controlName": "Nod",
+      "path": "Nod.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "broadcast"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1779649074000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":520,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Slider · Touch","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1779649074001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":1380,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"how the cap answers the hand. Each slider wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Lift","id":"ctrl_1779649074002","description":"Lift: the cap grows toward you.","controlType":"Slider"},
+        "Transform": {"x":113,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Parts": {
+          "_children": {
+            "pointerCurrent": {"_children":{"Layout":{"lift":1}}}
+          }
+        },
+        "States": {"_children":{"Hover":{"patches":{"parts":{"pointerCurrent":{"Layout.lift":1.12}}}}}},
+        "Animations": {"_children":{"lift":{"_type":"Animation","name":"lift","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["hover"],"reverse":true},"targets":[{"path":"Parts.pointerCurrent.Layout.lift","properties":["transform"]}],"duration":160,"delay":0,"easing":"outCubic","preset":{"id":"ce:slider:lift","revision":1,"from":"lift"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftCaption","id":"ctrl_1779649074003","controlType":"Label"},
+        "Transform": {"x":38,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Lift","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftHow","id":"ctrl_1779649074004","controlType":"Label"},
+        "Transform": {"x":38,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"LiftWhat","id":"ctrl_1779649074005","controlType":"Label"},
+        "Transform": {"x":40,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap grows toward you","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Grip","id":"ctrl_1779649074006","description":"Grip: the cap squeezes under the finger.","controlType":"Slider"},
+        "Transform": {"x":343,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Parts": {
+          "_children": {
+            "pointerCurrent": {"_children":{"Layout":{"lift":1}}}
+          }
+        },
+        "States": {"_children":{"Pressed":{"patches":{"parts":{"pointerCurrent":{"Layout.lift":0.9}}}}}},
+        "Animations": {"_children":{"grip":{"_type":"Animation","name":"grip","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["pressed"],"reverse":true},"targets":[{"path":"Parts.pointerCurrent.Layout.lift","properties":["transform"]}],"duration":90,"delay":0,"easing":"outBack","preset":{"id":"ce:slider:grip","revision":1,"from":"grip"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripCaption","id":"ctrl_1779649074007","controlType":"Label"},
+        "Transform": {"x":268,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Grip","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripHow","id":"ctrl_1779649074008","controlType":"Label"},
+        "Transform": {"x":268,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PRESS","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GripWhat","id":"ctrl_1779649074009","controlType":"Label"},
+        "Transform": {"x":270,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap squeezes under the finger","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Glow","id":"ctrl_1779649074010","description":"Glow: the fill breathes while the cap is held.","controlType":"Slider"},
+        "Transform": {"x":573,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"glow":{"_type":"Animation","name":"glow","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["dragging"]},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.5},{"at":1,"opacity":1}],"duration":720,"delay":0,"easing":"inOutQuad","iterations":"infinite","direction":"normal","preset":{"id":"ce:slider:glow","revision":1,"from":"glow"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowCaption","id":"ctrl_1779649074011","controlType":"Label"},
+        "Transform": {"x":498,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Glow","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowHow","id":"ctrl_1779649074012","controlType":"Label"},
+        "Transform": {"x":498,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"GlowWhat","id":"ctrl_1779649074013","controlType":"Label"},
+        "Transform": {"x":500,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the fill breathes while the cap is held","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Readout","id":"ctrl_1779649074014","description":"Readout: the value shows, and lingers a moment after.","controlType":"Slider"},
+        "Transform": {"x":733,"y":96,"width":204,"height":220},
+        "Behavior": {"orientation":"vertical","showHandleLabels":true},
+        "Parts": {
+          "_children": {
+            "labelCurrent": {"opacity":0,"_children":{"Text":{"_children":{"Font":{"size":14}}}}}
+          }
+        },
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"labelCurrent":{"opacity":1}}}}}},
+        "Animations": {"_children":{"readoutIn":{"_type":"Animation","name":"readoutIn","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["*"],"to":["dragging"],"reverse":false},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":120,"delay":0,"easing":"outQuad","preset":{"id":"ce:slider:readout","revision":1,"from":"readoutIn"}},"readoutOut":{"_type":"Animation","name":"readoutOut","enabled":true,"kind":"transition","trigger":{"type":"stateChange","from":["dragging"],"to":["*"],"leaving":true},"targets":[{"path":"Parts.labelCurrent.opacity","properties":["opacity"]}],"duration":400,"delay":600,"easing":"inOutQuad","preset":{"id":"ce:slider:readout","revision":1,"from":"readoutOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutCaption","id":"ctrl_1779649074015","controlType":"Label"},
+        "Transform": {"x":728,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Readout","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutHow","id":"ctrl_1779649074016","controlType":"Label"},
+        "Transform": {"x":728,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"WHILE MOVING","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ReadoutWhat","id":"ctrl_1779649074017","controlType":"Label"},
+        "Transform": {"x":730,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the value shows, and lingers a moment after","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRing","id":"ctrl_1779649074018","description":"Focus ring: its fill breathes while it has the keys.","controlType":"Slider"},
+        "Transform": {"x":1033,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"breathe":{"_type":"Animation","name":"breathe","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","to":["focused"]},"targets":[{"path":"Parts.bodyTrackFill"}],"frames":[{"at":0,"opacity":1},{"at":0.5,"opacity":0.3},{"at":1,"opacity":1}],"duration":1400,"delay":0,"easing":"inOutQuad","iterations":"infinite","direction":"normal","preset":{"id":"ce:slider:focus-ring","revision":1,"from":"breathe"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingCaption","id":"ctrl_1779649074019","controlType":"Label"},
+        "Transform": {"x":958,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Focus ring","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingHow","id":"ctrl_1779649074020","controlType":"Label"},
+        "Transform": {"x":958,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"KEYBOARD FOCUS","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FocusRingWhat","id":"ctrl_1779649074021","controlType":"Label"},
+        "Transform": {"x":960,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"its fill breathes while it has the keys","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Nod","id":"ctrl_1779649074022","description":"Nod: the cap nods once when the pointer arrives.","controlType":"Slider"},
+        "Transform": {"x":1263,"y":96,"width":64,"height":220},
+        "Behavior": {"orientation":"vertical"},
+        "Animations": {"_children":{"nod":{"_type":"Animation","name":"nod","enabled":true,"kind":"keyframes","trigger":{"type":"stateChange","from":["*"],"to":["hover"]},"targets":[{"path":"Parts.pointerCurrent"}],"frames":[{"at":0,"scale":1},{"at":0.35,"scale":1.18},{"at":0.7,"scale":0.96},{"at":1,"scale":1}],"duration":420,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","preset":{"id":"ce:slider:nod","revision":1,"from":"nod"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NodCaption","id":"ctrl_1779649074023","controlType":"Label"},
+        "Transform": {"x":1188,"y":328,"width":214,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Nod","_children":{"Fill":{"colour":"FFEDEFF2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NodHow","id":"ctrl_1779649074024","controlType":"Label"},
+        "Transform": {"x":1188,"y":350,"width":214,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"HOVER","_children":{"Fill":{"colour":"FF7FD1C7"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"NodWhat","id":"ctrl_1779649074025","controlType":"Label"},
+        "Transform": {"x":1190,"y":368,"width":210,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the cap nods once when the pointer arrives","_children":{"Fill":{"colour":"FFA0A8B0"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:lift",
+      "name": "Lift",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "lift": {
+          "_type": "Animation",
+          "name": "lift",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.lift",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 160,
+          "delay": 0,
+          "easing": "outCubic"
+        }
+      },
+      "states": {
+        "Hover": {
+          "when": {
+            "hover": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "pointerCurrent": {
+                "Layout.lift": 1.12
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Parts.pointerCurrent.Layout.lift": 1
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:grip",
+      "name": "Grip",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "press"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "grip": {
+          "_type": "Animation",
+          "name": "grip",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "pressed"
+            ],
+            "reverse": true
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent.Layout.lift",
+              "properties": [
+                "transform"
+              ]
+            }
+          ],
+          "duration": 90,
+          "delay": 0,
+          "easing": "outBack"
+        }
+      },
+      "states": {
+        "Pressed": {
+          "when": {
+            "pressed": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "pointerCurrent": {
+                "Layout.lift": 0.9
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Parts.pointerCurrent.Layout.lift": 1
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:glow",
+      "name": "Glow",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "while moving"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "glow": {
+          "_type": "Animation",
+          "name": "glow",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "dragging"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.5
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 720,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:readout",
+      "name": "Readout",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "while moving"
+      ],
+      "size": "recipe",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "readoutIn": {
+          "_type": "Animation",
+          "name": "readoutIn",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "dragging"
+            ],
+            "reverse": false
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 120,
+          "delay": 0,
+          "easing": "outQuad"
+        },
+        "readoutOut": {
+          "_type": "Animation",
+          "name": "readoutOut",
+          "enabled": true,
+          "kind": "transition",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "dragging"
+            ],
+            "to": [
+              "*"
+            ],
+            "leaving": true
+          },
+          "targets": [
+            {
+              "path": "Parts.labelCurrent.opacity",
+              "properties": [
+                "opacity"
+              ]
+            }
+          ],
+          "duration": 400,
+          "delay": 600,
+          "easing": "inOutQuad"
+        }
+      },
+      "states": {
+        "Dragging": {
+          "when": {
+            "dragging": true
+          },
+          "patches": {
+            "component": {},
+            "parts": {
+              "labelCurrent": {
+                "opacity": 1
+              }
+            }
+          }
+        }
+      },
+      "fields": {
+        "Behavior.showHandleLabels": true,
+        "Parts.labelCurrent.opacity": 0
+      }
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:focus-ring",
+      "name": "Focus ring",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "keyboard focus"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "breathe": {
+          "_type": "Animation",
+          "name": "breathe",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "to": [
+              "focused"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.bodyTrackFill"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 1
+            },
+            {
+              "at": 0.5,
+              "opacity": 0.3
+            },
+            {
+              "at": 1,
+              "opacity": 1
+            }
+          ],
+          "duration": 1400,
+          "delay": 0,
+          "easing": "inOutQuad",
+          "iterations": "infinite",
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:slider:nod",
+      "name": "Nod",
+      "category": "Slider",
+      "tags": [
+        "Touch",
+        "hover"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "nod": {
+          "_type": "Animation",
+          "name": "nod",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "stateChange",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "hover"
+            ]
+          },
+          "targets": [
+            {
+              "path": "Parts.pointerCurrent"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "scale": 1
+            },
+            {
+              "at": 0.35,
+              "scale": 1.18
+            },
+            {
+              "at": 0.7,
+              "scale": 0.96
+            },
+            {
+              "at": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

@@ -198,7 +198,12 @@ export function updateKeyframe(target, index, patch) {
 
 // --- Triggers -----------------------------------------------------------------------------------
 
-const names = (list) => (Array.isArray(list) ? list.map((v) => String(v ?? '').trim()).filter(Boolean) : []);
+// Case is ignored, as transitions and keyframe animations ignore it (transitionSelection.js,
+// keyframeAnimation.js). The tab writes a trigger's states lower-cased ("hover"); the runtime hands
+// over the States section's keys as written ("Hover"). Compared as written, a sequence on a state
+// never started in the app, while tests that passed lower-case names on both sides went on passing.
+// Found building the States tab's Motion slots, 2026-11-24.
+const names = (list) => (Array.isArray(list) ? list.map((v) => String(v ?? '').trim().toLowerCase()).filter(Boolean) : []);
 const any = (list) => list.length === 0 || list.includes('*');
 
 /**
@@ -209,6 +214,8 @@ export function triggerFires(animation, prevStates = [], nextStates = []) {
   if (String(animation?.trigger?.type ?? 'stateChange') !== 'stateChange') return false;
   const to = names(animation?.trigger?.to);
   const from = names(animation?.trigger?.from);
+  prevStates = names(prevStates);
+  nextStates = names(nextStates);
   const entered = nextStates.filter((s) => !prevStates.includes(s));
   const left = prevStates.filter((s) => !nextStates.includes(s));
   const toOk = any(to) ? entered.length > 0 || left.length > 0 : entered.some((s) => to.includes(s));
@@ -220,7 +227,7 @@ export function triggerFires(animation, prevStates = [], nextStates = []) {
 export function triggerHeld(animation, states = []) {
   const to = names(animation?.trigger?.to);
   if (any(to)) return false;
-  return states.some((s) => to.includes(s));
+  return names(states).some((s) => to.includes(s));
 }
 
 // --- The timeline -------------------------------------------------------------------------------

@@ -481,7 +481,11 @@ public:
 
                 if (! std::exchange (receivingLength, ! receivingLength))
                 {
-                    parseJSON (String (buffer.getData(), bufferLength.len));
+                    // The payload is UTF-8 (sendCommand writes toRawUTF8()). String (const char*,
+                    // size_t) reads each byte as a character of its own, so a panel's "·" arrived
+                    // as "Â·" and a preset named Café as CafÃ©, both ways across the pipe.
+                    // (CEditor: vendored fix.)
+                    parseJSON (String::fromUTF8 (buffer.getData(), static_cast<int> (bufferLength.len)));
 
                     if (ret == ReturnAfterMessageReceived::yes)
                         return;

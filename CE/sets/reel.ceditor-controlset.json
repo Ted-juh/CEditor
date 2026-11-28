@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "efbed54e",
+  "fingerprint": "1c2a684c",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -71,6 +71,7 @@
       "display.screen": "FFF3E9C8",
       "display.backlight": "FFF4ECCF",
       "panel.surface": "FF5E6A5E",
+      "control.readout": "{control.cap}",
       "section.surface": "FF495349"
     },
     "lamp": {

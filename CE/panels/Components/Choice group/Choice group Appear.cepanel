@@ -1,0 +1,602 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "f6097fee-c0b5-4e1a-9f3d-f6097feef609",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Choice group Appear",
+  "scriptId": "component_choice-appear",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1020,
+  "height": 460,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF162B35",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Cascade.value",
+      "label": "Cascade",
+      "controlName": "Cascade",
+      "path": "Cascade.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Square",
+        "Tri",
+        "Sine"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "FanOut.value",
+      "label": "FanOut",
+      "controlName": "FanOut",
+      "path": "FanOut.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "-2",
+        "-1",
+        "0",
+        "+1",
+        "+2"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "TypewriterLabels.value",
+      "label": "TypewriterLabels",
+      "controlName": "TypewriterLabels",
+      "path": "TypewriterLabels.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Sine",
+        "Square",
+        "Noise"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "DropIn.value",
+      "label": "DropIn",
+      "controlName": "DropIn",
+      "path": "DropIn.value",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "satellite"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1777817710000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Choice group · Appear","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1777817710001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":960,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the options arriving, one after another. Each group wears one built-in preset: Preview (F5) plays it.","_children":{"Fill":{"colour":"FFB9C6CC"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Cascade","id":"ctrl_1777817710002","description":"Cascade: the options come in one after another.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_2","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Saw","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Square","internalValue":"opt_2","sendValue":1,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Tri","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"Sine","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"cascade":{"_type":"Animation","name":"cascade","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.option"}],"frames":[{"at":0,"opacity":0,"y":8},{"at":1,"opacity":1,"y":0}],"duration":320,"delay":0,"easing":"outCubic","iterations":1,"direction":"normal","optionStagger":110,"preset":{"id":"ce:choice:cascade","revision":1,"from":"cascade"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeCaption","id":"ctrl_1777817710003","controlType":"Label"},
+        "Transform": {"x":40,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Cascade","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeHow","id":"ctrl_1777817710004","controlType":"Label"},
+        "Transform": {"x":40,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF70CFC0"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"CascadeWhat","id":"ctrl_1777817710005","controlType":"Label"},
+        "Transform": {"x":44,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the options come in one after another","_children":{"Fill":{"colour":"FFB9C6CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanOut","id":"ctrl_1777817710006","description":"Fan out: the options open out from the one chosen.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":370,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_3","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"-2","internalValue":"opt_1","sendValue":0,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"-1","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"0","internalValue":"opt_3","sendValue":2,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"+1","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_5","displayText":"+2","internalValue":"opt_5","sendValue":4,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"fanOut":{"_type":"Animation","name":"fanOut","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.option"}],"frames":[{"at":0,"opacity":0,"scale":0.5},{"at":0.7,"opacity":1,"scale":1.06},{"at":1,"opacity":1,"scale":1}],"duration":380,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","optionStagger":140,"optionOrder":"fromChosen","preset":{"id":"ce:choice:fan-out","revision":1,"from":"fanOut"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanOutCaption","id":"ctrl_1777817710007","controlType":"Label"},
+        "Transform": {"x":360,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Fan out","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanOutHow","id":"ctrl_1777817710008","controlType":"Label"},
+        "Transform": {"x":360,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF70CFC0"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"FanOutWhat","id":"ctrl_1777817710009","controlType":"Label"},
+        "Transform": {"x":364,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the options open out from the one chosen","_children":{"Fill":{"colour":"FFB9C6CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TypewriterLabels","id":"ctrl_1777817710010","description":"Typewriter labels: each option's word is typed in, one option after another.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":690,"y":96,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"radio"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"Sine","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"Square","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"Noise","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"typed":{"_type":"Animation","name":"typed","enabled":true,"kind":"text","effect":"typewriter","way":"in","delay":0,"easing":"outQuad","iterations":1,"split":"letter","order":"forward","stagger":45,"duration":160,"trigger":{"type":"always"},"targets":[{"path":"Parts.optionLabel"}],"optionStagger":260,"preset":{"id":"ce:choice:typewriter-labels","revision":1,"from":"typed"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TypewriterLabelsCaption","id":"ctrl_1777817710011","controlType":"Label"},
+        "Transform": {"x":680,"y":150,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Typewriter labels","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TypewriterLabelsHow","id":"ctrl_1777817710012","controlType":"Label"},
+        "Transform": {"x":680,"y":172,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF70CFC0"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"TypewriterLabelsWhat","id":"ctrl_1777817710013","controlType":"Label"},
+        "Transform": {"x":684,"y":190,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each option's word is typed in, one option after another","_children":{"Fill":{"colour":"FFB9C6CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropIn","id":"ctrl_1777817710014","description":"Drop in: the options drop into place, the last first.","controlType":"RadioButtonGroup"},
+        "Transform": {"x":50,"y":266,"width":280,"height":40},
+        "Behavior": {"defaultValue":"opt_1","visualStyle":"buttons"},
+        "Value": {"rows":[{"id":"opt_1","displayText":"A","internalValue":"opt_1","sendValue":0,"selectedByDefault":true,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_2","displayText":"B","internalValue":"opt_2","sendValue":1,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_3","displayText":"C","internalValue":"opt_3","sendValue":2,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""},{"id":"opt_4","displayText":"D","internalValue":"opt_4","sendValue":3,"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]},
+        "Animations": {"_children":{"dropIn":{"_type":"Animation","name":"dropIn","enabled":true,"kind":"keyframes","trigger":{"type":"always"},"targets":[{"path":"Parts.option"}],"frames":[{"at":0,"opacity":0,"y":-16},{"at":0.7,"opacity":1,"y":2},{"at":1,"opacity":1,"y":0}],"duration":420,"delay":0,"easing":"outQuad","iterations":1,"direction":"normal","optionStagger":90,"optionOrder":"reverse","preset":{"id":"ce:choice:drop-in","revision":1,"from":"dropIn"}}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropInCaption","id":"ctrl_1777817710015","controlType":"Label"},
+        "Transform": {"x":40,"y":320,"width":300,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Drop in","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropInHow","id":"ctrl_1777817710016","controlType":"Label"},
+        "Transform": {"x":40,"y":342,"width":300,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF70CFC0"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"DropInWhat","id":"ctrl_1777817710017","controlType":"Label"},
+        "Transform": {"x":44,"y":360,"width":292,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the options drop into place, the last first","_children":{"Fill":{"colour":"FFB9C6CC"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationPresets": [
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:cascade",
+      "name": "Cascade",
+      "category": "Choice group",
+      "tags": [
+        "Appear",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "cascade": {
+          "_type": "Animation",
+          "name": "cascade",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.option"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 0,
+              "y": 8
+            },
+            {
+              "at": 1,
+              "opacity": 1,
+              "y": 0
+            }
+          ],
+          "duration": 320,
+          "delay": 0,
+          "easing": "outCubic",
+          "iterations": 1,
+          "direction": "normal",
+          "optionStagger": 110
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:fan-out",
+      "name": "Fan out",
+      "category": "Choice group",
+      "tags": [
+        "Appear",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "fanOut": {
+          "_type": "Animation",
+          "name": "fanOut",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.option"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 0,
+              "scale": 0.5
+            },
+            {
+              "at": 0.7,
+              "opacity": 1,
+              "scale": 1.06
+            },
+            {
+              "at": 1,
+              "opacity": 1,
+              "scale": 1
+            }
+          ],
+          "duration": 380,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal",
+          "optionStagger": 140,
+          "optionOrder": "fromChosen"
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:typewriter-labels",
+      "name": "Typewriter labels",
+      "category": "Choice group",
+      "tags": [
+        "Appear",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "typed": {
+          "_type": "Animation",
+          "name": "typed",
+          "enabled": true,
+          "kind": "text",
+          "effect": "typewriter",
+          "way": "in",
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "split": "letter",
+          "order": "forward",
+          "stagger": 45,
+          "duration": 160,
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.optionLabel"
+            }
+          ],
+          "optionStagger": 260
+        }
+      },
+      "states": {},
+      "fields": {}
+    },
+    {
+      "format": "ceditor-animation-preset",
+      "version": 1,
+      "id": "ce:choice:drop-in",
+      "name": "Drop in",
+      "category": "Choice group",
+      "tags": [
+        "Appear",
+        "panel opens"
+      ],
+      "size": "effect",
+      "colours": "keep",
+      "revision": 1,
+      "animations": {
+        "dropIn": {
+          "_type": "Animation",
+          "name": "dropIn",
+          "enabled": true,
+          "kind": "keyframes",
+          "trigger": {
+            "type": "always"
+          },
+          "targets": [
+            {
+              "path": "Parts.option"
+            }
+          ],
+          "frames": [
+            {
+              "at": 0,
+              "opacity": 0,
+              "y": -16
+            },
+            {
+              "at": 0.7,
+              "opacity": 1,
+              "y": 2
+            },
+            {
+              "at": 1,
+              "opacity": 1,
+              "y": 0
+            }
+          ],
+          "duration": 420,
+          "delay": 0,
+          "easing": "outQuad",
+          "iterations": 1,
+          "direction": "normal",
+          "optionStagger": 90,
+          "optionOrder": "reverse"
+        }
+      },
+      "states": {},
+      "fields": {}
+    }
+  ]
+}

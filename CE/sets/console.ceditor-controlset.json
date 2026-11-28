@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e2cafd27",
+  "fingerprint": "2f166029",
   "set": {
     "id": "console",
     "name": "Console",
@@ -71,6 +71,7 @@
       "display.screen": "FF141A12",
       "display.backlight": "FF30352E",
       "panel.surface": "FF5E6166",
+      "control.readout": "{control.cap}",
       "section.surface": "FF494C50"
     },
     "lamp": {

@@ -26,8 +26,13 @@ import {
   colourAnimationValue,
   colourVariables,
   COLOUR_CHANNELS,
+  readEmit,
+  turnDirection,
 } from '../src/CE_Application/utils/keyframeAnimation.js';
-import { readTrigger } from '../src/CE_Application/utils/interactionRuntime.js';
+import { readTrigger, stepsOfControl } from '../src/CE_Application/utils/interactionRuntime.js';
+import { readTextEffect } from '../src/CE_Application/utils/textEffects.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { meterClipAt, meterLevelSignals } from '../src/CE_Application/utils/meterLayout.js';
 
 const node = (trigger, extra = {}) => ({
   _type: 'Animation', name: 'pulse', enabled: true, kind: 'keyframes',
@@ -38,11 +43,20 @@ const node = (trigger, extra = {}) => ({
 // --- Reading -------------------------------------------------------------------------------------
 
 test('the trigger types a keyframe animation answers', () => {
-  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'beat', 'script']);
+  // `event` joined on 2026-11-24: a gesture (click, long press, flick…), the States tab's Events
+  // row, played on request as `script` is (stateMotion.js). `valueStep` on 2026-11-26: once each
+  // time a knob's value crosses into another of its steps (the Components showcase's Detent).
+  // `hold` on 2026-11-27: while a timed button is held to confirm, over its own hold time.
+  // `optionsChange` the same day: a choice group whose list of options changed (choiceGroupParts.test.js).
+  // `clip` and `level` the same day: a meter's level reaching where it clips, or crossing a line.
+  assert.deepEqual(KEYFRAME_TRIGGER_TYPES, ['always', 'stateChange', 'valueChange', 'valueStep', 'beat', 'script', 'event', 'hold', 'optionsChange', 'clip', 'level']);
+  assert.equal(defaultIterations('clip'), 1, 'once a clip');
   assert.equal(defaultIterations('always'), 'infinite');
   assert.equal(defaultIterations('stateChange'), 'infinite', 'a state animation loops while the state holds');
   assert.equal(defaultIterations('valueChange'), 1);
+  assert.equal(defaultIterations('valueStep'), 1, 'once a step');
   assert.equal(defaultIterations('beat'), 1);
+  assert.equal(defaultIterations('event'), 1, 'a gesture plays it once');
 });
 
 test('only the part matters in a target, and anything not under Parts is the control', () => {
@@ -273,13 +287,173 @@ test('a restart flips the colour channels with the motion, so they stay in step'
   assert.deepEqual(phase(second), ['b', 'b']);
 });
 
-test('colour variables are all four, always, so a part never paints with its control\'s pulse', () => {
-  assert.equal(colourVariables(null), '--ce-kf-paint:none;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:none;');
+test('colour variables are all five, always, so a part never paints with its control\'s pulse', () => {
+  // The fifth is a fill gradient's turn and shift (gradientPaint.js), added with the Paint engine.
+  assert.equal(colourVariables(null), '--ce-kf-paint:none;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:none;--ce-kf-gradient:none;--ce-kf-image:none;');
   assert.equal(colourVariables({ paint: ['p 1ms'], text: ['t 1ms', 'u 1ms'] }),
-    '--ce-kf-paint:p 1ms;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:t 1ms, u 1ms;');
+    '--ce-kf-paint:p 1ms;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:t 1ms, u 1ms;--ce-kf-gradient:none;--ce-kf-image:none;');
   // A part whose fill is absorbed onto it plays paint itself, and must not hand it to its layers too.
   assert.match(colourVariables({ paint: ['p 1ms'] }, { skip: ['paint'] }), /^--ce-kf-paint:none;/);
   assert.equal(animationDeclaration(['m 1ms'], { extra: ['p 1ms'] }), 'animation:m 1ms, p 1ms;');
   assert.equal(animationDeclaration(null, { extra: ['p 1ms'], svg: true }), 'animation:p 1ms;',
     'a colour alone needs no transform origin');
+});
+
+// --- A step of the value, and words thrown (2026-11-26, the Components showcase's knob) -----------
+
+test('a step animation fires each time the value comes to another step, during a drag too', () => {
+  const { step, clock } = rig(node({ type: 'valueStep', steps: 4 }));
+  assert.equal(phaseOf(step([], { valueNormalized: 0.5 })), null, 'where the value starts is no step');
+  clock.t = 100;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.55 })), null, 'within the same step: nothing');
+  clock.t = 200;
+  const up = step(['Dragging'], { valueNormalized: 0.7, dragging: true });
+  assert.equal(phaseOf(up), 'a', 'into the next step, while dragged');
+  assert.deepEqual(up.fired, ['pulse']);
+  clock.t = 220;
+  assert.equal(phaseOf(step(['Dragging'], { valueNormalized: 1, dragging: true })), 'b', 'the next step restarts it at once, as a detent does');
+  clock.t = 240;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.99 })), 'b', 'rounded: 0.99 is still the top step');
+});
+
+// --- A meter's level crossing a line (2026-11-27, the Meter, phase 2) ----------------------------
+
+test('When it clips fires each time the level reaches the clip point, and again only after falling back', () => {
+  const { step, clock } = rig(node({ type: 'clip' }));
+  assert.equal(phaseOf(step([], { valueNormalized: 0.95, clipAt: 0.9 })), null, 'already over as it is first seen: not a clip');
+  clock.t = 100;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.5, clipAt: 0.9 })), null, 'falling is not clipping');
+  clock.t = 200;
+  const clipped = step([], { valueNormalized: 0.9, clipAt: 0.9 });
+  assert.equal(phaseOf(clipped), 'a', 'at the clip point, it clips');
+  assert.deepEqual(clipped.fired, ['pulse']);
+  clock.t = 300;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.89, clipAt: 0.9 })), 'a', 'a hair under the line is still over it');
+  clock.t = 320;
+  assert.equal(phaseOf(step([], { valueNormalized: 1, clipAt: 0.9 })), 'a', 'so coming back up is not a second clip');
+  clock.t = 400;
+  step([], { valueNormalized: 0.6, clipAt: 0.9 });
+  clock.t = 500;
+  assert.equal(phaseOf(step([], { valueNormalized: 0.97, clipAt: 0.9 })), 'b', 'fallen back and over again: the next clip');
+});
+
+test('When it crosses a level answers the way it is asked: up, down or either', () => {
+  const crossings = (way) => {
+    const { step, clock } = rig(node({ type: 'level', at: 0.5, way }));
+    const fired = [];
+    for (const [t, v] of [[0, 0.2], [100, 0.6], [200, 0.3], [300, 0.7]]) {
+      clock.t = t;
+      if (step([], { valueNormalized: v }).fired.length) fired.push(t);
+    }
+    return fired;
+  };
+  assert.deepEqual(crossings('up'), [100, 300]);
+  assert.deepEqual(crossings('down'), [200]);
+  assert.deepEqual(crossings('both'), [100, 200, 300]);
+  assert.deepEqual(readTrigger({ trigger: { type: 'level' } }).at, 0.9, 'a level not named: 90% of the scale');
+  assert.equal(readTrigger({ trigger: { type: 'level', at: 3 } }).at, 1);
+  assert.equal(readTrigger({ trigger: { type: 'level', way: 'sideways' } }).way, 'up');
+});
+
+test('a meter\'s level is what its animations hear, and where it clips is its lamp, its top zone or full scale', () => {
+  const meter = createControl('Meter');
+  meter._children.Meter = { ...meter._children.Meter, valueMin: -48, valueMax: 0, __value: -12 };
+  const signals = meterLevelSignals(meter);
+  assert.equal(signals.valueRaw, -12);
+  assert.equal(signals.valueNormalized, 0.75);
+  assert.equal(signals.clipAt, 0.9, 'the default zones: red from 90%');
+  meter._children.Parts._children.lamp.visible = true;
+  meter._children.Parts._children.lamp.clipFrom = 0.8;
+  assert.equal(meterClipAt(meter), 0.8, 'a clip lamp says where it lights');
+  meter._children.Parts._children.lamp.visible = false;
+  meter._children.Meter.zones = [{ from: 0, colour: 'FF5B9BD5' }];
+  assert.equal(meterClipAt(meter), 1, 'one zone and no lamp: full scale');
+  delete meter._children.Meter.__value;
+  meter._children.Meter.value = -48;
+  assert.equal(meterLevelSignals(meter).valueNormalized, 0, 'nothing arriving: its own value');
+});
+
+test('a step trigger reads its count, kept in range, and a control steps as its own steps say', () => {
+  assert.equal(readTrigger({ trigger: { type: 'valueStep', steps: 7.4 } }).steps, 7);
+  assert.equal(readTrigger({ trigger: { type: 'valueStep', steps: 9999 } }).steps, 400);
+  assert.equal(readTrigger({ trigger: { type: 'valueStep' } }).steps, 0, 'none named: the control\'s own');
+  const knob = createControl('Knob');
+  Object.assign(knob._children.Behavior, { min: 0, max: 4, step: 1 });
+  assert.equal(stepsOfControl(knob), 4, 'a knob of five choices has four steps between them');
+  Object.assign(knob._children.Behavior, { min: 0, max: 1, step: 0 });
+  assert.equal(stepsOfControl(knob), 20, 'a knob with no step: twenty, one every 5%');
+  Object.assign(knob._children.Behavior, { min: 0, max: 127, step: 0.01 });
+  assert.equal(stepsOfControl(knob), 20, 'more than 400 is no detent anyone feels');
+});
+
+const emitNode = (fields = {}) => ({
+  _type: 'Animation', name: 'stream', enabled: true, kind: 'emit', duration: 700, delay: 0, easing: 'outQuad',
+  trigger: { type: 'valueStep', steps: 10 }, targets: [], ...fields,
+});
+
+test('an emit animation reads what it throws, from where and how far, kept in range', () => {
+  const entry = readEmit(emitNode({ shows: 'delta', from: 'centre', direction: 'up', travel: 9999, size: 1 }));
+  assert.deepEqual(
+    { ...entry.emit, easing: undefined },
+    { shows: 'delta', words: '', from: 'centre', direction: 'up', travel: 400, size: 6, colour: null, duration: 700, delay: 0, easing: undefined },
+  );
+  assert.equal(entry.moves, false);
+  assert.deepEqual(entry.frames, []);
+  const plain = readEmit(emitNode({ shows: 'x', from: 'y', direction: 'z' })).emit;
+  assert.deepEqual([plain.shows, plain.from, plain.direction, plain.travel, plain.size], ['value', 'tip', 'pointer', 36, 12]);
+  assert.equal(readEmit(emitNode({ enabled: false })), null);
+  assert.equal(readEmit({ kind: 'keyframes' }), null);
+  assert.equal(readEmit(emitNode(), '', { timeScale: 2 }).emit.duration, 1400, 'slow motion stretches its flight');
+});
+
+test('each step throws a word with the value and the one before it; a word lasts its flight', () => {
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const catalog = { enabled: true, reducedMotion: false, entries: [readEmit(emitNode())] };
+  const step = (v) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog });
+  assert.deepEqual(step(0.2).emits, [], 'the value as it opens throws nothing');
+  clock.t = 50;
+  const one = step(0.3);
+  assert.deepEqual(one.emits.map((w) => [w.value, w.from, w.turn]), [[0.3, 0.2, 1]]);
+  clock.t = 100;
+  const two = step(0.1);
+  assert.deepEqual(two.emits.map((w) => [w.value, w.from, w.turn]), [[0.3, 0.2, 1], [0.1, 0.3, -1]], 'down: the turn says so');
+  assert.notEqual(two.key, one.key, 'a new word restyles');
+  clock.t = 50 + 700 + 201;
+  assert.deepEqual(step(0.1).emits.map((w) => w.value), [0.1], 'the first has faded; the second is still in the air');
+  clock.t = 100 + 700 + 201;
+  assert.deepEqual(step(0.1).emits, []);
+  player.reset();
+  assert.deepEqual(step(0.9).emits, [], 'reset forgets where the value was');
+});
+
+test('a word thrown on another trigger carries the value as it is', () => {
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const catalog = { enabled: true, reducedMotion: false, entries: [readEmit(emitNode({ trigger: { type: 'script' } }))] };
+  const step = (v, plays = {}) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog }, { plays });
+  assert.deepEqual(step(0.4).emits, []);
+  assert.deepEqual(step(0.6, { stream: 1 }).emits.map((w) => [w.value, w.from]), [[0.6, 0.4]]);
+});
+
+test('a text effect whose direction is the turn goes the way the value went', () => {
+  assert.deepEqual(['odometer', 'roll', 'reel'].map((effect) => [turnDirection({ effect }, 1), turnDirection({ effect }, -1)]),
+    [['up', 'down'], ['up', 'down'], ['up', 'down']], 'a counter\'s digits');
+  assert.deepEqual(['push', 'wipe'].map((effect) => [turnDirection({ effect }, 1), turnDirection({ effect }, -1)]),
+    [['left', 'right'], ['left', 'right']], 'a carousel: up, the next word comes in from the right');
+  const text = readTextEffect({ kind: 'text', enabled: true, name: 'names', effect: 'push', direction: 'turn',
+    trigger: { type: 'valueStep', steps: 4 }, targets: [{ path: 'Parts.labelCurrent' }] });
+  assert.equal(text.direction, 'turn');
+  const clock = { t: 0 };
+  const player = createKeyframePlayer({ now: () => clock.t });
+  const entry = { name: 'names', text, moves: false, part: 'labelCurrent', trigger: text.trigger, iterations: 1, frames: [], span: 600 };
+  const catalog = { enabled: true, reducedMotion: false, entries: [entry] };
+  const step = (v) => player.next({ activeStates: [], signals: { valueNormalized: v }, keyframes: catalog });
+  step(0.5);
+  clock.t = 10;
+  assert.equal(step(0.75).texts.get('labelCurrent')[0].effect.direction, 'left');
+  clock.t = 20;
+  const down = step(0.25);
+  assert.equal(down.texts.get('labelCurrent')[0].effect.direction, 'right');
+  assert.match(down.rules, /@keyframes/, 'its rules are the turned effect\'s');
 });

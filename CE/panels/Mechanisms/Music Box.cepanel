@@ -1,0 +1,1228 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "01a70f9f-3c4a-4d17-9e21-01a70f9f01a7",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Music Box",
+  "scriptId": "mechanism_musicbox",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 720,
+  "height": 405,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1A100C",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "carbon-pro"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Glow","id":"ctrl_1727725727000","controlType":"Label"},
+        "Transform": {"x":60,"y":-40,"width":600,"height":420},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"radial","centerX":50,"centerY":50,"stops":[{"position":0,"color":"#553A2414"},{"position":100,"color":"#001A100C"}]}},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Box","id":"ctrl_1727725727001","controlType":"Label"},
+        "Transform": {"x":70,"y":120,"width":580,"height":240},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":180,"stops":[{"position":0,"color":"#8a5a32"},{"position":100,"color":"#4a2e18"}]}},"Border":{"enabled":false},"Corners":{"radius":14}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Well","id":"ctrl_1727725727002","controlType":"Label"},
+        "Transform": {"x":100,"y":146,"width":520,"height":186},
+        "Background": {"_children":{"Fill":{"colour":"FF2A1A10"},"Border":{"enabled":false},"Corners":{"radius":8}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Drum","id":"ctrl_1727725727003","controlType":"Label"},
+        "Transform": {"x":120,"y":166,"width":250,"height":146},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":0,"stops":[{"position":0,"color":"#7a5a1e"},{"position":50,"color":"#f0d080"},{"position":100,"color":"#7a5a1e"}]}},"Border":{"enabled":false},"Corners":{"radius":10},"Patterns":{"_type":"Patterns","_children":{"pattern1":{"_type":"Pattern","enabled":true,"src":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%3E%3Ccircle%20cx%3D%2211.1%22%20cy%3D%2234.1%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2223.8%22%20cy%3D%2234.5%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%224.7%22%20cy%3D%2232.1%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2215.3%22%20cy%3D%224.8%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%225.3%22%20cy%3D%2236.5%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2236.1%22%20cy%3D%2221.1%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2218.4%22%20cy%3D%2221.6%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2223.6%22%20cy%3D%2229.4%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2229.5%22%20cy%3D%2217.2%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2219.1%22%20cy%3D%2232.0%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2215.3%22%20cy%3D%2219.4%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.1%22%20cy%3D%2228.5%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2231.4%22%20cy%3D%2215.2%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%229.1%22%20cy%3D%2236.4%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%227.2%22%20cy%3D%2218.5%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2218.5%22%20cy%3D%226.7%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%226.9%22%20cy%3D%2224.1%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2229.3%22%20cy%3D%225.9%22%20r%3D%221.8%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E","tint":"FF4A3410","opacity":90,"blend":"normal","scale":1,"repeat":"both","align":"center","offsetX":0,"offsetY":0,"place":"behind","speed":40,"direction":270,"flipX":false,"flipY":false}}}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine1","id":"ctrl_1727725727004","controlType":"Label"},
+        "Transform": {"x":380,"y":172,"width":200,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FFB5BDC6"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine2","id":"ctrl_1727725727005","controlType":"Label"},
+        "Transform": {"x":380,"y":185,"width":191,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FF9AA3AE"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine3","id":"ctrl_1727725727006","controlType":"Label"},
+        "Transform": {"x":380,"y":198,"width":182,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FFB5BDC6"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine4","id":"ctrl_1727725727007","controlType":"Label"},
+        "Transform": {"x":380,"y":211,"width":173,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FF9AA3AE"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine5","id":"ctrl_1727725727008","controlType":"Label"},
+        "Transform": {"x":380,"y":224,"width":164,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FFB5BDC6"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine6","id":"ctrl_1727725727009","controlType":"Label"},
+        "Transform": {"x":380,"y":237,"width":155,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FF9AA3AE"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine7","id":"ctrl_1727725727010","controlType":"Label"},
+        "Transform": {"x":380,"y":250,"width":146,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FFB5BDC6"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine8","id":"ctrl_1727725727011","controlType":"Label"},
+        "Transform": {"x":380,"y":263,"width":137,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FF9AA3AE"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine9","id":"ctrl_1727725727012","controlType":"Label"},
+        "Transform": {"x":380,"y":276,"width":128,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FFB5BDC6"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Tine10","id":"ctrl_1727725727013","controlType":"Label"},
+        "Transform": {"x":380,"y":289,"width":119,"height":7},
+        "Background": {"_children":{"Fill":{"colour":"FF9AA3AE"},"Border":{"enabled":false},"Corners":{"radius":3}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Comb","id":"ctrl_1727725727014","controlType":"Label"},
+        "Transform": {"x":560,"y":160,"width":34,"height":156},
+        "Background": {"_children":{"Fill":{"colour":"00000000","solidEnabled":false,"gradientEnabled":true,"gradient":{"type":"linear","angle":90,"stops":[{"position":0,"color":"#d8dde2"},{"position":100,"color":"#7d848c"}]}},"Border":{"enabled":false},"Corners":{"radius":4}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Key","id":"ctrl_1727725727015","controlType":"Label"},
+        "Transform": {"x":650,"y":210,"width":60,"height":52},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2252%22%20viewBox%3D%220%200%2060%2052%22%3E%3Crect%20x%3D%2226%22%20y%3D%2220%22%20width%3D%228%22%20height%3D%2230%22%20fill%3D%22%23c9a24a%22%2F%3E%3Cpath%20d%3D%22M30%2022%20C%2010%2022%204%2010%2010%204%20C%2016%20-2%2026%208%2030%2014%20C%2034%208%2044%20-2%2050%204%20C%2056%2010%2050%2022%2030%2022%20Z%22%20fill%3D%22%23e0bb5a%22%20stroke%3D%22%238a6a24%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Star","id":"ctrl_1727725727016","controlType":"Label"},
+        "Transform": {"x":330,"y":52,"width":60,"height":60},
+        "Background": {"_children":{"Fill":{"colour":"00000000","imageEnabled":true,"imageSrc":"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%3E%3Cpath%20d%3D%22M30%202%20L%2037%2022%20L%2058%2022%20L%2041%2035%20L%2047%2056%20L%2030%2043%20L%2013%2056%20L%2019%2035%20L%202%2022%20L%2023%2022%20Z%22%20fill%3D%22%23ffe28a%22%20stroke%3D%22%23c9a24a%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E","imageFit":"contain"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":14}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note1","id":"ctrl_1727725727017","controlType":"Label"},
+        "Transform": {"x":420,"y":150,"width":30,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"♪","_children":{"Fill":{"colour":"FFFFE28A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note2","id":"ctrl_1727725727018","controlType":"Label"},
+        "Transform": {"x":456,"y":150,"width":30,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"♪","_children":{"Fill":{"colour":"FFFFE28A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note3","id":"ctrl_1727725727019","controlType":"Label"},
+        "Transform": {"x":492,"y":150,"width":30,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"♪","_children":{"Fill":{"colour":"FFFFE28A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note4","id":"ctrl_1727725727020","controlType":"Label"},
+        "Transform": {"x":528,"y":150,"width":30,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"♪","_children":{"Fill":{"colour":"FFFFE28A"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":22}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1727725727021","controlType":"Label"},
+        "Transform": {"y":368,"width":720,"height":30},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MUSIC BOX","_children":{"Fill":{"colour":"FFE8D2A8"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":20,"letterSpacing":12}}}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_musicbox",
+      "name": "Tune",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 5000,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_musicbox_1",
+          "controlId": "ctrl_1727725727004",
+          "target": "Transform",
+          "start": 0,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_2",
+          "controlId": "ctrl_1727725727017",
+          "target": "Transform",
+          "start": 0,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 20,
+                "opacity": 0
+              },
+              {
+                "at": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "y": -90,
+                "opacity": 0,
+                "rotate": -18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_3",
+          "controlId": "ctrl_1727725727008",
+          "target": "Transform",
+          "start": 300,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_4",
+          "controlId": "ctrl_1727725727011",
+          "target": "Transform",
+          "start": 600,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_5",
+          "controlId": "ctrl_1727725727013",
+          "target": "Transform",
+          "start": 900,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_6",
+          "controlId": "ctrl_1727725727011",
+          "target": "Transform",
+          "start": 1200,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_7",
+          "controlId": "ctrl_1727725727018",
+          "target": "Transform",
+          "start": 1200,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 20,
+                "opacity": 0
+              },
+              {
+                "at": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "y": -90,
+                "opacity": 0,
+                "rotate": 18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_8",
+          "controlId": "ctrl_1727725727008",
+          "target": "Transform",
+          "start": 1500,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_9",
+          "controlId": "ctrl_1727725727006",
+          "target": "Transform",
+          "start": 1800,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_10",
+          "controlId": "ctrl_1727725727009",
+          "target": "Transform",
+          "start": 2100,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_11",
+          "controlId": "ctrl_1727725727004",
+          "target": "Transform",
+          "start": 2400,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_12",
+          "controlId": "ctrl_1727725727019",
+          "target": "Transform",
+          "start": 2400,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 20,
+                "opacity": 0
+              },
+              {
+                "at": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "y": -90,
+                "opacity": 0,
+                "rotate": -18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_13",
+          "controlId": "ctrl_1727725727008",
+          "target": "Transform",
+          "start": 2700,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_14",
+          "controlId": "ctrl_1727725727011",
+          "target": "Transform",
+          "start": 3000,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_15",
+          "controlId": "ctrl_1727725727013",
+          "target": "Transform",
+          "start": 3300,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FF9AA3AE"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FF9AA3AE"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_16",
+          "controlId": "ctrl_1727725727012",
+          "target": "Transform",
+          "start": 3600,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_17",
+          "controlId": "ctrl_1727725727020",
+          "target": "Transform",
+          "start": 3600,
+          "length": 1400,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "y": 20,
+                "opacity": 0
+              },
+              {
+                "at": 0.15,
+                "opacity": 1
+              },
+              {
+                "at": 1,
+                "y": -90,
+                "opacity": 0,
+                "rotate": 18
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_18",
+          "controlId": "ctrl_1727725727010",
+          "target": "Transform",
+          "start": 3900,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_19",
+          "controlId": "ctrl_1727725727008",
+          "target": "Transform",
+          "start": 4200,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_20",
+          "controlId": "ctrl_1727725727006",
+          "target": "Transform",
+          "start": 4500,
+          "length": 500,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "outQuad",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 0.08,
+                "x": -6,
+                "fill": "FFFFF4D0"
+              },
+              {
+                "at": 0.3,
+                "x": 3
+              },
+              {
+                "at": 0.5,
+                "x": -1.5
+              },
+              {
+                "at": 0.75,
+                "x": 0.6,
+                "fill": "FFB5BDC6"
+              },
+              {
+                "at": 1,
+                "x": 0,
+                "fill": "FFB5BDC6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_21",
+          "controlId": "ctrl_1727725727015",
+          "target": "Transform",
+          "start": 0,
+          "length": 4800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0
+              },
+              {
+                "at": 1,
+                "rotate": -360
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_musicbox_22",
+          "controlId": "ctrl_1727725727016",
+          "target": "Transform",
+          "start": 0,
+          "length": 4800,
+          "effect": {
+            "kind": "keyframes",
+            "easing": "linear",
+            "iterations": 1,
+            "direction": "normal",
+            "frames": [
+              {
+                "at": 0,
+                "rotate": 0,
+                "y": 0
+              },
+              {
+                "at": 0.25,
+                "y": -6
+              },
+              {
+                "at": 0.5,
+                "y": 0
+              },
+              {
+                "at": 0.75,
+                "y": -6
+              },
+              {
+                "at": 1,
+                "rotate": 360,
+                "y": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

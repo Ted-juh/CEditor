@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bb0c3046",
+  "fingerprint": "77ffe94e",
   "set": {
     "id": "stompbox",
     "name": "Performance",
@@ -71,6 +71,7 @@
       "display.screen": "FF0A0A0B",
       "display.backlight": "FF272728",
       "panel.surface": "FF242A2B",
+      "control.readout": "{text.label}",
       "section.surface": "FF1C2122"
     },
     "lamp": {

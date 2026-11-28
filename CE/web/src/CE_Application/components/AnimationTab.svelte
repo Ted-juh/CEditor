@@ -48,11 +48,22 @@
   import X from 'lucide-svelte/icons/x';
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
+  import PathBar from './animation/PathBar.svelte';
+  import TextEffectEditor from './animation/TextEffectEditor.svelte';
+  import { TEXT_TRIGGER_LABELS, TEXT_TRIGGER_TYPES, nameValueSwapPatch } from '../utils/textEffects.js';
+  import { labelShows } from '../utils/labelShows.js';
+  import { attachmentsOf } from '../utils/attachedLabels.js';
+  import { flattenTargets, targetSteps, targetTree } from '../utils/targetPaths.js';
+  import { FLICK_DIRECTIONS, LONG_PRESS_MS, MOTION_EVENTS } from '../utils/stateMotion.js';
   import EasingCurve from './animation/EasingCurve.svelte';
   import StateChips from './animation/StateChips.svelte';
   import AnimationStage from './animation/AnimationStage.svelte';
   import BezierEditor from './animation/BezierEditor.svelte';
   import FramesEditor from './animation/FramesEditor.svelte';
+  import ValueFramesEditor from './animationDesigner/ValueFramesEditor.svelte';
+  import PresetLinkCard from './animation/PresetLinkCard.svelte';
+  import PresetLibrary from './animation/PresetLibrary.svelte';
+  import { panelLoopSummary, panelLoopLines, showNextLoop } from '../stores/loopBudgetStore.js';
   import SequenceTimeline from './animation/SequenceTimeline.svelte';
   import * as anime from '../utils/animeTimeline.js';
   import { addKeyframe, removeKeyframe, updateKeyframe, normalizeKeyframes, keyframesDuration, sampleKeyframes, isColourTarget } from '../utils/keyframeModel.js';
@@ -63,7 +74,14 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
-  import { activePanel, selectedComponentIds } from '../stores/panels.js';
+  import PropertyText from '../properties/PropertyText.svelte';
+  import { isTimedButtonBehavior } from '../utils/timedButtonPreview.js';
+  import { choicePartNames } from '../utils/choiceGroupLayout.js';
+  import { LAMP_ORDER_LABELS, OPTION_ORDERS, OPTION_ORDER_LABELS } from '../utils/optionStagger.js';
+  import { LEVEL_TRIGGER_TYPES } from '../utils/keyframeAnimation.js';
+  import { METER_CELL_PART, METER_DEVICE_TYPES, meterPartNames } from '../models/meterDeviceParts.js';
+  import { activePanel, selectedComponentIds, openAnimationDesigner } from '../stores/panels.js';
+  import Maximize2 from 'lucide-svelte/icons/maximize-2';
   import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
   import { ANIMATION_PRESETS, PRESET_BY_ID, presetPatch, presetBlockedBecause } from '../utils/animationPresets.js';
   import { beginHistoryTransaction, commitHistoryTransaction } from '../stores/history.js';
@@ -84,10 +102,8 @@
     addTarget,
     removeTarget,
     moveTarget,
-    buildTarget,
     OFFERED_PROPERTIES,
     OFFERED_ROOT_PROPERTIES,
-    CONTROL_ITSELF,
     TRIGGER_TYPES,
     EASING_CHOICES,
     CUSTOM_EASING,
@@ -95,7 +111,10 @@
     SPRING_LIMITS,
     easingPatch,
     cleanSpring,
-    ANIMATION_KINDS,
+    animationKindsFor,
+    VALUE_KIND,
+    EMIT_KIND,
+    throwsFromKey,
     SEQUENCE_KIND,
     EASING_NAMES,
     offeredTargetsFor,
@@ -108,6 +127,7 @@
     kindPatch,
     targetStatus,
     newAnimationShape,
+    animationsPatch,
     cleanAnimationName,
     uniqueAnimationName,
     renameBlockedBecause,
@@ -132,7 +152,17 @@
   let controlId = $derived(control?._children?.Core?.id ?? '');
   let controlName = $derived(control?._children?.Core?.name || control?._children?.Core?.controlType || '');
   let section = $derived(getSection(control, 'Animations'));
-  let partNames = $derived(Object.keys(getSection(control, 'Parts')?._children ?? {}));
+  // Its own parts, and a choice group's drawn from its rows (the thumb, the chosen option, every option).
+  let partNames = $derived([...Object.keys(getSection(control, 'Parts')?._children ?? {}), ...choicePartNames(control), ...meterPartNames(control)]);
+  // A choice group's own trigger: its list of options changed (a group that depends on another's choice).
+  let choiceOffered = $derived(choicePartNames(control).length > 0);
+  // A meter's own triggers: its level reaching where it clips, or crossing a line (the Meter, phase 2).
+  let levelOffered = $derived(METER_DEVICE_TYPES.has(String(control?._children?.Core?.controlType ?? '')));
+  // Playing on every option or every label, it can take them one after another.
+  let selectedPartName = $derived(String(selected?.part ?? (selected?.animation?.targets?.[0]?.path ?? '').replace(/^Parts\./, '')));
+  // Or on every lamp of a meter (models/meterDeviceParts.js METER_CELL_PART): one after another too.
+  let lampsStagger = $derived(levelOffered && selectedPartName === METER_CELL_PART);
+  let staggerOffered = $derived((choiceOffered && ['option', 'optionLabel'].includes(selectedPartName)) || lampsStagger);
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
@@ -142,11 +172,13 @@
   let selected = $derived(rows.find((row) => row.name === selectedName) ?? null);
 
   let sequence = $derived(selected?.kind === SEQUENCE_KIND);
+  // A transition that plays when a state is left rather than entered (`trigger.leaving`).
+  let leavingTrigger = $derived(!sequence && selected?.triggerType === 'stateChange' && selected?.trigger?.leaving === true);
   // For "does this part exist" on a sequence, generator-made parts count: a filmstrip's frame
   // lives on one, and the document never holds it.
   let knownPartNames = $derived(sequence ? [...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])] : partNames);
-  let targets = $derived(selected ? describeTargets(selected, knownPartNames) : []);
-  let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+  let targets = $derived(selected ? describeTargets(selected, knownPartNames, { control }) : []);
+  let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames, { control }), 0));
 
   // Triggers name states by the control's own States keys; anything else never matches.
   let stateNames = $derived(control ? controlStateNames(control) : []);
@@ -161,11 +193,46 @@
   let selectedClashes = $derived(selected ? clashesFor(selected.name, clashes) : []);
 
   let keyframes = $derived(selected?.kind === 'keyframes');
-  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence' };
+  let textKind = $derived(selected?.kind === 'text');
+  // What a knob's or slider's value draws (step 6): offered on a control that draws one.
+  let valueKind = $derived(selected?.kind === VALUE_KIND);
+  // Words thrown from the pointer (phase 2 of the Components' Knob): a knob or slider only.
+  let emitKind = $derived(selected?.kind === EMIT_KIND);
+  // A button throws words from its key: words of its own or a count, rising; it has no value or pointer.
+  let fromKey = $derived(throwsFromKey(control));
+  // The hold trigger is a timed button's: no other control is ever held to confirm.
+  let holdOffered = $derived(isTimedButtonBehavior(control?._children?.Behavior));
+  let kinds = $derived.by(() => {
+    const list = animationKindsFor(control);
+    return valueKind && !list.includes(VALUE_KIND) ? [...list, VALUE_KIND] : list;
+  });
+  // Whether the place a keyframe animation plays on paints a fill gradient: its frames then offer
+  // the gradient's turn and shift (FramesEditor, utils/gradientPaint.js).
+  let paintsGradient = $derived.by(() => {
+    if (!keyframes) return false;
+    const path = String(selected?.targets?.[0]?.path ?? '');
+    const partName = path.startsWith('Parts.') ? path.split('.')[1] : '';
+    const owner = partName ? resolvedPartsOf(control)?.[partName] : control;
+    const fill = owner?._children?.Background?._children?.Fill;
+    return fill?.gradientEnabled === true && !!fill?.gradient;
+  });
+  // …and whether it paints an image, whose pan, zoom and spin its frames can then move.
+  let paintsImage = $derived.by(() => {
+    if (!keyframes) return false;
+    const path = String(selected?.targets?.[0]?.path ?? '');
+    const partName = path.startsWith('Parts.') ? path.split('.')[1] : '';
+    const owner = partName ? resolvedPartsOf(control)?.[partName] : control;
+    const fill = owner?._children?.Background?._children?.Fill;
+    return fill?.imageEnabled === true && !!fill?.imageSrc;
+  });
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence', text: 'Text', value: 'Value', emit: 'Words' };
   const KIND_TITLES = {
     transition: 'Eases between two styles when something changes',
     keyframes: 'Plays a shape of its own on one part — a pulse, a blink — looping, on the beat, or from a script',
     sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
+    text: 'Real words, whole or a piece at a time: typewriter, explode, roll, push, wipe, crossfade, shimmer',
+    value: 'What the value draws — its arc, its pointer — moved for a moment, then handed back to the value: a ring sweep',
+    emit: 'Words thrown: from a knob\'s or a slider\'s pointer as the value steps, or rising from a button\'s key as it plays',
   };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
@@ -184,26 +251,28 @@
   let rawTargetIndex = $state(-1);
   let targetIndex = $derived(rawTargetIndex >= 0 && rawTargetIndex < targets.length ? rawTargetIndex : -1);
 
-  // What the "add a target" row is set to.
-  let newPart = $state('');
-  let newProperty = $state(OFFERED_PROPERTIES[0].path);
-  // A change lands on one of the control's parts or on the control itself. A control with no parts
-  // of its own has only the second — and until this was offered, the Add button was simply dead
-  // for it, with nothing to say why.
-  let onControl = $derived(newPart === CONTROL_ITSELF || !partNames.length);
-  let partForAdd = $derived(onControl ? '' : (newPart || partNames[0] || ''));
-  let partOptions = $derived([
-    ...partNames.map((name) => ({ value: name, label: name })),
-    { value: CONTROL_ITSELF, label: 'The control itself' },
-  ]);
-  // What the Change dropdown offers: the part's properties or the control's own, and for a
-  // sequence the control's value channels and a frame track per filmstrip part.
-  let offered = $derived(offeredTargetsFor(control, selected?.kind, { onControl }));
-  let offeredForAdd = $derived(offered.find((entry) => entry.path === newProperty) ?? offered[0]);
+  // What the "add a change" row is set to: one target, picked with the path bar
+  // (animation/PathBar.svelte) as Knob01 › Body › Cap › Scale. It replaced two flat lists, "On"
+  // (every part by its internal name, then "The control itself") and "Change"; the owner asked for
+  // the control or any part of it to be easy to pick (2026-11-24). The choices are the same ones:
+  // the path bar is built from offeredTargetsFor and writes with buildTarget.
+  let pendingTarget = $state(null);
+  // The control's own entries, value channels and filmstrip frames included: what a track's label
+  // is looked up in.
+  let offered = $derived(offeredTargetsFor(control, selected?.kind, { onControl: true }));
+  let addChoices = $derived(flattenTargets(targetTree(control, selected?.kind)));
+  // Until something is picked: the first part's first property, where the old "On" list began; a
+  // control with no parts of its own starts on the control itself, which is all it has.
+  let targetForAdd = $derived(
+    addChoices.find((item) => item.target.path === pendingTarget?.path)?.target
+      ?? addChoices.find((item) => item.target.path.startsWith('Parts.'))?.target
+      ?? addChoices[0]?.target
+      ?? null
+  );
   // Tell the user before they add it, not after.
-  let addStatus = $derived(sequence
-    ? sequenceTargetStatus(buildTarget(partForAdd, offeredForAdd), knownPartNames, { triggerType: selected?.triggerType ?? 'stateChange' })
-    : targetStatus(buildTarget(partForAdd, offeredForAdd), partNames));
+  let addStatus = $derived(!targetForAdd ? { works: false, detail: 'This control offers nothing to change.' } : sequence
+    ? sequenceTargetStatus(targetForAdd, knownPartNames, { triggerType: selected?.triggerType ?? 'stateChange' })
+    : targetStatus(targetForAdd, partNames));
 
     // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
   // A target of another kind means another tab is being opened right now, and stealing it is how
@@ -397,8 +466,8 @@ onMount(() => {
 
   function add() {
     if (!selected) return;
-    const target = buildTarget(partForAdd, offeredForAdd);
-    if (!target) return;
+    if (!targetForAdd) return;
+    const target = { ...targetForAdd, properties: [...(targetForAdd.properties ?? [])] };
     // On a sequence a new track starts with one keyframe holding the authored value, as the kind
     // switch seeds, so adding it changes nothing on screen until a second one.
     if (sequence) {
@@ -434,7 +503,7 @@ onMount(() => {
     if (!controlId) return;
     const name = uniqueAnimationName(rows.map((row) => row.name), newName);
     if (!name) return;
-    updateControlProperty(controlId, `Animations.${name}`, newAnimationShape(name));
+    applyControlPatch(controlId, animationsPatch(control, { [name]: newAnimationShape(name) }), { pin: true });
     newName = '';
     wantedName = name;
     rawTargetIndex = -1;
@@ -475,7 +544,46 @@ onMount(() => {
   // A preset is an animation AND the state change it animates (utils/animationPresets.js). It goes on
   // the armed control, or on every selected control at once — one undo step either way.
   let presetReport = $state('');
+  // The preset library or the save form (components/animation/PresetLibrary.svelte), or nothing.
+  let presetPanel = $state('');
+
+  /** A control without an Animations section (a Label) is given an empty one, so it can have some. */
+  function giveAnimations() {
+    if (!controlId || !control) return;
+    const step = beginHistoryTransaction();
+    applyControlPatch(controlId, animationsPatch(control, {}), { pin: true });
+    commitHistoryTransaction(step);
+  }
   let selectionIds = $derived([...($selectedComponentIds ?? [])]);
+  // What the library's Apply puts a preset on: every selected control, else the one the tab is on.
+  let presetTargets = $derived(selectionIds.length > 1 ? selectionIds : (controlId ? [controlId] : []));
+
+  /**
+   * The name ↔ value swap (utils/textEffects.js nameValueSwapPatch): on the armed Label if it shows a
+   * control's name or value, else on the Label showing the armed control's name. The Label is where
+   * the words are; a knob draws none of its own.
+   */
+  function addNameValueSwap() {
+    if (!controlId) return;
+    const byId = (id) => panelControls.find((entry) => entry._children?.Core?.id === id);
+    let label = ['name', 'value', 'nameValue'].includes(labelShows(control)) ? control : null;
+    if (!label) {
+      const attached = (attachmentsOf(panelControls).get(controlId) ?? []).map(byId).filter(Boolean);
+      label = attached.find((entry) => labelShows(entry) === 'nameValue')
+        ?? attached.find((entry) => labelShows(entry) === 'name') ?? null;
+    }
+    if (!label) {
+      presetReport = `${controlName || 'This control'} has no name Label to swap. Give it one (a Label that shows its name), then use Name ↔ value again.`;
+      return;
+    }
+    const id = label._children.Core.id;
+    const { patch, names } = nameValueSwapPatch(label, animationsPatch);
+    const step = beginHistoryTransaction();
+    applyControlPatch(id, patch);
+    commitHistoryTransaction(step);
+    const labelName = label._children.Core.name || id;
+    presetReport = `${labelName} now shows the name, and the value while ${controlName || 'the control'} is touched: ${names.join(', ')}.`;
+  }
 
   function addPreset(presetId, toSelection = false) {
     const preset = PRESET_BY_ID[presetId];
@@ -547,25 +655,17 @@ onMount(() => {
 
 {#snippet addbox()}
   <div class="addbox">
-    <label class="addfield">
-      <span>On</span>
-      <PropertySelect options={partOptions}
-                      value={onControl ? CONTROL_ITSELF : partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
-                      onchange={(value) => { newPart = value; }} />
-    </label>
-    <label class="addfield">
-      <span>Change</span>
-      <PropertySelect options={offered.map((entry) => ({ value: entry.path, label: entry.label }))}
-                      value={offeredForAdd?.path ?? newProperty} ariaLabel="What to change"
-                      onchange={(value) => { newProperty = value; }} />
-    </label>
-    <button type="button" class="addbtn" disabled={!offeredForAdd} onclick={add}>
+    <div class="addpath">
+      <PathBar {control} kind={selected?.kind} value={targetForAdd}
+               onchange={(target) => { pendingTarget = target; }} />
+    </div>
+    <button type="button" class="addbtn" disabled={!targetForAdd} onclick={add}>
       <Plus size={13} /> {sequence ? 'Add this track' : 'Add this change'}
     </button>
     <button type="button" class="mk quiet" onclick={() => { adding = false; }}>Done</button>
-    {#if !addStatus.works}
+    {#if targetForAdd && !addStatus.works}
       <p class="warn">
-        <b>{titleCase(offeredForAdd.label)} does nothing.</b>
+        <b>{titleCase(targetSteps(targetForAdd).at(-1) ?? targetForAdd.path)} does nothing.</b>
         {addStatus.detail}
       </p>
     {/if}
@@ -587,7 +687,8 @@ onMount(() => {
   {:else if !section}
     <div class="empty">
       <strong>{controlName} has no animations.</strong>
-      <p>This tab edits a control's Animations section. Custom components have one.</p>
+      <p>This tab edits a control's Animations section. A Label starts without one: give it one to put a text effect or an animation preset on its words.</p>
+      <button type="button" class="arm" data-give-animations onclick={giveAnimations}>Give it animations</button>
       <button type="button" class="arm" onclick={armFromSelection}>Use the selection</button>
     </div>
   {:else}
@@ -602,13 +703,25 @@ onMount(() => {
             <i class="stale" title="Not the control that is selected now — the tab stays where you opened it">not selected</i>
           {/if}
           <span class="headtools">
+            <!-- The full editor, its own tab: scenes across controls, a timeline, the stage. -->
+            <button type="button" class="ic" data-open-designer disabled={$activePanel?.id == null}
+                    onclick={() => openAnimationDesigner($activePanel?.id)}
+                    title="Open the Animation Designer: this panel's scenes and every animation on one timeline, in a tab of its own"
+                    aria-label="Open the Animation Designer"><Maximize2 size={14} /></button>
             <button type="button" class="ic" disabled={!($selectedComponentIds?.size)} onclick={armFromSelection}
                     title="Use selection: point this tab at the control that is selected now" aria-label="Use selection"><Crosshair size={14} /></button>
             <button type="button" class="ic" onclick={clearEditorTarget} title="Clear: stop editing this control" aria-label="Clear"><X size={14} /></button>
           </span>
         </div>
-        {#if deadCount || clashes.length || unknownCount}
+        {#if deadCount || clashes.length || unknownCount || $panelLoopSummary.over}
           <div class="alarms">
+            {#if $panelLoopSummary.over}
+              <!-- The panel's loops over the budget (utils/loopBudget.js). A click goes to each in turn. -->
+              <button type="button" class="alarm loops" data-loop-alarm onclick={showNextLoop}
+                      title={`More than ${$panelLoopSummary.budget} things on this panel keep moving; each open plug-in window draws them all.\n${$panelLoopLines.join('\n')}\nClick to go to each in turn.`}>
+                Panel: {$panelLoopSummary.count} loops
+              </button>
+            {/if}
             {#if deadCount}
               <span class="alarm" role="status">
                 {deadCount} {deadCount === 1 ? 'target does' : 'targets do'} nothing
@@ -631,6 +744,7 @@ onMount(() => {
         <div class="listwrap">
           <AnimationList
             {rows}
+            {control}
             {partNames}
             {stateNames}
             {clashes}
@@ -679,16 +793,19 @@ onMount(() => {
         <!-- 2. Its settings: timing on the left, what starts it on the right -->
         <section class="col setcol">
           <div class="setbox">
+            {#if selected.animation?.preset}
+              <PresetLinkCard {controlId} name={selected.name} node={selected.animation} onreport={(text) => { presetReport = text; }} />
+            {/if}
             <div class="r kindrow">
                 <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own on one part; a sequence runs a track per change along a time axis">Kind</span>
-                <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
-                           value={ANIMATION_KINDS.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
+                <Segmented options={kinds.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
+                           value={kinds.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
                            onchange={(value) => { stopPlaying(); selectedKeyframe = null; setProps(kindPatch(selected, value, control)); }} />
             </div>
             <div class="grpcol">
               <div class="grp">Timing</div>
               <div class="r">
-                <label for="anim-dur">{sequence ? 'Length' : 'Duration'}</label>
+                <label for="anim-dur">{sequence ? 'Length' : (textKind ? 'Each piece' : 'Duration')}</label>
                 <div class="cell"><NumberCell label="ms" value={sequence ? axisLength : selected.duration} min={sequence ? 100 : 0} step={10}
                   onchange={(value) => setProp('duration', Math.max(sequence ? 100 : 0, Math.round(value)))} /></div>
               </div>
@@ -711,8 +828,25 @@ onMount(() => {
                   <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
                     onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
                 </div>
+                {#if staggerOffered}
+                  <!-- On a choice group's every option or label: each this many ms after the last
+                       (utils/optionStagger.js), in this order. -->
+                  <div class="r">
+                    <span class="lab">{lampsStagger ? 'Each lamp' : 'Each option'}</span>
+                    <div class="cell"><NumberCell label="ms later" value={selected.animation.optionStagger ?? 0} min={0} max={2000} step={10}
+                      onchange={(value) => setProp('optionStagger', Math.max(0, Math.min(2000, Math.round(value))))} /></div>
+                  </div>
+                  {#if (selected.animation.optionStagger ?? 0) > 0}
+                    <div class="r">
+                      <span class="lab">Order</span>
+                      <Segmented options={OPTION_ORDERS.map((value) => ({ value, label: (lampsStagger ? LAMP_ORDER_LABELS : OPTION_ORDER_LABELS)[value] }))}
+                                 value={selected.animation.optionOrder ?? 'forward'} ariaLabel="Option order"
+                                 onchange={(value) => setProp('optionOrder', value)} />
+                    </div>
+                  {/if}
+                {/if}
               {/if}
-              {#if keyframes}
+              {#if keyframes || valueKind}
                 <div class="r">
                   <span class="lab">Repeat</span>
                   <Segmented options={[{ value: 'count', label: 'Count' }, { value: 'infinite', label: 'Loop' }]}
@@ -726,26 +860,67 @@ onMount(() => {
                       onchange={(value) => setProp('iterations', Math.max(1, Math.round(value)))} /></div>
                   </div>
                 {/if}
+                {#if keyframes}
+                  <div class="r">
+                    <span class="lab">Direction</span>
+                    <Segmented options={[{ value: 'normal', label: 'Forward' }, { value: 'alternate', label: 'Back and forth' }]}
+                               value={selected.direction} ariaLabel="Direction"
+                               onchange={(value) => setProp('direction', value)} />
+                  </div>
+                {/if}
+              {/if}
+              {#if textKind}
                 <div class="r">
-                  <span class="lab">Direction</span>
-                  <Segmented options={[{ value: 'normal', label: 'Forward' }, { value: 'alternate', label: 'Back and forth' }]}
-                             value={selected.direction} ariaLabel="Direction"
-                             onchange={(value) => setProp('direction', value)} />
+                  <span class="lab">Repeat</span>
+                  <Segmented options={[{ value: 'once', label: 'Once' }, { value: 'infinite', label: 'Loop' }]}
+                             value={selected.iterations === 'infinite' ? 'infinite' : 'once'} ariaLabel="Repeat"
+                             onchange={(value) => setProp('iterations', value === 'infinite' ? 'infinite' : 1)} />
                 </div>
               {/if}
-              <button type="button" class="dbg" onclick={debugSelected}
-                      title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
+              <span class="dbgrow">
+                <button type="button" class="dbg" onclick={debugSelected}
+                        title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
+                <button type="button" class="dbg" data-save-preset onclick={() => { presetPanel = 'save'; }}
+                        title="Save this animation, or all of this control's, as an animation preset of your own">Save as preset…</button>
+              </span>
             </div>
 
             <div class="grpcol">
               <div class="grp">Runs when</div>
-              {#if keyframes}
+              {#if keyframes || textKind || valueKind || emitKind}
                 <div class="r">
                   <span class="lab">Trigger</span>
-                  <PropertySelect options={KEYFRAME_TRIGGER_TYPES.map((value) => ({ value, label: KEYFRAME_TRIGGER_LABELS[value] }))}
+                  <!-- A value animation "all the time" would never let the value be seen, and words
+                       "all the time" would never be thrown: not offered. -->
+                  <PropertySelect options={(textKind ? TEXT_TRIGGER_TYPES : KEYFRAME_TRIGGER_TYPES.filter((type) => !(valueKind || emitKind) || type !== 'always'))
+                                    .filter((type) => type !== 'hold' || holdOffered || selected.triggerType === 'hold')
+                                    .filter((type) => type !== 'optionsChange' || choiceOffered || selected.triggerType === 'optionsChange')
+                                    .filter((type) => !LEVEL_TRIGGER_TYPES.includes(type) || levelOffered || selected.triggerType === type)
+                                    .map((value) => ({ value, label: (textKind ? TEXT_TRIGGER_LABELS : KEYFRAME_TRIGGER_LABELS)[value] ?? KEYFRAME_TRIGGER_LABELS[value] }))}
                                   value={selected.triggerType} ariaLabel="Keyframe trigger"
-                                  onchange={(value) => setProps({ trigger: { ...(selected.animation.trigger ?? {}), type: value } })} />
+                                  onchange={(value) => setProps({ trigger: {
+                                    ...(selected.animation.trigger ?? {}),
+                                    type: value,
+                                    ...(value === 'event' && !selected.animation.trigger?.event ? { event: 'click' } : {}),
+                                  } })} />
                 </div>
+                {#if selected.triggerType === 'valueStep'}
+                  <!-- How many steps the range is cut into: 0, the control's own (its step size). -->
+                  <div class="r">
+                    <span class="lab">Steps</span>
+                    <div class="cell"><NumberCell label="0: its own" value={selected.animation.trigger?.steps ?? 0} min={0} max={400} step={1}
+                      onchange={(value) => setProp('trigger.steps', Math.max(0, Math.min(400, Math.round(value))))} /></div>
+                  </div>
+                  {#if selected.kind === 'keyframes'}
+                    <!-- A step back plays it mirrored, side for side (keyframeAnimation.js mirroredEntry). -->
+                    <div class="r">
+                      <span class="lab">Step back</span>
+                      <Segmented options={[{ value: false, label: 'Same' }, { value: true, label: 'Mirrored' }]}
+                                 value={selected.animation.followTurn === true} ariaLabel="On a step back"
+                                 onchange={(value) => setProp('followTurn', value === true)} />
+                    </div>
+                  {/if}
+                {/if}
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">
                     <span class="lab">In</span>
@@ -789,6 +964,53 @@ onMount(() => {
                       onchange={(value) => setProp('trigger.every', Math.max(1, Math.round(value)))} /></div>
                   </div>
                   <p class="hint">Plays on every {selected.trigger.every === 1 ? 'beat' : `${selected.trigger.every}th beat`} while the transport runs.</p>
+                {:else if selected.triggerType === 'clip'}
+                  <p class="hint">Plays each time the level reaches where the meter clips: the level its clip lamp lights at, else where its top zone starts, else full scale. Not again until it has fallen back.</p>
+                {:else if selected.triggerType === 'level'}
+                  <div class="r">
+                    <span class="lab">Level</span>
+                    <div class="cell"><NumberCell label="% of the scale" value={Math.round((selected.animation.trigger?.at ?? 0.9) * 100)} min={0} max={100} step={1}
+                      onchange={(value) => setProp('trigger.at', Math.max(0, Math.min(100, Math.round(value))) / 100)} /></div>
+                  </div>
+                  <div class="r">
+                    <span class="lab">Crossing</span>
+                    <Segmented options={[{ value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }, { value: 'both', label: 'Either way' }]}
+                               value={selected.animation.trigger?.way ?? 'up'} ariaLabel="Crossing"
+                               onchange={(value) => setProp('trigger.way', value)} />
+                  </div>
+                  <p class="hint">Plays each time the meter's level crosses this line the way chosen.</p>
+                {:else if selected.triggerType === 'event'}
+                  {@const gesture = MOTION_EVENTS.find((entry) => entry.id === selected.animation.trigger?.event) ?? MOTION_EVENTS[0]}
+                  <div class="r">
+                    <span class="lab">Event</span>
+                    <PropertySelect options={MOTION_EVENTS.map((entry) => ({ value: entry.id, label: entry.label }))}
+                                    value={gesture.id} ariaLabel="Event"
+                                    onchange={(value) => setProp('trigger.event', value)} />
+                  </div>
+                  {#if gesture.id === 'flick'}
+                    <div class="r">
+                      <span class="lab">Direction</span>
+                      <Segmented options={FLICK_DIRECTIONS.map((value) => ({ value, label: value === 'any' ? 'Any' : { left: '←', right: '→', up: '↑', down: '↓' }[value], title: value }))}
+                                 value={selected.animation.trigger?.direction ?? 'any'} ariaLabel="Flick direction"
+                                 onchange={(value) => setProp('trigger.direction', value)} />
+                    </div>
+                  {:else if gesture.id === 'longPress'}
+                    <div class="r">
+                      <span class="lab">Hold</span>
+                      <div class="cell"><NumberCell label="ms" value={selected.animation.trigger?.hold ?? LONG_PRESS_MS} min={150} step={50}
+                        onchange={(value) => setProp('trigger.hold', Math.max(150, Math.round(value)))} /></div>
+                    </div>
+                  {/if}
+                  <p class="hint">Plays on each {gesture.label.toLowerCase()} on the control, in Preview and in the plug-in. A gesture the control already uses is shared, never taken.</p>
+                {:else if selected.triggerType === 'textChange'}
+                  {@const waits = (selected.to ?? []).find((state) => state === 'value' || state === 'name') ?? 'any'}
+                  <div class="r">
+                    <span class="lab">Waits for</span>
+                    <Segmented options={[{ value: 'any', label: 'Any words' }, { value: 'value', label: 'The value' }, { value: 'name', label: 'The name' }]}
+                               value={waits} ariaLabel="Waits for"
+                               onchange={(value) => setProp('trigger.to', value === 'any' ? ['*'] : [value])} />
+                  </div>
+                  <p class="hint">Plays when the words change: "in" on the words that arrive, "out" on the ones that leave. A Label showing "Name, value while touched" swaps them as the knob is pressed and let go.</p>
                 {:else if selected.triggerType === 'script'}
                   <p class="hint">Played by a script — <code>ce.anim.play("{controlName}", "{selected.name}")</code> — or with Play in the Preview.</p>
                 {:else}
@@ -797,9 +1019,22 @@ onMount(() => {
               {:else}
                 <div class="r">
                   <label for="anim-trigger">Trigger</label>
-                  <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
-                             value={selected.triggerType} ariaLabel="Trigger"
-                             onchange={(value) => setProp('trigger.type', value)} />
+                  {#if sequence}
+                    <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
+                               value={selected.triggerType} ariaLabel="Trigger"
+                               onchange={(value) => setProp('trigger.type', value)} />
+                  {:else}
+                    <!-- Leaving plays when a From state is left (`trigger.leaving`): the States tab's
+                         Leaving slot. A choice here rather than a row of its own: the tab never scrolls. -->
+                    <Segmented options={[{ value: 'stateChange', label: 'State' }, { value: 'leaving', label: 'Leaving' }, { value: 'valueChange', label: 'Value' }]}
+                               value={leavingTrigger ? 'leaving' : selected.triggerType} ariaLabel="Trigger"
+                               onchange={(value) => setProps({ trigger: {
+                                 ...(selected.animation?.trigger ?? {}),
+                                 type: value === 'valueChange' ? 'valueChange' : 'stateChange',
+                                 leaving: value === 'leaving',
+                                 ...(value === 'leaving' ? { reverse: false } : {}),
+                               } })} />
+                  {/if}
                 </div>
                 {#if selected.triggerType === 'stateChange'}
                   <div class="r top">
@@ -814,6 +1049,8 @@ onMount(() => {
                   </div>
                   {#if sequence}
                     <p class="hint">Plays from the start each time the control enters a To state.</p>
+                  {:else if leavingTrigger}
+                    <p class="hint">Plays when the control leaves a From state, for a To state (* is any).</p>
                   {:else}
                     <div class="r">
                       <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
@@ -861,19 +1098,97 @@ onMount(() => {
               <div class="panehead">
                 <b>Frames</b>
                 <span class="count">{selected.frames.length}</span>
-                <label class="playson">
+                <div class="playson">
                   <span>Plays on</span>
-                  <PropertySelect options={[{ value: '', label: 'The control itself' }, ...partNames.map((name) => ({ value: name, label: name }))]}
-                                  value={selected.part} ariaLabel="Plays on"
-                                  onchange={(value) => setProp('targets', keyframeTargets(value))} />
-                </label>
+                  <!-- A keyframe animation plays on a place, not a property: the path bar's
+                       place and part, the same picker the other kinds add a change with. -->
+                  <PathBar {control} kind="keyframes" compact value={keyframeTargets(selected.part)[0]}
+                           onchange={(target) => setProp('targets', [{ path: target.path }])} />
+                </div>
               </div>
               <div class="panebody">
                 {#if targets.some((entry) => !entry.status.works)}
                   <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
                 {/if}
-                <FramesEditor frames={selected.frames} onchange={(next) => setProp('frames', next)} />
+                <FramesEditor frames={selected.frames} gradient={paintsGradient} image={paintsImage} onchange={(next) => setProp('frames', next)} />
                 <p class="hint">Scale, turn, move and fade, and two colours: fill recolours a solid fill, a shape or a line; text, its text. A gradient or an image keeps its own colours.</p>
+              </div>
+            </div>
+          {:else if textKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Text effect</b>
+              </div>
+              <div class="panebody">
+                {#if targets.some((entry) => !entry.status.works)}
+                  <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
+                {/if}
+                <TextEffectEditor row={selected} {control} onpatch={(patch) => setProps(patch)} />
+              </div>
+            </div>
+          {:else if emitKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Words thrown</b>
+              </div>
+              <div class="panebody" data-emit-animation>
+                <div class="r">
+                  <span class="lab">Shows</span>
+                  <Segmented options={[
+                    ...(fromKey ? [] : [{ value: 'value', label: 'The value' }, { value: 'delta', label: 'How far it moved' }]),
+                    { value: 'words', label: 'Words' }, { value: 'count', label: 'A count' },
+                  ]}
+                             value={selected.animation.shows ?? (fromKey ? 'words' : 'value')} ariaLabel="Shows" onchange={(value) => setProps(value === 'words' && !String(selected.animation.words ?? '').trim() ? { shows: value, words: '+1' } : { shows: value })} />
+                </div>
+                {#if (selected.animation.shows ?? (fromKey ? 'words' : 'value')) === 'words'}
+                  <div class="r">
+                    <span class="lab">Words</span>
+                    <div class="cell" data-emit-words><PropertyText value={selected.animation.words ?? ''} placeholder="+1" ariaLabel="Words thrown"
+                      commit={(value) => setProp('words', String(value ?? '').trim().slice(0, 24))} /></div>
+                  </div>
+                {/if}
+                <div class="r">
+                  <span class="lab">From</span>
+                  <Segmented options={fromKey
+                    ? [{ value: 'centre', label: levelOffered ? 'The meter' : 'The key' }, { value: 'tip', label: 'Above it' }]
+                    : [{ value: 'tip', label: 'The pointer’s tip' }, { value: 'centre', label: 'The centre' }]}
+                             value={selected.animation.from ?? (fromKey ? 'centre' : 'tip')} ariaLabel="From" onchange={(value) => setProp('from', value)} />
+                </div>
+                <div class="r">
+                  <span class="lab">Flies</span>
+                  {#if fromKey}
+                    <span class="note">Up</span>
+                  {:else}
+                    <Segmented options={[{ value: 'pointer', label: 'Along the pointer' }, { value: 'up', label: 'Up' }]}
+                               value={selected.animation.direction ?? 'pointer'} ariaLabel="Flies" onchange={(value) => setProp('direction', value)} />
+                  {/if}
+                  <div class="cell"><NumberCell label="px" value={selected.animation.travel ?? 36} min={0} max={400} step={2}
+                    onchange={(value) => setProp('travel', Math.max(0, Math.min(400, Math.round(value))))} /></div>
+                </div>
+                <div class="r">
+                  <span class="lab">Size</span>
+                  <div class="cell"><NumberCell label="px" value={selected.animation.size ?? 12} min={6} max={72} step={1}
+                    onchange={(value) => setProp('size', Math.max(6, Math.min(72, Math.round(value))))} /></div>
+                </div>
+                {#if fromKey}
+                  <p class="hint">Each time it plays, the words — or how many times it has played — rise from {controlName} and fade. Several can be in the air at once.</p>
+                {:else}
+                  <p class="hint">Each time it plays, {controlName}'s value — or how far it moved since the last word — flies out and fades. Several can be in the air at once. On a step trigger, one word a step, while it is turned too.</p>
+                {/if}
+              </div>
+            </div>
+          {:else if valueKind}
+            <div class="pane">
+              <div class="panehead">
+                <b>Where the value is drawn</b>
+                <span class="count">{selected.valueFrames.length}</span>
+              </div>
+              <div class="panebody" data-value-animation>
+                {#if targets.some((entry) => !entry.status.works)}
+                  <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
+                {/if}
+                <ValueFramesEditor frames={selected.valueFrames} onchange={(next) => setProp('frames', next)} />
+                <p class="hint">It moves the drawing, not the value: nothing is sent, and the readout still says what the value is. It ends on the value, and while {controlName} is turned it shows where it is turned to.</p>
               </div>
             </div>
           {:else if sequence}
@@ -1034,8 +1349,18 @@ onMount(() => {
           <button type="button" class="preset" title={entry.summary}
                   onclick={(event) => addPreset(entry.id, event.shiftKey && selectionIds.length > 1)}>{entry.label}</button>
         {/each}
+        <button type="button" class="preset" data-recipe="nameValue"
+                title="On a knob's name Label (or the Label itself): the name, and the value while the knob is touched — pushed in, then the name typed back"
+                onclick={addNameValueSwap}>Name ↔ value</button>
+        <button type="button" class="preset library" data-library aria-pressed={presetPanel === 'library'}
+                title="Your animation presets and this panel's: apply, import, export"
+                onclick={() => { presetPanel = presetPanel === 'library' ? '' : 'library'; }}>Library…</button>
       </div>
     </div>
+    {#if presetPanel}
+      <PresetLibrary mode={presetPanel} {control} selectedName={selected?.name ?? ''} targets={presetTargets}
+                     onclose={() => { presetPanel = ''; }} onreport={(text) => { presetReport = text; }} />
+    {/if}
   {/if}
 </div>
 
@@ -1044,6 +1369,7 @@ onMount(() => {
      is too tall for a short dock scrolls on its own, and the track list scrolls inside its box.
      Type is 13 to 14 px and never under 12; the old tab's labels were 8 to 10. */
   .anim-tab {
+    position: relative;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1084,6 +1410,7 @@ onMount(() => {
     font-size: 12px; font-weight: 600; color: #1A1206; background: #E5A029;
     padding: 2px 7px; border-radius: 4px; white-space: nowrap;
   }
+  button.alarm { border: 0; font-family: inherit; line-height: inherit; cursor: pointer; }
   .listwrap { flex: 1; min-height: 60px; display: flex; flex-direction: column; }
   .newrow { display: flex; gap: 6px; }
   .newrow .txt { flex: 1; }
@@ -1127,6 +1454,9 @@ onMount(() => {
     background: transparent; color: #AEB9C4; font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer;
   }
   .dbg:hover { color: #E8EEF3; border-color: #5B6670; }
+  .dbgrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .preset.library { border-color: #2E5677; background: #16314A; color: #D6ECFF; }
+  .preset.library[aria-pressed='true'] { border-color: #5AA9E6; }
 
   /* buttons */
   .mk {
@@ -1166,11 +1496,11 @@ onMount(() => {
   .panehead b { font-weight: 600; }
   .panehead .count { color: #AEB9C4; }
   .panebody { flex: 1; min-height: 0; overflow: hidden auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; scrollbar-color: #4A5560 #12161A; }
-  .playson { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; width: 260px; }
-  .playson span { white-space: nowrap; }
+  .playson { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; min-width: 0; }
+  .playson > span { white-space: nowrap; }
 
-  .addbox { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid #2B323A; background: #1A2026; }
-  .addfield { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #AEB9C4; flex: 1 1 150px; max-width: 240px; min-width: 0; }
+  .addbox { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid #2B323A; background: #1A2026; }
+  .addpath { flex: 1 1 420px; min-width: 0; font-size: 13px; color: #AEB9C4; }
   .addbtn {
     display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
     border: 1px solid #2E7D6B; border-radius: 6px; background: #10362F; color: #BFF3E6;

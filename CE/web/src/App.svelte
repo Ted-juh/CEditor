@@ -79,7 +79,6 @@
   import { clampDockHeight, maxDisplayDockHeight, resolveDockHeight } from './CE_Application/utils/displayDock.js';
   import { advanceWorkspaceSwap, workspaceSwapPhase } from './CE_Application/utils/chromeMotion.js';
   import { startPerfDebugStallWatch, syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
-  import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
   import { resolveWorkspaceChrome } from './CE_Application/utils/workspaceChrome.js';
 
   const debugRoute = typeof window !== 'undefined'
@@ -407,7 +406,7 @@
     flushUnsavedSessionSnapshot({ unloading: true });
   }
 
-  function maybeLoadCustomComponentStressTest() {
+  async function maybeLoadCustomComponentStressTest() {
     if (typeof window === 'undefined' || isCutoutDebug) return;
     const params = new URLSearchParams(window.location.search);
     if (!params.has('custom_component_stress')) return;
@@ -415,6 +414,9 @@
     const sessionKey = `ce.customComponentStress.loaded.${requestId}`;
     if (window.sessionStorage?.getItem(sessionKey) === 'true') return;
 
+    // Loaded only when the URL asks for it: 62 kB of generator that every start used to parse for
+    // a page nobody opens (vite.config.js, chunkSizeWarningLimit).
+    const { createCustomComponentStressPanel, createCustomComponentStressTest } = await import('./CE_Application/utils/customComponentStressTest.js');
     const stress = createCustomComponentStressTest();
     const entries = stress.definitions
       .map((definition) => customComponentLibrary.saveControl(definition.component, definition.metadata))

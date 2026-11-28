@@ -1,12 +1,14 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
+  import PatternLayers from '../../CE_Panel/components/PatternLayers.svelte';
+  import { hasPatterns } from '../utils/patternLayers.js';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import CanvasControlNested from './CanvasControl.svelte';
   import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
-  import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { plainFillCSS, fillShapeCSS } from '../utils/plainFillCSS.js';
   import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { drawnPartEntries } from '../utils/booleanGroups.js';
@@ -17,6 +19,8 @@
   import { anatomyForm } from '../models/controlAnatomy.js';
   import { BUTTON_DEVICE_TYPES, buttonDeviceDrawn, isButtonDevicePart } from '../models/buttonDeviceParts.js';
   import { METER_DEVICE_TYPES, meterDeviceDrawn, isMeterDevicePart } from '../models/meterDeviceParts.js';
+  import { meterLevelSignals } from '../utils/meterLayout.js';
+  import { effectNeedleStep, meterBallistics } from '../utils/meterMotion.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import ParameterStatusEditor from './ParameterStatusEditor.svelte';
   import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
@@ -86,16 +90,17 @@
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { attachedFollowers, textShownOwners, withAttached } from '../utils/attachedLabels.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
-  import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { blendsThroughControl, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
   import { authoredShownText } from '../utils/labelText.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
-  import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { rootTransitionDeclaration, colourTransitionVar, transitionDeclaration } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
-  import { noteAnimationsFired, animationPlays } from '../stores/animationActivity.js';
+  import { noteAnimationsFired, animationPlays, requestAnimationPlay } from '../stores/animationActivity.js';
+  import { splitText, textEffectSpan, textPieceStyles, reelColumns, REEL_WINDOW, odometerChanged, wordsHistory } from '../utils/textEffects.js';
   import { createKeyframePlayer, animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transport } from '../stores/transport.js';
   import {
@@ -114,7 +119,6 @@
   import { flatControls } from '../utils/containment.js';
   import { applyPanelDependentChoices } from '../stores/interactionPreview.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
-  import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
   import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
@@ -132,7 +136,7 @@
     buildFontVariationSettings, buildIconTintStyle, buildTextFillLayerStyle,
     cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
-    normalizeTextCaseMode, safeSvgId, svgTextAnchorFor, textAlignFor,
+    normalizeTextCaseMode, parseHexColor, rgbaColor, safeSvgId, svgTextAnchorFor, textAlignFor,
     textCaseVariantCaps, usesIconTint, withFilter,
   } from './canvasControlStyles.js';
   import { resolveTextEffects } from './canvasControlTextEffects.js';
@@ -144,11 +148,15 @@
     measureGlyphAdvance,
   } from './canvasControlTextLayout.js';
   import {
-    buildRadioWholeBackground,
-    resolveRadioSegmentStyle,
-    resolveRadioSelectedKeys,
-    resolveRadioShapeRadius,
-  } from '../utils/radioSegmentStyle.js';
+    choiceGroupLayout, choiceKey, choiceOrientation, choiceRows, choiceSelectionMode, choiceStyleDrawsFrame,
+    choiceStyleOf, choiceStyleOnPanel, isChoiceGroupBehavior, measureChoiceLabel, selectedChoiceKeys,
+  } from '../utils/choiceGroupLayout.js';
+  import { resolveChoiceOption, standsOutFrom } from '../utils/choiceGroupStyle.js';
+  import { lampCss, lampFaceCss } from '../utils/lampFace.js';
+  import ChoiceGroup from './ChoiceGroup.svelte';
+  import { animatedParts, thumbBox, thumbDirection, thumbEdges, thumbTransition } from '../utils/choiceGroupMotion.js';
+  import { optionRankVars } from '../utils/optionStagger.js';
+  const NO_CHOICE_PARTS = new Set();
   import {
     computeResizedRect, computeRotatedResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
@@ -156,10 +164,14 @@
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
+  import { SCENE_STAGE } from '../stores/sceneStage.js';
+  import { sceneControlOutput, mergeKeyframeOutputs, textSwitchTimes } from '../utils/sceneModel.js';
+  import { drawnValueFor, ownValuePlay, liveDrawnValue } from '../utils/valueDrawn.js';
+  import { VALUE_TARGET } from '../utils/sceneFormat.js';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
-  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveColourValue, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { macroGeometry, macroValue } from '../utils/macroLayout.js';
   import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroKnobSignature, macroUsesSetKnob } from '../utils/macroKnob.js';
@@ -422,7 +434,7 @@
   });
   let macroKnobBase = $derived(macroKnobBaseRuntime(macroKnob));
   let macroKnobState = $derived(macroKnob
-    ? macroKnobRuntime(macroKnobBase, renderControl?._children?.Macro?.__value ?? macroValue(renderControl), previewSession?.dragging === true)
+    ? macroKnobRuntime(macroKnobBase, Number.isFinite(drawnValue) ? drawnValue : (renderControl?._children?.Macro?.__value ?? macroValue(renderControl)), previewSession?.dragging === true)
     : null);
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
@@ -430,7 +442,13 @@
     return namespace ? `${namespace}-${baseId}` : baseId;
   });
   let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
-  let background = $derived(getSection(renderControl, 'Background'));
+  // A choice group draws its Background as a frame in the segmented style only; the others draw
+  // their options on the panel, or each on a key of its own (ChoiceGroup.svelte).
+  let background = $derived(
+    isChoiceGroupBehavior(getSection(renderControl, 'Behavior')) && !choiceStyleDrawsFrame(choiceStyleOf(getSection(renderControl, 'Behavior')))
+      ? null
+      : getSection(renderControl, 'Background')
+  );
   let text = $derived(getSection(renderControl, 'Text'));
   // Radio items need the authored base/state tree, with the same set tokens resolved
   // as the main control. Raw tokens are not valid renderer colours.
@@ -438,7 +456,13 @@
   let sourceBackground = $derived(getSection(resolvedSourceControl, 'Background') ?? background);
   let sourceText = $derived(getSection(resolvedSourceControl, 'Text') ?? text);
   let icon = $derived(getSection(renderControl, 'Icon'));
-  let effects = $derived(getSection(renderControl, 'Effects'));
+  // A choice group whose options sit on the panel (radio, LED, tabs) draws no face, so the face's
+  // effects (a set's drop shadow) would fall on its bare labels and rings; a row of keys keeps them.
+  let effects = $derived(
+    isChoiceGroupBehavior(getSection(renderControl, 'Behavior')) && choiceStyleOnPanel(choiceStyleOf(getSection(renderControl, 'Behavior')))
+      ? null
+      : getSection(renderControl, 'Effects')
+  );
   let contentLayout = $derived(getSection(renderControl, 'ContentLayout'));
   let behavior = $derived(getSection(renderControl, 'Behavior'));
   let valueSection = $derived(getSection(renderControl, 'Value'));
@@ -1807,13 +1831,283 @@
     if (!keyframeEntries.length || !id) return undefined;
     return animationPlays.subscribe((all) => { playsNow = all?.[id] ?? {}; });
   });
-  let activeKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
-    { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: playsNow }));
+  // A choice group whose options changed (it depends on another's choice) plays what waits for that:
+  // asked for here, as a script asks for a play, once each time the list is different.
+  let choiceListSeen = null;
+  let choiceListChanges = 0;
+  let choiceListPlays = $derived.by(() => {
+    if (!isRadioGroupControl || !keyframeEntries.some((entry) => entry.trigger?.type === 'optionsChange')) return null;
+    const list = choiceRows(valueRows).map((row, index) => `${choiceKey(row, index)}\u0001${row?.displayText ?? ''}`).join('\u0002');
+    if (choiceListSeen !== null && list !== choiceListSeen) choiceListChanges += 1;
+    choiceListSeen = list;
+    if (!choiceListChanges) return null;
+    return Object.fromEntries(keyframeEntries.filter((entry) => entry.trigger?.type === 'optionsChange').map((entry) => [entry.name, `options:${choiceListChanges}`]));
+  });
+  // A meter's level is the value its animations hear (the Meter, phase 2): On change, Each step, When
+  // it clips and When it crosses a level all listen to it. It has no Behavior for the runtime to read
+  // a value from, so its level, as it arrives, takes the value's place in what the player is given.
+  // Heard, never sent.
+  let keyframeRuntime = $derived.by(() => {
+    if (!interactionRuntime || !METER_DEVICE_TYPES.has(String(core?.controlType ?? ''))) return interactionRuntime;
+    return { ...interactionRuntime, signals: { ...(interactionRuntime.signals ?? {}), ...meterLevelSignals(renderControl) } };
+  });
+  let playerKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? keyframeRuntime : null,
+    { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: choiceListPlays ? { ...playsNow, ...choiceListPlays } : playsNow }));
+  // The Animation Designer's stage (stores/sceneStage.js): the scene it shows, posed at its playhead
+  // or playing, joins this control's own animations. Anywhere else there is no stage, and nothing.
+  // In Preview and the plug-in (step 5b) the surface's scene runtime gives every scene playing, each
+  // running or held at its end: they all draw here, one on top of the next.
+  const sceneStage = getContext(SCENE_STAGE) ?? null;
+  let stageFrame = $derived(sceneStage ? $sceneStage : null);
+  let stagePlays = $derived(stageFrame?.plays
+    ?? (stageFrame?.scene ? [{ scene: stageFrame.scene, at: stageFrame.playing ? null : stageFrame.at, phase: stageFrame.phase ?? 'a' }] : []));
+  // Words with more than one text clip in a running scene draw the one that started last
+  // (sceneModel.js): as each later clip starts, this control moves the words on to it, counted from
+  // then. Its clock starts when it first sees the play, as the play's CSS animations do; a posed play
+  // (the playhead, a seek, a hand) says its moment itself.
+  const textStarts = new Map();
+  const textSwitched = new Map();
+  let textElapsed = $state({});
+  const textPlayKey = (play) => `${play.scene?.id}:${play.phase ?? 'a'}`;
+  $effect(() => {
+    const plays = stagePlays;
+    const id = core?.id;
+    const timers = [];
+    untrack(() => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const passed = {};
+      const seen = new Set();
+      for (const play of plays) {
+        if (Number.isFinite(play.at)) continue;
+        const times = textSwitchTimes(play.scene, id);
+        if (!times.length) continue;
+        const key = textPlayKey(play);
+        seen.add(key);
+        if (!textStarts.has(key)) textStarts.set(key, now);
+        const since = now - textStarts.get(key);
+        const due = times.filter((ms) => ms <= since).at(-1);
+        if (due !== undefined && textSwitched.get(key)?.[0] !== due) textSwitched.set(key, [due, since]);
+        passed[key] = due === undefined ? 0 : textSwitched.get(key)[1];
+        for (const ms of times) {
+          if (ms <= since) continue;
+          timers.push(setTimeout(() => {
+            const at = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - (textStarts.get(key) ?? 0);
+            textSwitched.set(key, [ms, at]);
+            textElapsed = { ...textElapsed, [key]: at };
+          }, ms - since));
+        }
+      }
+      for (const key of [...textStarts.keys()]) if (!seen.has(key)) { textStarts.delete(key); textSwitched.delete(key); }
+      textElapsed = passed;
+    });
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  });
+  let sceneKeyframes = $derived(core?.id && stagePlays.length
+    ? stagePlays.reduce((drawn, play) => {
+      const elapsed = Number.isFinite(play.at) ? null : (textElapsed[textPlayKey(play)] ?? 0);
+      const output = sceneControlOutput(play.scene, core.id, { at: play.at, phase: play.phase, elapsed });
+      return output ? mergeKeyframeOutputs(drawn, output) : drawn;
+    }, null)
+    : null);
+  // What the value draws, moved by a scene's value clips (step 6, utils/valueDrawn.js): an arc's
+  // `d` and a pointer's angle are attributes CSS cannot animate, so a running clip is worked out here
+  // a frame at a time. A running play's clock starts when this control first sees it — when its CSS
+  // animations start too — and a play started again (its phase flipped) starts it again. Posed plays
+  // (the Designer's playhead, a seek, a scene a hand drives) say their moment themselves. The
+  // control's own value animations come from its keyframe player, each with the moment its run began;
+  // a scene's are drawn over them, as a scene's animations are.
+  let ownValuePlays = $derived(core?.id && playerKeyframes?.values?.length
+    ? playerKeyframes.values.map((run) => ownValuePlay(core.id, run))
+    : []);
+  let sceneValuePlays = $derived(core?.id && stagePlays.length
+    ? stagePlays.filter((play) => play.scene?.clips?.some?.((clip) => clip.controlId === core.id && clip.target === VALUE_TARGET))
+    : []);
+  let valuePlays = $derived(ownValuePlays.length ? [...ownValuePlays, ...sceneValuePlays] : sceneValuePlays);
+  const valueStarts = new Map();
+  let valueNow = $state(0);
+  let valueFrame = 0;
+  const valuePlayKey = (play) => `${play.scene?.id}:${play.phase ?? 'a'}`;
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  // What it draws now, which an effect starts from and hands back to: a knob's signals, the Macro's
+  // own position, a meter's place on its scale.
+  let liveNormalized = $derived(liveDrawnValue(renderControl ?? control, interactionRuntime?.signals));
+  let drawnValueState = $derived(valuePlays.length
+    ? drawnValueFor(valuePlays, core.id, liveNormalized, {
+      elapsedOf: (play) => Math.max(0, valueNow - (Number.isFinite(play.startedAt) ? play.startedAt : (valueStarts.get(valuePlayKey(play)) ?? valueNow))),
+      dragging: previewSession?.dragging === true || interactionRuntime?.signals?.dragging === true,
+    })
+    : { value: null, running: false });
+  let effectValue = $derived(drawnValueState.value);
+  // A meter's ballistics (utils/meterMotion.js) move what a value effect draws too: the effect says
+  // where the needle is going, the spring how it gets there, so a Self-test on a Lazy needle sweeps
+  // lazily and a PPM's leaps. As it ends, the needle follows the meter's own drawn place (its
+  // ballistics already) till it catches it and hands back, so nothing jumps. A meter that jumps, as
+  // every meter did before phase 2, draws the effect as it says.
+  let effectBallistics = $derived(METER_DEVICE_TYPES.has(String(core?.controlType ?? '')) ? meterBallistics(renderControl?._children?.Meter ?? {}) : null);
+  let effectNeedle = $state(null);
+  let needleFrame = 0;
+  $effect(() => {
+    const ballistics = effectBallistics;
+    const going = Number.isFinite(effectValue);
+    const needle = effectNeedle;
+    if (!ballistics) { if (needle) effectNeedle = null; return; }
+    if (!going && !needle) return;
+    if (needleFrame || typeof requestAnimationFrame !== 'function') return;
+    needleFrame = requestAnimationFrame(() => {
+      needleFrame = 0;
+      effectNeedle = effectNeedleStep(effectNeedle, { effect: effectValue, live: liveNormalized, now: nowMs(), ballistics: effectBallistics });
+    });
+  });
+  onDestroy(() => { if (needleFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(needleFrame); needleFrame = 0; });
+  // Till the spring's first step, the needle is where it was drawn.
+  let drawnValue = $derived(effectNeedle ? effectNeedle.pos : effectBallistics && Number.isFinite(effectValue) ? liveNormalized : effectValue);
+  $effect.pre(() => {
+    const plays = valuePlays;
+    untrack(() => {
+      const seen = new Set();
+      const now = nowMs();
+      let fresh = false;
+      for (const play of plays) {
+        if (Number.isFinite(play.at)) continue;
+        if (Number.isFinite(play.startedAt)) { fresh = true; continue; }
+        const key = valuePlayKey(play);
+        seen.add(key);
+        if (!valueStarts.has(key)) valueStarts.set(key, now);
+      }
+      for (const key of [...valueStarts.keys()]) if (!seen.has(key)) valueStarts.delete(key);
+      if (seen.size || fresh) valueNow = now;
+    });
+  });
+  // A frame at a time while an effect runs: each step moves the clock on, and the clock moving is
+  // what asks for the next. So it must always move. It reads performance.now(), the clock the runs'
+  // starts are on, not the frame's timestamp, which can be behind a start set this frame; and
+  // Chromium has been seen to hand two callbacks the same frame time, which left the clock where it
+  // was, asked for nothing more, and held a knob on the first frame of its effect (2026-11-26: Ring
+  // sweep drawn at 0 instead of its value, one panel open in three).
+  $effect(() => {
+    if (!drawnValueState.running || valueFrame || typeof requestAnimationFrame !== 'function') return;
+    const step = () => { valueFrame = 0; valueNow = Math.max(nowMs(), valueNow + 0.001); };
+    valueFrame = requestAnimationFrame(step);
+  });
+  onDestroy(() => { if (valueFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(valueFrame); valueFrame = 0; });
+  // A control some scene waits on tells the runtime which states it enters (sceneRuntime.js): each
+  // state that starts to hold, and `default` when the last one stops. Not on the first look, as the
+  // keyframe player does not: a toggle that opens switched on does not set off its scene.
+  let statesBefore = null;
+  let reportsStates = $derived(!!(sceneStage?.fire && core?.id && stageFrame?.listeners?.state?.has?.(core.id)));
+  $effect(() => {
+    if (!reportsStates) { statesBefore = null; return; }
+    const now = new Set((interactionRuntime?.activeStates ?? []).map((state) => String(state).trim().toLowerCase()).filter(Boolean));
+    const before = statesBefore;
+    statesBefore = now;
+    if (!before) return;
+    const id = core.id;
+    untrack(() => {
+      for (const state of now) if (!before.has(state)) sceneStage.fire({ type: 'state', controlId: id, to: state });
+      if (now.size === 0 && before.size > 0) sceneStage.fire({ type: 'state', controlId: id, to: 'default' });
+    });
+  });
+  // A control whose value drives a scene (a value clock, utils/sceneClock.js) reports its value as
+  // it changes, the first look included: that is where the scene starts.
+  let reportsValue = $derived(!!(sceneStage?.input && core?.id && stageFrame?.listeners?.value?.has?.(core.id)));
+  $effect(() => {
+    if (!reportsValue || keyframeValueKey == null) return;
+    const normalized = Number(keyframeValueKey);
+    if (!Number.isFinite(normalized)) return;
+    const id = core.id;
+    untrack(() => sceneStage.input(id, 'value', { normalized }));
+  });
+  let activeKeyframes = $derived(mergeKeyframeOutputs(playerKeyframes, sceneKeyframes));
   $effect(() => {
     const fired = activeKeyframes?.fired;
     if (fired?.length) noteAnimationsFired(core?.id, fired);
   });
   let rootKeyframeCSS = $derived(animationDeclaration(activeKeyframes?.parts?.get('') ?? null));
+
+  // --- Text effects (utils/textEffects.js) -------------------------------------------------------
+  // While a text effect plays on the control's own text, the text is drawn as pieces (letters,
+  // words, lines or the whole), each with its own animation, a stagger after the last. A text SWAP
+  // (trigger `textChange`) plays when the words change — a Label that shows a knob's name and, while
+  // it is touched, its value: the words that left play their "out" effect on a ghost of the old text
+  // while the new words play "in". Text drawn as SVG (an outline, a glow, a gradient fill) has no
+  // pieces to cut; it plays the effect whole.
+  const isSwapOut = (item) => item?.trigger?.type === 'textChange' && item.effect?.way === 'out';
+  let ownTextEffects = $derived(activeKeyframes?.texts?.get('') ?? []);
+  let liveTextEffect = $derived(ownTextEffects.filter((item) => !isSwapOut(item)).at(-1) ?? null);
+  let ghostTextEffect = $derived(ownTextEffects.filter(isSwapOut).at(-1) ?? null);
+
+  // What the words said before they last changed, line by line, for an odometer: only the letters
+  // that differ roll (textEffects.js odometerChanged, wordsHistory).
+  const linesBefore = wordsHistory((lines) => lines.join('\n'));
+
+  /** Lines of text cut into pieces for one effect, each piece with its inline style; per line. */
+  function textPiecesFor(lines, item) {
+    const all = [];
+    const odometer = item.effect.effect === 'odometer' && item.effect.split === 'letter';
+    const before = odometer ? linesBefore(lines) : null;
+    lines.forEach((line, index) => {
+      const changed = odometer ? odometerChanged(line, before?.[index] ?? null) : null;
+      splitText(line === '' ? '\u200B' : line, item.effect.split).forEach((piece, k) => {
+        all.push({ ...piece, animated: piece.animated && changed?.[k] !== false, line: index });
+      });
+    });
+    const seedText = `${core?.id ?? ''}:${item.name}`;
+    // A reel's letters are windows on their columns (textEffects.js reelColumns).
+    const styles = textPieceStyles(item.effect, all, { phase: item.phase, seedText, at: item.at ?? null, columns: true });
+    const columns = reelColumns(item.effect, all, { seedText });
+    const pieces = all.map((piece, index) => ({ ...piece, style: styles[index], column: columns[index] }));
+    return lines.map((_, index) => pieces.filter((piece) => piece.line === index));
+  }
+
+  /**
+   * Which text a swap waits for: `to` names 'value', 'name', or any change ('*' or none). Waiting for
+   * the value means the words BECOMING the value: on a Label that swaps the two, a turn that changes
+   * the value it already shows is the value following the knob, not a swap, and pushing every new
+   * number in over the last drew two at once. A Label that shows only the value plays on each.
+   */
+  function swapMatches(trigger, shownAs, wasShownAs) {
+    const to = trigger?.to ?? [];
+    if (!to.length || to.includes('*')) return true;
+    const now = String(shownAs ?? '').toLowerCase();
+    if (!to.includes(now)) return false;
+    return !(wasShownAs && String(wasShownAs).toLowerCase() === now && text?.shows === 'nameValue');
+  }
+
+  // The words as they were last drawn, so a change can leave a ghost of them; and the ghost.
+  let shownTextFrame = { text: null, shownAs: '', lines: [], lineStyles: [], anchor: '', span: '', glyph: '' };
+  let ghostText = $state(null);
+  let ghostTimer = null;
+  onDestroy(() => clearTimeout(ghostTimer));
+  $effect(() => {
+    const frame = {
+      text: renderedTextContent,
+      shownAs: String(text?.shownAs ?? ''),
+      lines: svgTextLines,
+      // Each line's alignment and spacing, as the live words carry it: a centred caption's ghost is
+      // centred too, where its words were, not set flush left beside the new ones.
+      lineStyles: textSet.usesCustomFlow ? [] : svgTextLines.map((_, index) => blockLinePaintStyles(index).join('; ')),
+      anchor: textAnchorStyle,
+      span: textSpanStyle,
+      glyph: textGlyphStyle,
+    };
+    const live = previewSessionOverride != null;
+    untrack(() => {
+      const before = shownTextFrame;
+      shownTextFrame = frame;
+      if (!live || before.text === null || before.text === frame.text || !core?.id) return;
+      const swaps = keyframeEntries.filter((entry) => entry.text && entry.trigger?.type === 'textChange'
+        && swapMatches(entry.trigger, frame.shownAs, before.shownAs));
+      if (!swaps.length) return;
+      const out = swaps.find((entry) => entry.text.way === 'out');
+      if (out && before.text) {
+        clearTimeout(ghostTimer);
+        ghostText = { ...before, seq: (ghostText?.seq ?? 0) + 1 };
+        const count = splitText(before.text, out.text.split).filter((piece) => piece.animated).length;
+        ghostTimer = setTimeout(() => { ghostText = null; }, textEffectSpan(out.text, count) + 80);
+      }
+      for (const entry of swaps) requestAnimationPlay(core.id, entry.name);
+    });
+  });
   // Colour frames reach the layers that paint as inherited custom properties. Only a control that
   // has any sets them; then it and every part set all four, so a pulse stays where it was put.
   let keyframeColours = $derived(activeKeyframes?.colours?.size ? activeKeyframes.colours : null);
@@ -1859,7 +2153,26 @@
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
   let separateBackground = $derived(hasBackgroundEffects(background));
+  // A knob's readout at its pointer's tip stands 22 px past the dial, and a knob drawn in a tight fit
+  // fills its box: on a 100 px knob it stood up to 28 px past the box in every built-in set, and the
+  // box cut it off. It is meant to hang outside (sliderGeometry.resolveCircularTrackMetrics), so a
+  // knob's or slider's box lets its readout and thrown words hang, and the renderer cuts its drawing
+  // to the box as the box did. Not where the control paints a fill of its own here, whose rounded
+  // corners the box's clip cuts the drawing to.
+  let labelsHang = $derived(isSliderControl && !hasAnatomy && !absorbedFillCSS);
+  // Patterns (utils/patternLayers.js): the ones behind are drawn by BackgroundRenderer, the ones in
+  // front here, after the text. They move in Preview, the player and the Animation tab's stage, and
+  // are drawn still on the design canvas, which never moves on its own (the owner's decision,
+  // docs/design/animation-designer.md) — and still under the Preview's Reduced motion switch as
+  // under the OS one.
+  let frontPatterns = $derived(!hasAnatomy && hasPatterns(background));
+  // A fill absorbed onto .control-content is a colour or a gradient, and plays that channel's frames.
+  let absorbedGradient = $derived(/gradient\(/.test(absorbedFillCSS ?? ''));
+  let frontPatternClip = $derived(frontPatterns ? fillShapeCSS(background?._children?.Corners, displayW, displayH) : '');
+  let patternsStill = $derived(editorInteractionEnabled !== false || interactionRuntime?.keyframes?.reducedMotion === true);
   let blendCSS  = $derived(buildBlendCSS(effects));
+  // A stacking context of its own, unless a layer inside blends with what is behind (effectsCSS.js).
+  let stacksAlone = $derived(!blendsThroughControl(control));
   let filterCSS = $derived(buildFilterCSS(effects));
 
   // A flat colour or a single gradient paints on `.control-content` itself instead of on a child
@@ -1870,7 +2183,10 @@
   // The one thing this does move: `.control-content` carries `overflow: hidden`, so a rounded fill
   // now rounds the clip as well as the paint. Content in the corner of a rounded control used to
   // be drawn outside its own visible shape; it is cut to it instead.
-  let absorbedFillCSS = $derived(background ? plainFillCSS(background, displayW, displayH) : null);
+  // A fill whose image a keyframe animation moves (keyframeAnimation.js, AND AN IMAGE) is drawn as
+  // a layer: absorbed onto .control-content, moving the picture would move the content with it.
+  let imageMoves = $derived(!!keyframeColours?.get?.('')?.image?.length);
+  let absorbedFillCSS = $derived(background && !imageMoves ? plainFillCSS(background, displayW, displayH) : null);
 
   function textShapeMaskId(kind = 'block') {
     return `text-shape-mask-${svgIdSeed}-${kind}`;
@@ -2159,6 +2475,32 @@
 
   let textFill = $derived(text?._children?.Fill ?? null);
   let textFont = $derived(text?._children?.Font ?? null);
+  // Words a button or a meter throws (utils/keyframeAnimation.js EMIT): words of its own or a count,
+  // rising from the key or the meter (`centre`) or its top edge (`tip`), in its caption's colour and
+  // face. Drawn here, beside the control's content and not in it, so the box does not cut them off as
+  // they rise; each fades as it goes, and the player forgets it once it has flown. A knob's and a
+  // slider's are the slider renderer's. The Components showcase's Button, and the Meter's "OVER".
+  let keyWords = $derived.by(() => {
+    const type = String(core?.controlType ?? '');
+    if (!(BUTTON_DEVICE_TYPES.has(type) || METER_DEVICE_TYPES.has(type)) || !activeKeyframes?.emits?.length) return [];
+    return activeKeyframes.emits.map((word) => {
+      const emit = word.emit;
+      const said = emit.shows === 'count' ? String(word.count ?? 1) : (emit.words || '+1');
+      const top = emit.from === 'tip' ? 0 : displayH / 2;
+      const colour = emit.colour ? cssColor(emit.colour) : cssColor(textFill?.colour ?? 'FFFFFFFF');
+      const family = textFont?.family ? `font-family:'${String(textFont.family).replace(/'/g, '')}', sans-serif` : '';
+      return {
+        id: word.id,
+        text: said,
+        style: [
+          `left:${(displayW / 2).toFixed(1)}px`, `top:${top.toFixed(1)}px`, `color:${colour}`, `font-size:${emit.size}px`, family,
+          `--ce-emit-y:${(-emit.travel).toFixed(1)}px`,
+          `animation-duration:${Math.round(emit.duration)}ms`, `animation-delay:${Math.round(emit.delay)}ms`,
+          `animation-timing-function:${emit.easing}, cubic-bezier(0.7, 0, 0.9, 0.45)`,
+        ].filter(Boolean).join(';'),
+      };
+    });
+  });
   let textMultiline = $derived(text?._children?.Multiline ?? null);
   let textEffects = $derived(text?._children?.Effects ?? null);
   let textPosition = $derived(text?._children?.Position ?? null);
@@ -2178,17 +2520,8 @@
   // below it, so a bat is as tall as three bezels.
   let lampHeight = $derived(lampKind === 'bat' ? lampSize * 3 : lampSize);
   let lampLit = $derived(interactionRuntime?.signals?.checked === true || interactionRuntime?.signals?.selectionActive === true);
-  function lampCss(value, fallback) {
-    const raw = String(value ?? '').replace(/^#/, '').trim();
-    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw)) return fallback;
-    if (raw.length === 6) return `#${raw}`;
-    return `rgba(${parseInt(raw.slice(2, 4), 16)}, ${parseInt(raw.slice(4, 6), 16)}, ${parseInt(raw.slice(6, 8), 16)}, ${(parseInt(raw.slice(0, 2), 16) / 255).toFixed(3)})`;
-  }
   let lampStyle = $derived.by(() => {
     if (!hasLamp) return '';
-    const lit = lampCss(contentLayout?.lampColour, '#5B9BD5');
-    const off = lampCss(contentLayout?.lampOffColour, '#2C2C2C');
-    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
     const inset = numberOr(contentLayout?.[lampOnRight ? 'paddingRight' : 'paddingLeft'], 8);
     const left = lampOnRight ? displayW - inset - lampWidth : inset;
     const top = (displayH - lampHeight) / 2;
@@ -2196,15 +2529,9 @@
       // The lever is inline SVG (below); the box only places it.
       return [`left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampHeight}px`].join('; ');
     }
-    const colour = lampLit ? lit : off;
-    const face = lampKind === 'jewel'
-      ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,${lampLit ? 0.75 : 0.35}) 0%, rgba(255,255,255,0) 45%), ${colour}`
-      : colour;
-    const glow = lampLit ? `0 0 ${Math.max(4, lampSize * 0.8)}px ${lit}, 0 0 ${Math.max(2, lampSize * 0.25)}px ${lit}` : 'inset 0 1px 2px rgba(0,0,0,0.6)';
     return [
       `left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampSize}px`,
-      `background:${face}`, `border:1px solid ${bezel}`, `box-shadow:${glow}`,
-      `border-radius:${lampKind === 'window' ? '2px' : '50%'}`,
+      lampFaceCss({ kind: lampKind, lit: lampLit, colour: contentLayout?.lampColour, offColour: contentLayout?.lampOffColour, bezelColour: contentLayout?.lampBezelColour, size: lampSize }),
     ].join('; ');
   });
   // The bat's inks: the bezel is the set's bezel colour, the lever the lamp colour when thrown up
@@ -2894,7 +3221,16 @@
    * pair. Both of those are invisible in the server-rendered string a golden baseline reads; only
    * the browser's parse shows the loss.
    */
-  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle].filter(Boolean).join('; '));
+  // How far a Part effect's halves travel to leave the box: its width (textEffects.js).
+  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle, `--ce-part-reach:${Math.round(displayW || 0)}px`].filter(Boolean).join('; '));
+  // The live words as pieces while a text effect plays on them, per line; null when none does.
+  let livePieces = $derived(liveTextEffect && !showBlockTextVisual ? textPiecesFor(svgTextLines, liveTextEffect) : null);
+  let ghostPieces = $derived(ghostText && ghostTextEffect && !showBlockTextVisual ? textPiecesFor(ghostText.lines, ghostTextEffect) : null);
+  // Text drawn as SVG plays the effect whole, on the drawing.
+  let textVisualEffectStyle = $derived(liveTextEffect && (showBlockTextVisual || textSet.usesCustomFlow)
+    ? (textPieceStyles({ ...liveTextEffect.effect, stagger: 0 }, [{ text: renderedTextContent, animated: true }],
+      { phase: liveTextEffect.phase, seedText: `${core?.id ?? ''}:${liveTextEffect.name}` })[0] ?? '').replace(/display:inline-block;white-space:pre;/, '')
+    : '');
   let hasLineDecorations = $derived(
     textFont?.underline === true || textFont?.strikethrough === true || textFont?.overline === true
   );
@@ -3064,156 +3400,246 @@
   // The library first, then the icons the open panel carries with it (utils/documentIcons.js) — a
   // shared panel or the exported player has the picture even where the library does not.
   let resolvedStoredIcon = $derived(resolveIcon(icon, $storedIcons, $documentIcons));
-  let radioGroupPreviewStateName = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
-  let radioGroupPreviewSegmentIds = $derived(
-    radioGroupPreviewStateName
-      ? normalizeSegmentTargetIds(
-        sourceValueSection,
-        $segmentEditScope?.mode === 'segments'
-          ? $segmentEditScope.segmentIds ?? []
-          : []
-      )
-      : []
-  );
-  let radioGroupEditTargetSegmentIds = $derived(
-    $segmentEditScope?.mode === 'segments'
+  // --- The choice group (RadioButtonGroup). utils/choiceGroupLayout.js places its options,
+  // utils/choiceGroupStyle.js resolves each one in its own states, ChoiceGroup.svelte draws them
+  // (docs/design/choice-group.md). Hover, press and keyboard focus are an option's, named in the
+  // session by Preview (choiceHover, choicePressed, choiceFocus); the Segments tab can preview a
+  // state on the options it targets.
+  let choiceStyle = $derived(isRadioGroupControl ? choiceStyleOf(sourceBehavior) : '');
+  let choiceMulti = $derived(choiceSelectionMode(sourceBehavior) === 'multi');
+  let sourceContentLayout = $derived(getSection(resolvedSourceControl, 'ContentLayout') ?? contentLayout);
+  let choicePreviewState = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
+  let choiceEditTargets = $derived(
+    isRadioGroupControl && $segmentEditScope?.mode === 'segments'
       ? normalizeSegmentTargetIds(sourceValueSection, $segmentEditScope.segmentIds ?? [])
       : []
   );
-  let radioGroupActiveStateNames = $derived.by(() => {
-    if (!isRadioGroupControl) return [];
-    if (Array.isArray(interactionRuntime?.activeStates) && interactionRuntime.activeStates.length > 0) {
-      return interactionRuntime.activeStates;
-    }
-    return radioGroupPreviewStateName ? [radioGroupPreviewStateName] : [];
-  });
-  let radioGroupSelectionMode = $derived(String(sourceBehavior?.selectionMode ?? 'single').trim().toLowerCase() === 'multi' ? 'multi' : 'single');
-  let radioGroupVisualStyle = $derived(String(sourceBehavior?.visualStyle ?? sourceBehavior?.subtype ?? 'radio'));
-  let radioGroupLayout = $derived.by(() => resolveRadioGroupLayout({
-    behavior: sourceBehavior,
-    valueRows,
-    width: displayW,
-    height: displayH,
-    paddingLeft: contentBox.paddingLeft,
-    paddingRight: contentBox.paddingRight,
-    paddingTop: contentBox.paddingTop,
-    paddingBottom: contentBox.paddingBottom,
-    gap: contentBox.gap,
-  }));
-  let radioGroupSelectedKeys = $derived.by(() => {
+  let choicePreviewsChoice = $derived(!!choicePreviewState && (
+    ['selected', 'checked'].includes(choicePreviewState.toLowerCase())
+    || sourceStatesSection?._children?.[choicePreviewState]?.when?.checked === true
+  ));
+  let choiceSelected = $derived.by(() => {
     if (!isRadioGroupControl) return new Set();
-
-    const forcedSelectedRowIds = radioGroupPreviewStateName
-      && (
-        normalizeKey(radioGroupPreviewStateName) === 'selected'
-        || normalizeKey(radioGroupPreviewStateName) === 'checked'
-        || sourceStatesSection?._children?.[radioGroupPreviewStateName]?.when?.checked === true
-      )
-      && radioGroupPreviewSegmentIds.length > 0
-      ? radioGroupPreviewSegmentIds
-      : [];
-
-    if (forcedSelectedRowIds.length > 0) {
-      return resolveRadioSelectedKeys(valueRows, sourceBehavior, { forceSelectedRowIds: forcedSelectedRowIds });
+    if (choicePreviewsChoice && choiceEditTargets.length > 0) {
+      return selectedChoiceKeys(valueRows, sourceBehavior, { forceRowIds: choiceEditTargets });
     }
-
-    const selected = new Set();
-    const runtimeValue = interactionRuntime?.signals?.valueRaw;
-    if (Array.isArray(runtimeValue)) {
-      for (const entry of runtimeValue) {
-        selected.add(String(entry));
-      }
-    } else if (runtimeValue !== undefined && runtimeValue !== null && runtimeValue !== '') {
-      selected.add(String(runtimeValue));
-    }
-
+    const raw = interactionRuntime?.signals?.valueRaw;
+    const values = Array.isArray(raw) ? raw : (raw === undefined || raw === null || raw === '' ? [] : [raw]);
+    const selected = new Set(values.map((value) => String(value).trim()));
     if (selected.size > 0 || previewSession?.valueOverrideEnabled === true) {
-      if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
-        return new Set([selected.values().next().value]);
-      }
-      return selected;
+      return choiceMulti || selected.size <= 1 ? selected : new Set([selected.values().next().value]);
     }
-
-    return resolveRadioSelectedKeys(valueRows, sourceBehavior);
+    return selectedChoiceKeys(valueRows, sourceBehavior);
   });
-  let radioGroupItems = $derived.by(() => {
+  let choiceHoverKey = $derived(previewSession?.hover === true ? String(previewSession?.choiceHover ?? '') : '');
+  let choicePressedKey = $derived(previewSession?.pressed === true ? String(previewSession?.choicePressed ?? '') : '');
+  let choiceFocusKey = $derived(previewSession?.focused === true && previewSession?.inputModality === 'keyboard'
+    ? String(previewSession?.choiceFocus ?? '') : '');
+  let choicePalette = $derived.by(() => {
+    if (!isRadioGroupControl) return null;
+    const colour = (token) => resolveColourValue(token, controlSet ?? undefined);
+    // The thumb: the set's "on" body, unless that is the face's own colour, as in a fifth of the
+    // built-in sets; then its accent, its fill, its focus colour, whichever stands out.
+    const thumb = standsOutFrom(sourceBackground?._children?.Fill?.colour,
+      ['{surface.checked}', '{accent}', '{control.fill}', '{accent.hot}'].map(colour));
+    return { panelText: colour('{text.primary}'), mutedText: colour('{text.muted}'), accent: colour('{accent}'), thumb, focus: colour('{accent.hot}'), panel: colour('{panel.surface}') };
+  });
+  /** One option resolved in its own states (utils/choiceGroupStyle.js), with these flags. */
+  function resolveChoice(row, flags, previewed = false) {
+    return resolveChoiceOption({
+      style: choiceStyle, row, flags, inset: numberOr(sourceContentLayout?.paddingTop, 2),
+      background: sourceBackground, text: sourceText, contentLayout: sourceContentLayout,
+      valueSection: sourceValueSection, statesSection: sourceStatesSection,
+      signals: interactionRuntime?.signals ?? {}, palette: choicePalette,
+      previewState: previewed ? choicePreviewState : '',
+    });
+  }
+  let choiceOptions = $derived.by(() => {
     if (!isRadioGroupControl) return [];
-
-    return radioGroupLayout.items.map((entry, index) => {
-      const row = entry.row;
-      const rowId = String(row?.id ?? `row_${index + 1}`);
-      const internalKey = String(row?.internalValue ?? row?.id ?? `item_${index + 1}`);
-      const selected = radioGroupSelectedKeys.has(internalKey) || radioGroupSelectedKeys.has(rowId);
-      const editTarget = radioGroupEditTargetSegmentIds.includes(rowId);
-      const resolvedStyle = resolveRadioSegmentStyle({
-        row,
-        behavior: sourceBehavior,
-        background: sourceBackground,
-        text: sourceText,
-        valueSection: sourceValueSection,
-        statesSection: sourceStatesSection,
-        selected,
-        activeStateNames: radioGroupActiveStateNames,
-      });
-      const outerShape = String(resolvedStyle?.indicatorOuter?.shape ?? '').trim().toLowerCase();
-      const innerShape = String(resolvedStyle?.indicatorInner?.shape ?? '').trim().toLowerCase();
-      const outerVisible = resolvedStyle?.indicatorOuter?.visible !== false;
-      const innerVisible = resolvedStyle?.indicatorInner?.visible !== false
-        && (resolvedStyle?.indicatorInner?.selectedOnly !== true || selected);
-
+    return choiceRows(valueRows).map((row, index) => {
+      const key = choiceKey(row, index);
+      const rowId = String(row?.id ?? '');
+      const flags = {
+        selected: choiceSelected.has(key) || choiceSelected.has(rowId),
+        hover: choiceHoverKey === key,
+        pressed: choicePressedKey === key,
+        focused: choiceFocusKey === key,
+        // Another option is under the pointer (a state about it dims the rest: Spotlight).
+        peerHover: choiceHoverKey !== '' && choiceHoverKey !== key,
+      };
+      const previewed = choicePreviewState && !choicePreviewsChoice
+        && (choiceEditTargets.length === 0 || choiceEditTargets.includes(rowId));
       return {
-        id: rowId,
+        key,
+        rowId,
+        row,
+        flags,
         label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
-        selected,
-        editTarget,
-        shellBackground: buildRadioWholeBackground(resolvedStyle?.whole),
-        shellWidth: Math.max(0, numberOr(entry?.width, 0)),
-        shellHeight: Math.max(0, numberOr(entry?.height, 0)),
-        contentStyle: [
-          `padding:${Math.max(0, numberOr(resolvedStyle?.whole?.paddingY, 0))}px ${Math.max(0, numberOr(resolvedStyle?.whole?.paddingX, 0))}px`,
-          `gap:${Math.max(0, numberOr(resolvedStyle?.whole?.indicatorGap, 0))}px`,
-        ].join('; '),
-        indicatorOuterVisible: outerVisible,
-        indicatorOuterStyle: [
-          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.width, 0))}px`,
-          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.height, 0))}px`,
-          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.borderWidth, 0))}px`,
-          `border-radius:${resolveRadioShapeRadius(outerShape, resolvedStyle?.indicatorOuter?.radius)}`,
-          `background:${cssColor(resolvedStyle?.indicatorOuter?.fillColour)}`,
-          `border-color:${cssColor(resolvedStyle?.indicatorOuter?.borderColour)}`,
-        ].join('; '),
-        indicatorInnerVisible: innerVisible,
-        indicatorInnerStandalone: !outerVisible && innerVisible,
-        indicatorInnerStyle: [
-          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.width, 0))}px`,
-          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.height, 0))}px`,
-          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.borderWidth, 0))}px`,
-          `border-radius:${resolveRadioShapeRadius(innerShape, resolvedStyle?.indicatorInner?.radius)}`,
-          `background:${cssColor(resolvedStyle?.indicatorInner?.fillColour)}`,
-          `border-color:${cssColor(resolvedStyle?.indicatorInner?.borderColour)}`,
-          innerVisible ? 'opacity:1; transform:scale(1)' : 'opacity:0; transform:scale(0.7)',
-        ].join('; '),
-        labelStyle: [
-          `color:${cssColor(resolvedStyle?.label?.colour)}`,
-          `font-size:${Math.max(1, numberOr(resolvedStyle?.label?.fontSize, 11))}px`,
-          `font-weight:${resolvedStyle?.label?.fontWeight ?? 600}`,
-          `letter-spacing:${numberOr(resolvedStyle?.label?.letterSpacing, 0)}px`,
-          resolvedStyle?.label?.fontFamily ? `font-family:${JSON.stringify(resolvedStyle.label.fontFamily)}` : '',
-          resolvedStyle?.label?.fontStyle ? `font-style:${String(resolvedStyle.label.fontStyle).trim().toLowerCase()}` : '',
-          resolvedStyle?.label?.textTransform ? `text-transform:${resolvedStyle.label.textTransform}` : '',
-        ].filter(Boolean).join('; '),
+        resolved: resolveChoice(row, flags, previewed),
       };
     });
   });
-  let radioGroupStyle = $derived.by(() => {
-    if (!isRadioGroupControl) return '';
-    return [
-      `padding:${contentBox.paddingTop}px ${contentBox.paddingRight}px ${contentBox.paddingBottom}px ${contentBox.paddingLeft}px`,
-      `gap:${contentBox.gap}px`,
-      `--radio-columns:${Math.max(1, radioGroupLayout.columns)}`,
-      `--radio-rows:${Math.max(1, radioGroupLayout.rowCount)}`,
-    ].join('; ');
+  let choiceLayout = $derived.by(() => {
+    if (!isRadioGroupControl) return null;
+    const first = choiceOptions[0]?.resolved;
+    const indicator = first?.indicatorOuter?.visible
+      ? first.indicatorOuter.width
+      : (choiceStyle !== 'tab' && first?.indicatorInner?.visible ? first.indicatorInner.width : 0);
+    return choiceGroupLayout({
+      style: choiceStyle,
+      behavior: sourceBehavior,
+      valueRows,
+      width: displayW,
+      height: displayH,
+      padding: {
+        top: sourceContentLayout?.paddingTop, right: sourceContentLayout?.paddingRight,
+        bottom: sourceContentLayout?.paddingBottom, left: sourceContentLayout?.paddingLeft,
+      },
+      gap: sourceContentLayout?.gap,
+      labelWidths: choiceOptions.map((option) => measureChoiceLabel(option.label, option.resolved.label)),
+      indicator,
+      indicatorGap: first?.whole?.indicatorGap ?? 6,
+    });
   });
+  // --- Its options as parts (choiceGroupLayout.js CHOICE_PARTS, utils/choiceGroupMotion.js) ------
+  // Which parts anything COULD play on: a part with something on it is drawn ready to move, the
+  // thumb on a layer of its own. Outside Preview nothing plays, and the group draws as it always did.
+  let choiceAnimated = $derived(isRadioGroupControl && keyframeEntries.length + (interactionRuntime?.transitions?.partTransitions?.size ?? 0) > 0
+    ? animatedParts({ partTransitions: interactionRuntime?.transitions?.partTransitions, keyframeEntries })
+    : NO_CHOICE_PARTS);
+  let choiceChosenIndex = $derived(choiceOptions.findIndex((option) => option.flags.selected));
+  // The options' and the thumb's timings: what COULD play on them, not what changed this frame. The
+  // pointer going from one option to the next changes no state of the control's, and a move of the
+  // thumb is a new choice whatever made it (the hand, a script, the synth).
+  let choiceTimings = $derived(isRadioGroupControl ? (interactionRuntime?.transitions?.partTransitions ?? null) : null);
+  let choiceThumbOn = $derived(!choiceMulti && choiceAnimated.has('thumb') && choiceChosenIndex >= 0);
+
+  /** The colour frames on several parts at once, channel by channel; null when there are none. */
+  function joinedChannels(...all) {
+    const present = all.filter(Boolean);
+    if (!present.length) return null;
+    return Object.fromEntries(['paint', 'shape', 'stroke', 'text', 'gradient', 'image'].map((channel) => [channel, present.flatMap((lists) => lists[channel] ?? [])]));
+  }
+  /**
+   * What moves one option, its face and its words together: where it stands among the options (a
+   * staggered animation reads it, utils/optionStagger.js), its own scale and opacity as its states
+   * set them, eased on `Parts.option`'s transition, and what plays on every option and on the chosen
+   * one. Its colour frames are set only where some are played, so the control's own still reach it.
+   */
+  function choiceMotionCss(index, option, count) {
+    const chosen = option.flags.selected;
+    const moves = [...(activeKeyframes?.parts?.get?.('option') ?? []), ...(chosen ? (activeKeyframes?.parts?.get?.('chosen') ?? []) : [])];
+    const colours = joinedChannels(keyframeColours?.get?.('option'), chosen ? keyframeColours?.get?.('chosen') : null);
+    const bucket = choiceTimings?.get?.('option') ?? null;
+    const motion = option.resolved.motion;
+    return [
+      optionRankVars(index, count, choiceChosenIndex),
+      motion.scale !== 1 || motion.opacity !== 1 ? `scale:${motion.scale};opacity:${motion.opacity};` : '',
+      bucket ? transitionDeclaration({ transform: bucket.transform ?? null, opacity: bucket.opacity ?? null, size: null, colour: null }, { target: 'root' }) : '',
+      animationDeclaration(moves),
+      colours ? colourVariables(colours) : '',
+    ].join('');
+  }
+  /** One option's words: their scale and motion, their colour frames, and a text effect's pieces. */
+  function choiceLabelPlay(option) {
+    const chosen = option.flags.selected;
+    const moves = [...(activeKeyframes?.parts?.get?.('optionLabel') ?? []), ...(chosen ? (activeKeyframes?.parts?.get?.('chosenLabel') ?? []) : [])];
+    const colours = joinedChannels(keyframeColours?.get?.('optionLabel'), chosen ? keyframeColours?.get?.('chosenLabel') : null);
+    const bucket = choiceTimings?.get?.('optionLabel') ?? null;
+    const scale = option.resolved.motion.labelScale;
+    const words = (chosen ? activeKeyframes?.texts?.get?.('chosenLabel')?.at(-1) : null) ?? activeKeyframes?.texts?.get?.('optionLabel')?.at(-1) ?? null;
+    const outer = [
+      scale !== 1 ? `scale:${scale};` : '',
+      bucket ? transitionDeclaration({ transform: bucket.transform ?? null, opacity: bucket.opacity ?? null, size: null, colour: null }, { target: 'root' }) : '',
+      animationDeclaration(moves),
+      colours ? colourVariables(colours) : '',
+    ].join('');
+    let pieces = null;
+    if (words) {
+      const cut = splitText(option.label, words.effect.split);
+      const styles = textPieceStyles(words.effect, cut, { phase: words.phase, seedText: `${core?.id ?? ''}:${option.key}:${words.name}`, at: words.at ?? null });
+      pieces = cut.map((piece, k) => ({ text: piece.text, style: styles[k] }));
+    }
+    return { outer, colours: !!colours, pieces };
+  }
+
+  let choiceItems = $derived((choiceLayout?.items ?? []).map((item, index, all) => {
+    const option = choiceOptions[index];
+    return {
+      key: item.key,
+      id: `${svgIdSeed}-choice-${index}`,
+      label: option.label,
+      left: item.left,
+      top: item.top,
+      width: item.width,
+      height: item.height,
+      padX: option.resolved.whole.paddingX ?? item.padX,
+      selected: option.flags.selected,
+      focused: option.flags.focused,
+      editTarget: choiceEditTargets.includes(option.rowId),
+      resolved: option.resolved,
+      // Its mark is the thumb's, drawn apart where it can travel.
+      thumbbed: choiceThumbOn && option.flags.selected,
+      // And under the thumb it keeps its face as it is when not chosen, so a key stays a key while
+      // the colour travels to it (a strip's options have none: there the thumb is all there is).
+      restingBody: choiceThumbOn && option.flags.selected ? (resolveChoice(option.row, { ...option.flags, selected: false }).body ?? null) : null,
+      motion: choiceMotionCss(index, option, all.length),
+      words: choiceLabelPlay(option),
+    };
+  }));
+
+  // The thumb: the chosen option's mark in its chosen look alone (the pointer over it is the
+  // option's business), where it stands now, the way it last went, and its timing.
+  let lastThumbBox = null;
+  let lastThumbDirection = 1;
+  let choiceThumb = $derived.by(() => {
+    if (!choiceThumbOn) return null;
+    const item = choiceItems[choiceChosenIndex];
+    const option = choiceOptions[choiceChosenIndex];
+    if (!item || !option) return null;
+    const orientation = choiceOrientation(sourceBehavior);
+    const resolved = resolveChoice(option.row, { selected: true });
+    const box = thumbBox(choiceStyle, orientation, item, resolved);
+    if (!box) return null;
+    const direction = thumbDirection(lastThumbBox, box, orientation);
+    if (direction !== 0) lastThumbDirection = direction;
+    lastThumbBox = box;
+    const bucket = choiceTimings?.get?.('thumb') ?? null;
+    const colours = keyframeColours?.get?.('thumb') ?? null;
+    return {
+      box,
+      resolved,
+      edges: thumbEdges(box, displayW, displayH),
+      timing: thumbTransition(bucket, lastThumbDirection, orientation),
+      moves: animationDeclaration(activeKeyframes?.parts?.get?.('thumb') ?? null),
+      colours: colours ? colourVariables(colours) : '',
+    };
+  });
+  // A divider is hidden beside an option drawing a body of its own (the thumb, a hover): it would
+  // cut into it. Hairlines are the label's ink, faint, so they read on whatever the frame is.
+  let choiceDividers = $derived.by(() => {
+    const painted = new Set(choiceItems.filter((item) => item.resolved.body).map((item) => item.key));
+    return (choiceLayout?.dividers ?? []).map((divider) => ({ ...divider, hidden: divider.between.some((key) => painted.has(key)) }));
+  });
+  let choiceInk = $derived(choiceOptions.find((option) => !option.flags.selected)?.resolved.label.colour ?? 'FFFFFFFF');
+  let choiceBaseline = $derived.by(() => {
+    if (choiceStyle !== 'tab' || !choiceLayout?.items.length) return null;
+    const left = numberOr(sourceContentLayout?.paddingLeft, 0);
+    const vertical = choiceOrientation(sourceBehavior) === 'vertical';
+    const right = displayW - numberOr(sourceContentLayout?.paddingRight, 0);
+    const bottom = displayH - numberOr(sourceContentLayout?.paddingBottom, 0);
+    const top = numberOr(sourceContentLayout?.paddingTop, 0);
+    return vertical
+      ? { left, top, width: 1, height: Math.max(0, bottom - top), colour: fadedCss(choicePalette?.mutedText ?? choiceInk, 0.45) }
+      : { left, top: bottom - 1, width: Math.max(0, right - left), height: 1, colour: fadedCss(choicePalette?.mutedText ?? choiceInk, 0.45) };
+  });
+  let choiceActiveId = $derived(
+    (choiceItems.find((item) => item.focused) ?? choiceItems.find((item) => item.selected))?.id
+  );
+  function fadedCss(hex, alpha) {
+    const { r, g, b, a } = parseHexColor(hex);
+    return rgbaColor({ r, g, b, a: a * alpha });
+  }
   let hasIcon = $derived(!hasAnatomy && !isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
   let iconIsTinted = $derived(usesIconTint(icon?.tint));
   // Where the icon sits and how it is drawn: editor/iconLook.js, which a component's icon layer
@@ -3252,6 +3678,7 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
+  class:stacks-alone={stacksAlone}
   class:embedded
   data-control-id={embedded ? undefined : core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
@@ -3297,6 +3724,8 @@
   aria-label={previewInteractive || (inPreview && previewImageRole) ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
+  aria-activedescendant={previewInteractive && isRadioGroupControl ? choiceActiveId : undefined}
+  aria-orientation={previewInteractive && isRadioGroupControl ? choiceOrientation(sourceBehavior) : undefined}
   aria-expanded={previewInteractive ? previewAriaExpanded : undefined}
   aria-valuenow={previewInteractive ? previewAriaValueNow : undefined}
   aria-valuemin={previewInteractive ? previewAriaValueMin : undefined}
@@ -3311,15 +3740,16 @@
   <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
   {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
-      <BackgroundRenderer {background} width={displayW} height={displayH} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
     </div>
   {/if}
-  <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
+  <div bind:this={controlContentElement} class="control-content" class:labels-hang={labelsHang} class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} class:absorbs-gradient={!hasAnatomy && absorbedGradient} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} {drawnValue} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} partTexts={activeKeyframes?.texts ?? null}
+        partAnimations={activeKeyframes?.parts ?? null} partColours={keyframeColours} partTransitions={activeTransitions?.partTransitions ?? null} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
-      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} reducedMotion={patternsStill} patternAnimations={activeKeyframes?.patterns ?? null} patternTiming={activeTransitions?.rootTransitions?.get?.('colour') ?? null} {imageMoves} />
     {/if}
 
     {#if ownRenderer === 'LcdDisplay'}
@@ -3329,7 +3759,8 @@
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
       {/if}
     {:else if ownRenderer === 'Meter' && !hasAnatomy}
-      <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+      <MeterRenderer control={renderControl} width={displayW} height={displayH} {drawnValue}
+        partAnimations={activeKeyframes?.parts ?? null} partColours={keyframeColours} />
     {:else if ownRenderer === 'Shape'}
       <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
     {:else if ownRenderer === 'Keyboard'}
@@ -3379,7 +3810,7 @@
           renderIdNamespace={`${svgIdSeed}-knob`}
         />
       {/if}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} {drawnValue} />
     {:else if ownRenderer === 'Orbit'}
       <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
     {:else if ownRenderer === 'Looper'}
@@ -3493,11 +3924,15 @@
       <SliderFamilyRenderer
         control={renderControl}
         runtime={interactionRuntime}
+        clipDrawing={labelsHang}
+        {drawnValue}
         width={displayW}
         height={displayH}
         partTransitions={activeTransitions?.partTransitions ?? null}
         partAnimations={activeKeyframes?.parts ?? null}
         partColours={keyframeColours}
+        partTexts={activeKeyframes?.texts ?? null}
+        emits={activeKeyframes?.emits?.length ? activeKeyframes.emits : null}
         debug={interactionDebugEnabled}
       />
     {/if}
@@ -3513,6 +3948,8 @@
             ?? activeTransitions?.partTransitions?.get?.(part?.meta?.booleanInputs?.paintFrom)
             ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
+          textEffect={activeKeyframes?.texts?.get?.(partName)?.at(-1) ?? null}
+          patternAnimations={activeKeyframes?.partPatterns?.get?.(partName) ?? null}
           colourChannels={keyframeColours ? (keyframeColours.get(partName) ?? {}) : null}
           fadeHidden={fadeableParts.has(partName)}
           debug={interactionDebugEnabled}
@@ -3542,37 +3979,19 @@
       </div>
     {/if}
 
-    {#if isRadioGroupControl && radioGroupItems.length}
-      <div class="radio-group-content" style={radioGroupStyle}>
-        {#each radioGroupItems as item (item.id)}
-          <div
-            class="radio-group-item"
-            class:selected={item.selected}
-            class:edit-target={item.editTarget}
-            class:segmented={radioGroupVisualStyle === 'segmented'}
-            class:tab={radioGroupVisualStyle === 'tab'}
-          >
-            <div class="radio-group-item-shell">
-              <BackgroundRenderer background={item.shellBackground} width={item.shellWidth} height={item.shellHeight} />
-            </div>
-            <div class="radio-group-item-content" style={item.contentStyle}>
-              {#if item.indicatorOuterVisible}
-                <span class="radio-indicator-outer" style={item.indicatorOuterStyle}>
-                  {#if item.indicatorInnerVisible}
-                    <span class="radio-indicator-inner" style={item.indicatorInnerStyle}></span>
-                  {/if}
-                </span>
-              {:else if item.indicatorInnerStandalone}
-                <span class="radio-indicator-inner standalone" style={item.indicatorInnerStyle}></span>
-              {/if}
-              <span class="radio-group-label" style={item.labelStyle}>{item.label}</span>
-            </div>
-            {#if item.editTarget}
-              <div class="radio-edit-target-badge">Editing</div>
-            {/if}
-          </div>
-        {/each}
-      </div>
+    {#if isRadioGroupControl && choiceItems.length}
+      <ChoiceGroup
+        style={choiceStyle}
+        orientation={choiceOrientation(sourceBehavior)}
+        items={choiceItems}
+        dividers={choiceDividers}
+        dividerColour={fadedCss(choiceInk, 0.3)}
+        baseline={choiceBaseline}
+        focusColour={cssColor(choicePalette?.focus ?? 'FF5B9BD5')}
+        optionRole={choiceMulti ? 'checkbox' : 'radio'}
+        interactive={previewInteractive}
+        thumb={choiceThumb}
+      />
     {/if}
 
     {#if isComboboxControl}
@@ -3860,6 +4279,8 @@
       <img class="native-text-preview" style={nativePreviewStyle} src={nativePreviewData} alt="" />
     {/if}
 
+    <!-- A piece of words with a text effect on it; a reel's letter is a window on its column. -->
+    {#snippet wordPiece(piece)}{#if piece.column}<span style={REEL_WINDOW}><span style={piece.style}>{piece.column}</span></span>{:else}<span style={piece.style}>{piece.text}</span>{/if}{/snippet}
     {#if hasText && !textSet.usesCustomFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
         <!--
@@ -3874,6 +4295,18 @@
           styles are alignment and spacing, and on a single line they say the same thing one level
           up — 225 labels on the GAIA panel is 225 elements saved.
         -->
+        {#if ghostPieces}
+          <!-- The words a swap replaced, leaving with their "out" effect (see Text effects above). -->
+          {#key ghostText.seq}
+            <span class="text-span text-ghost" aria-hidden="true" style="{ghostText.anchor}; {ghostText.span}">
+              <span class="text-glyphs" style={ghostText.glyph}>
+                {#each ghostPieces as linePieces, index}
+                  <span class="text-line ghost-line" style={ghostText.lineStyles?.[index] ?? ''}>{#each linePieces as piece}{@render wordPiece(piece)}{/each}</span>
+                {/each}
+              </span>
+            </span>
+          {/key}
+        {/if}
         <span class="text-span ce-colour-anim" style="{textAnchorStyle}; {textSpanStyle}">
           <span
             bind:this={textGlyphElement}
@@ -3882,10 +4315,14 @@
             style={textGlyphAndLineStyle}
           >
             {#if foldsSoleLine}
-              {blockLineDomText(svgTextLines[0])}
+              {#if livePieces}
+                {#each livePieces[0] as piece}{@render wordPiece(piece)}{/each}
+              {:else}
+                {blockLineDomText(svgTextLines[0])}
+              {/if}
             {:else}
               {#each svgTextLines as line, index}
-                <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
+                <span class="text-line" style={blockLineDomStyleFor(index)}>{#if livePieces}{#each livePieces[index] as piece}{@render wordPiece(piece)}{/each}{:else}{blockLineDomText(line)}{/if}</span>
               {/each}
             {/if}
           </span>
@@ -3905,7 +4342,7 @@
       namespaces the <defs> ids so both can coexist in one document.
     -->
     {#snippet textVisual(ns, fillGate, drawText)}
-        <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+        <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true" style={textVisualEffectStyle || undefined}>
           {#if customTextureFill}
             <defs>
               <filter id={`${textShapeMaskId(ns)}-texture-tint`} x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
@@ -4081,8 +4518,21 @@
     {#if hasText && showBlockLineDecorations}
       {@render blockLineDecorations('front')}
     {/if}
+
+    {#if frontPatterns}
+      <!-- Patterns in front of the content: over the text, clipped to the control's shape. -->
+      <PatternLayers {background} place="front" width={displayW} height={displayH} clip={frontPatternClip} reducedMotion={patternsStill} animations={activeKeyframes?.patterns ?? null} timing={activeTransitions?.rootTransitions?.get?.('colour') ?? null} />
+    {/if}
   </div>
   </EffectSurface>
+
+  {#if keyWords.length}
+    <div class="key-words" aria-hidden="true">
+      {#each keyWords as word (word.id)}
+        <div class="key-word" data-emitted-word style={word.style}>{word.text}</div>
+      {/each}
+    </div>
+  {/if}
 
   {#if showCustomHitZones && customHitZoneEntries.length}
     <div class="custom-hit-zone-label-tray" aria-hidden="true">
@@ -4182,6 +4632,17 @@
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+  }
+  /* `isolation` makes a control a stacking context of its own, still in the document-order band (no
+     z-index: SceneryGround says why there is none). Without it the layers inside a control — its
+     words at z-index 2, a part's frames — join the SURFACE's stacking and paint over every later
+     control drawn above them: a Label's words showed through the panel laid over it, and the Film
+     Festival's Inception cut to black and kept its title. A control's own blend mode sits on this
+     element, so it still blends with what is behind it. Not for a control with a layer inside that
+     blends (blendsThroughControl): that layer has to reach what is behind the control, and in a
+     context of its own it would blend with nothing — a Photoshop knob's dodge layers went white. */
+  .canvas-control.stacks-alone {
+    isolation: isolate;
   }
   .canvas-control.embedded { pointer-events: none; }
   .macro-knob-ring { position: absolute; border-radius: 50%; pointer-events: none; }
@@ -4351,6 +4812,32 @@
     overflow: hidden;
     pointer-events: none;
   }
+  /* A knob's or slider's readout and thrown words hang past its box (SliderFamilyRenderer clips its
+     drawing to the box itself instead). */
+  .control-content.labels-hang { overflow: visible; }
+
+  /* Words a button threw: up from the key by --ce-emit-y, growing a little, and fading after they
+     have been read (the slider renderer's thrown words, on a key). From/to only: a percentage stop
+     in a component's keyframes puts its class on every element it draws (Svelte 5). */
+  .key-words { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+  .key-word {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    line-height: 1;
+    font-weight: 700;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+    animation-name: ce-key-word-move, ce-key-word-fade;
+    animation-fill-mode: both;
+  }
+  @keyframes ce-key-word-move {
+    from { translate: 0 0; scale: 0.85; }
+    to { translate: 0 var(--ce-emit-y, -36px); scale: 1.12; }
+  }
+  @keyframes ce-key-word-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
 
   /* A plain fill paints on .control-content and text on .text-span; both glide with the control's
      colour timing, which arrives as an inherited custom property (utils/transitionCss.js). */
@@ -4362,8 +4849,10 @@
      and a container draws the controls inside it inside its own element, so every control starts
      from none; a control with colour frames sets its own inline, which wins. Then the fill where
      it is absorbed onto this element, and the control's text. */
-  .canvas-control { --ce-kf-paint: none; --ce-kf-shape: none; --ce-kf-stroke: none; --ce-kf-text: none; }
+  .canvas-control { --ce-kf-paint: none; --ce-kf-shape: none; --ce-kf-stroke: none; --ce-kf-text: none; --ce-kf-gradient: none; }
   .control-content.absorbs-fill { animation: var(--ce-kf-paint, none); }
+  /* An absorbed gradient plays its turn and shift frames instead (utils/gradientPaint.js). */
+  .control-content.absorbs-fill.absorbs-gradient { animation: var(--ce-kf-gradient, none); }
   .text-span { animation: var(--ce-kf-text, none); }
   .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
@@ -4463,104 +4952,6 @@
     line-height: 1;
   }
 
-  .radio-group-content {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    grid-template-columns: repeat(var(--radio-columns, 1), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--radio-rows, 1), minmax(0, 1fr));
-    box-sizing: border-box;
-    pointer-events: none;
-    z-index: 3;
-  }
-
-  .radio-group-item {
-    min-width: 0;
-    min-height: 0;
-    position: relative;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  .radio-group-item.edit-target::after {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border: 2px solid rgba(46, 139, 87, 0.95);
-    border-radius: 8px;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.55),
-      0 0 10px rgba(46, 139, 87, 0.45);
-    pointer-events: none;
-    z-index: 6;
-  }
-
-  .radio-group-item-shell {
-    position: absolute;
-    inset: 0;
-  }
-
-  .radio-group-item-content {
-    position: absolute;
-    inset: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    min-height: 0;
-    box-sizing: border-box;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1px;
-  }
-
-  .radio-indicator-outer,
-  .radio-indicator-inner {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    box-sizing: border-box;
-  }
-
-  .radio-indicator-outer {
-    border-style: solid;
-  }
-
-  .radio-indicator-inner {
-    border-style: solid;
-    transition: transform 0.14s ease, opacity 0.14s ease;
-  }
-
-  .radio-indicator-inner.standalone {
-    align-self: center;
-  }
-
-  .radio-group-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.1;
-  }
-
-  .radio-edit-target-badge {
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    z-index: 7;
-    border-radius: 999px;
-    padding: 2px 5px;
-    background: rgba(14, 63, 42, 0.92);
-    border: 1px solid rgba(46, 139, 87, 0.95);
-    color: #FFF;
-    font-size: 8px;
-    font-weight: 700;
-    line-height: 1;
-    text-transform: uppercase;
-    pointer-events: none;
-  }
-
   .combobox-arrow {
     position: absolute;
     right: 10px;
@@ -4629,6 +5020,15 @@
   .text-line {
     display: block;
     min-width: 0;
+  }
+
+  /* A swap's outgoing words: on top of nothing and under the live text, never in the way. */
+  .text-ghost {
+    pointer-events: none;
+  }
+
+  .ghost-line {
+    white-space: pre;
   }
 
   .text-glyphs.hidden-glyphs {

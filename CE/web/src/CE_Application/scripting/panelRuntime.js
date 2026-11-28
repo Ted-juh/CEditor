@@ -210,6 +210,13 @@ import {
   uiSnapshot as uiSnapshotStore,
 } from '../stores/scriptUi.js';
 import { requestAnimationPlay } from '../stores/animationActivity.js';
+import { sceneRunFor } from '../stores/sceneStage.js';
+import { patternEntries } from '../utils/patternLayers.js';
+import { findEffect, effectNames, resolvePlace, textSpanFor, oneOffScene, swapFamily } from '../utils/sceneScript.js';
+import { patternPlacesOf } from '../utils/sceneModel.js';
+import { patternPlace } from '../utils/sceneFormat.js';
+import { isSliderFamily, sliderMarkCount, sliderWordsPlace, sliderWordsRefusal } from '../utils/anatomyWords.js';
+import { controlDrawsValue } from '../utils/valueDrawn.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
@@ -474,6 +481,73 @@ function channelizePath(control, path) {
   return path;
 }
 
+// SHORT PATHS (docs/design/animation-designer.md, decided by the owner on 2026-11-24): a step that
+// can only be one thing may be left out — "Text.colour" is "Text.Fill.colour", "bodyCap.scale" is
+// "Parts.bodyCap.Layout.scale". Tried only where the path as written leads nowhere, so no path that
+// resolves today changes. The written steps must appear in order in one full path to a property:
+// the first on its section (or, with the section left out, on the step after it) and the last on
+// its last, capitals ignored. Two fits or more are refused with both named, never guessed:
+// "Background.colour" could be the fill or the border. Mirrored in CE/src/Player/PanelValueModel.h;
+// the two must agree, which PanelValueModelTests.cpp and scriptShortPaths.test.js hold.
+const SHORT_PATH_DEPTH = 8;
+
+function collectLeafPaths(node, prefix, out, depth) {
+  if (depth > SHORT_PATH_DEPTH || !node || typeof node !== 'object' || Array.isArray(node)) return;
+  for (const key of Object.keys(node._children ?? {})) collectLeafPaths(node._children[key], [...prefix, key], out, depth + 1);
+  for (const key of Object.keys(node)) {
+    if (key === '_children' || key === '_type') continue;
+    const value = node[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) collectLeafPaths(value, [...prefix, key], out, depth + 1);
+    else out.push([...prefix, key]);
+  }
+}
+
+function stepsFit(written, full, offset) {
+  const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+  if (written.length < 2 || full.length - offset < written.length) return false;
+  if (!same(written[0], full[offset]) || !same(written.at(-1), full.at(-1))) return false;
+  let at = offset + 1;
+  for (let i = 1; i < written.length - 1; i += 1) {
+    while (at < full.length - 1 && !same(written[i], full[at])) at += 1;
+    if (at >= full.length - 1) return false;
+    at += 1;
+  }
+  return true;
+}
+
+/** Every full property path a short path fits on this control, as dotted strings. */
+function shortPathFits(control, segments) {
+  if (!control?._children || segments.length < 2) return [];
+  const first = String(segments[0]).toLowerCase();
+  const section = Object.keys(control._children).find((key) => key.toLowerCase() === first);
+  const leaves = [];
+  if (section) collectLeafPaths(control._children[section], [section], leaves, 1);
+  else for (const key of Object.keys(control._children)) collectLeafPaths(control._children[key], [key], leaves, 1);
+  const offset = section ? 0 : 1;
+  return [...new Set(leaves.filter((full) => stepsFit(segments, full, offset)).map((full) => full.join('.')))];
+}
+
+/** The one path a short path names, or null: none fits, or more than one does. */
+function shortPathFor(control, segments) {
+  const fits = shortPathFits(control, segments);
+  return fits.length === 1 ? fits[0] : null;
+}
+
+/** A short path that could be more than one thing, said once, with every candidate. */
+function reportAmbiguousPath(call, path, control, segments) {
+  // Only a path that leads nowhere as written is a short path: an exact one is never ambiguous.
+  const first = String(segments[0] ?? '').toLowerCase();
+  const section = Object.keys(control?._children ?? {}).find((key) => key.toLowerCase() === first);
+  const exact = section
+    ? walkCaseInsensitive(control, segments)
+    : Object.keys(control?._children ?? {}).some((key) => walkCaseInsensitive(control._children[key], segments));
+  if (exact) return false;
+  const fits = shortPathFits(control, segments);
+  if (fits.length < 2) return false;
+  addScriptTrace('error', '', `${call}("${path}"): "${segments.join('.')}" could be ${fits.length} things on "${control?._children?.Core?.name ?? ''}": ${fits.join(', ')}. Write more of the path.`);
+  return true;
+}
+
 /** Map a script path's segments to the model's real-case section path. */
 function resolveModelPath(control, segments) {
   // A bare control name means its value — `.value` is documented as the default representation, so
@@ -487,7 +561,7 @@ function resolveModelPath(control, segments) {
     path = SHORTHANDS[first];
   // Explicit section path (e.g. "background.fill.colour") — walk from the control.
   } else if (control?._children && Object.keys(control._children).some((k) => k.toLowerCase() === first)) {
-    path = walkCaseInsensitive(control, segments) ?? segments.join('.');
+    path = walkCaseInsensitive(control, segments) ?? shortPathFor(control, segments) ?? segments.join('.');
   } else {
     // Otherwise search each section for the property (e.g. a bare "fill.colour" or a channel name).
     path = null;
@@ -497,7 +571,7 @@ function resolveModelPath(control, segments) {
         if (sub) { path = `${secKey}.${sub}`; break; }
       }
     }
-    if (path == null) path = SHORTHANDS[first] ?? segments.join('.');
+    if (path == null) path = SHORTHANDS[first] ?? shortPathFor(control, segments) ?? segments.join('.');
   }
   return channelizePath(control, path);
 }
@@ -821,6 +895,8 @@ function setValue(path, value, formOrOpts = '') {
   }
 
   const modelPath = resolveModelPath(control, segs);
+  // A short path that fits two properties is refused rather than written as a new one of neither.
+  if (modelPath === segs.join('.') && reportAmbiguousPath('set', path, control, segs)) return;
   // A script renaming a control follows the same rule as the editor: no dots in a name.
   if (modelPath === 'Core.name') value = sanitizeControlName(value);
 
@@ -1046,6 +1122,7 @@ function getValue(path, form = '', report = false) {
   if (report && raw === undefined && !readsLiveValue(control, modelPath) && customChannelOfPath(control, modelPath) == null) {
     const explicitSection = segs.length > 1
       && Object.keys(control._children ?? {}).some((k) => k.toLowerCase() === String(segs[0]).toLowerCase());
+    if (reportAmbiguousPath('get', addressed.path, control, segs)) return undefined;
     if (pathReadsNothing(control, segs)) {
       getFoundNothing(addressed.path, segs.join('.'), name);
       return undefined;
@@ -4763,6 +4840,38 @@ function runAction(ref, args) {
   return undefined;
 }
 
+/** The markers already told that the panel's scripts are paused (runMarkerAction), until they run. */
+const pausedMarkersSaid = new Set();
+
+/**
+ * A scene's timeline marker (utils/sceneRuntime.js) calls its action as the scene passes it, as run()
+ * calls one: an action a script registered with ce.core.action, or a function a script defines by
+ * that name. One no script defines is said in the console in the scene's words, not run()'s.
+ */
+export function runMarkerAction(action, { scene = '' } = {}) {
+  const name = String(action ?? '').trim();
+  if (!name) return undefined;
+  const defined = actions.has(name.toLowerCase())
+    || activeScripts().some((s) => s.enabled !== false && typeof handlerCache.get(s.id)?.handlers?.[name] === 'function');
+  // A panel opened from a file runs no code until it is trusted (the trust banner), so its actions
+  // are not defined yet: that is not a missing action, and saying "no script defines" sent people
+  // looking for a script that was there. Said once for each marker until the scripts are enabled.
+  if (!defined && !ensurePanelExecutionApproved()) {
+    const key = `${scene}\u0000${name}`;
+    if (!pausedMarkersSaid.has(key)) {
+      pausedMarkersSaid.add(key);
+      addScriptTrace('warn', '', `Scene "${scene}": a marker calls "${name}", and this panel's scripts are paused. Choose "Enable scripts for this session" and the marker will call it.`);
+    }
+    return undefined;
+  }
+  if (!defined) {
+    const names = [...actions.values()].map((a) => a.name);
+    addScriptTrace('error', '', `Scene "${scene}": a marker calls "${name}", and no script defines that action${names.length ? `. The actions: ${names.join(', ')}` : ''}. Register one with ce.core.action("${name}", function).`);
+    return undefined;
+  }
+  return runAction(name);
+}
+
 /** The actions scripts have registered, for the editor's binding UI. Names as declared. */
 export function registeredActions() {
   return [...actions.values()].map((a) => a.name);
@@ -5445,27 +5554,203 @@ function animationFinishImpl(path) {
  * a transition has no shape of its own, only a change to ease — and the refusal says which keyframe
  * animations the control does have, so a typo is one message away from fixed.
  */
-function animatePlayImpl(controlName, animationName) {
+function animatePlayImpl(controlName, animationName, opts, scriptId = '') {
+  // One argument, or a table for the second: a panel scene (step 5c). Two names: a control's own.
+  // A control's name alone is still the old call missing its animation, and says so as it did.
+  const oneName = animationName === undefined || animationName === null || (typeof animationName === 'object' && !Array.isArray(animationName));
+  const named = controlName !== undefined && controlName !== null && String(controlName).trim() !== '';
+  if (oneName && named && (findSceneQuietly(controlName) || !controlNamed(controlName))) {
+    return playSceneImpl(controlName, animationName ?? opts ?? null, scriptId);
+  }
   // A name left out was looked up as the text "undefined", and said so.
   const given = (v) => v !== undefined && v !== null && String(v).trim() !== '';
   if (!given(controlName)) { addScriptTrace('error', '', 'ce.anim.play: no control name was given.'); return false; }
   const control = controlNamed(controlName);
   if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
   const all = control?._children?.Animations?._children ?? {};
-  const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+  // Keyframe animations, text effects and value animations play on request; a transition plays when
+  // its trigger does.
+  const canPlay = (a) => ['keyframes', 'text', 'value'].includes(String(a?.kind ?? ''));
+  const playable = Object.entries(all).filter(([, a]) => canPlay(a)).map(([k]) => k);
   const have = playable.length
-    ? `Its keyframe animations: ${playable.join(', ')}.`
-    : 'It has no keyframe animations — make one in the Animation tab.';
+    ? `The animations it can play: ${playable.join(', ')}.`
+    : 'It has no keyframe animations, text effects or value animations — make one in the Animation tab.';
   if (!given(animationName)) { addScriptTrace('error', '', `ce.anim.play: no animation name was given. ${have}`); return false; }
   const wanted = String(animationName).toLowerCase();
   const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
   const node = key == null ? null : all[key];
-  if (!node || String(node.kind ?? '') !== 'keyframes') {
+  if (!node || !canPlay(node)) {
     const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
     addScriptTrace('error', '', `ce.anim.play: ${why}. ${have}`);
     return false;
   }
   return requestAnimationPlay(control._children?.Core?.id, String(node.name ?? key));
+}
+
+// --- Scenes, from a script (step 5c; docs/design/animation-designer.md) -----------------------------
+// A panel scene played, held at a point, or a one-off effect: drawn, not computed, so the panel's
+// window only, as ce.anim.play always was. The surface showing the panel owns the playing
+// (utils/sceneRuntime.js) and is found by the panel (stores/sceneStage.js): with no window there is
+// none, and the call returns false and waits for nothing.
+
+function panelScenes() { return Array.isArray(activePanel()?.animationScenes) ? activePanel().animationScenes : []; }
+function liveSceneRun() { return sceneRunFor(activePanel()?.id ?? null); }
+function sceneNamedForScript(verb, name) {
+  const wanted = String(name ?? '').trim().toLowerCase();
+  const scenes = panelScenes();
+  const scene = scenes.find((entry) => String(entry.name).toLowerCase() === wanted || entry.id === name) ?? null;
+  if (!scene) {
+    const have = scenes.length ? `The panel's scenes: ${scenes.map((entry) => entry.name).join(', ')}.` : 'The panel has no scenes — make one in the Animation Designer.';
+    addScriptTrace('error', '', `${verb}: no scene called "${name ?? ''}". ${have}`);
+  }
+  return scene;
+}
+/** A script's done(completed), run as its other callbacks are. */
+function sceneDone(verb, opts, scriptId) {
+  const fn = animDone(verb, opts);
+  return fn ? (completed) => runScriptCallback(scriptId, 'done', () => fn(completed === true)) : null;
+}
+
+function findSceneQuietly(name) {
+  const wanted = String(name ?? '').trim().toLowerCase();
+  return panelScenes().find((entry) => String(entry.name).toLowerCase() === wanted || entry.id === name) ?? null;
+}
+
+function playSceneImpl(sceneName, opts, scriptId = '') {
+  const scene = sceneNamedForScript('ce.anim.play', sceneName);
+  if (!scene) return false;
+  const run = liveSceneRun();
+  if (!run) return false;
+  return run.start(scene.id, { done: sceneDone('ce.anim.play', opts, scriptId) });
+}
+
+function animateSeekImpl(sceneName, position) {
+  const scene = sceneNamedForScript('ce.anim.seek', sceneName);
+  if (!scene) return false;
+  const where = realNumber(position);
+  if (where === undefined) { addScriptTrace('error', '', `ce.anim.seek: ${shownValue(position)} is not a position; give 0 (its start) to 1 (its end).`); return false; }
+  const run = liveSceneRun();
+  return run ? run.seek(scene.id, where) : false;
+}
+
+/** `Control[.Text|.part]` read: `{ control, controlName, place }`, or null with the reason said. */
+function sceneTarget(verb, target) {
+  const steps = String(target ?? '').split('.').map((step) => step.trim()).filter(Boolean);
+  if (!steps.length) { addScriptTrace('error', '', `${verb}: no target was given; name a control, its Text, or one of its parts.`); return null; }
+  const control = controlNamed(steps[0]);
+  if (!control) { addScriptTrace('error', '', `${verb}: no control named "${steps[0]}".`); return null; }
+  const place = resolvePlace(control, steps.slice(1));
+  if (!place) {
+    const parts = Object.keys(control?._children?.Parts?._children ?? {});
+    addScriptTrace('error', '', `${verb}: "${steps.slice(1).join('.')}" is not on ${steps[0]}. ${control?._children?.Text ? 'It has Text' : 'It has no Text'}${parts.length ? `, and the parts ${parts.join(', ')}` : ''}.`);
+    return null;
+  }
+  return { control, controlName: String(control._children?.Core?.name ?? steps[0]), place };
+}
+const panelPresetsForScripts = () => (Array.isArray(activePanel()?.animationPresets) ? activePanel().animationPresets : []);
+
+function animateEffectImpl(target, effectName, opts, scriptId = '') {
+  const verb = 'ce.anim.effect';
+  const entry = findEffect(effectName, { panelPresets: panelPresetsForScripts() });
+  if (!entry) {
+    addScriptTrace('error', '', `${verb}: no effect or preset called "${effectName ?? ''}". The effects: ${effectNames({ panelPresets: panelPresetsForScripts() }).join(', ')}.`);
+    return false;
+  }
+  const isText = entry.effect?.kind === 'text';
+  const isValue = entry.effect?.kind === 'value';
+  // The control alone takes a text effect on its words, the library's own place for one, and a
+  // value effect on what its value draws (step 6).
+  const named = sceneTarget(verb, target);
+  if (!named) return false;
+  // A Pattern effect on the control alone goes on its first pattern, or a part's when it has none.
+  const firstPattern = patternPlacesOf(named.control)[0];
+  if (entry.target === 'Patterns' && named.place === 'Transform' && !firstPattern) {
+    addScriptTrace('error', '', `${verb}: "${entry.label}" plays on a pattern, and ${named.controlName} has none, nor do its parts.`);
+    return false;
+  }
+  // A knob has no words of its own: a text effect on it alone plays on those it draws, its scale's
+  // numbers, its ticks or its handle labels (utils/anatomyWords.js), as in the Designer.
+  const wordsHome = () => (isSliderFamily(named.control) ? sliderWordsPlace(named.control) ?? 'Text' : 'Text');
+  const place = isText && named.place === 'Transform' ? wordsHome()
+    : isValue && named.place === 'Transform' ? 'Value'
+      : entry.target === 'Patterns' && named.place === 'Transform' ? firstPattern
+        : named.place;
+  if (isValue && (place !== 'Value' || !controlDrawsValue(named.control))) {
+    addScriptTrace('error', '', `${verb}: "${entry.label}" moves what a value draws — on a knob, a slider, a Macro or a meter; ${named.controlName} draws none there.`);
+    return false;
+  }
+  if (!isValue && place === 'Value') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on what a value draws; give ${named.controlName} or one of its parts.`); return false; }
+  if (patternPlace(place) && entry.effect?.kind !== 'keyframes') { addScriptTrace('error', '', `${verb}: "${entry.label}" does not play on a pattern; a pattern takes a move or a fade.`); return false; }
+  // Words are the control's own (Text) or a part's; a pattern has none.
+  const wordsPart = place.startsWith('Parts.') && !patternPlace(place) ? place.slice('Parts.'.length) : null;
+  if (isText && place !== 'Text' && wordsPart === null) { addScriptTrace('error', '', `${verb}: "${entry.label}" plays on words; give ${named.controlName}, ${named.controlName}.Text or one of its parts.`); return false; }
+  const noWords = isText ? sliderWordsRefusal(named.control, wordsPart ?? '') : '';
+  if (noWords) { addScriptTrace('error', '', `${verb}: ${noWords}`); return false; }
+  if (isText && place === 'Text' && !named.control._children?.Text) { addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own for "${entry.label}".`); return false; }
+  const words = wordsPart === null ? named.control._children?.Text?.content : named.control._children?.Parts?._children?.[wordsPart]?._children?.Text?.content;
+  const marks = wordsPart === null ? null : sliderMarkCount(named.control, wordsPart);
+  const length = animTiming(verb, opts, 'duration', isText ? textSpanFor(entry.effect, words, { pieces: marks }) : entry.length);
+  const delay = Math.max(0, animTiming(verb, opts, 'delay', 0));
+  const run = liveSceneRun();
+  if (!run) return false;
+  const controlId = named.control._children.Core.id;
+  const scene = oneOffScene({ controlId, target: place, effect: entry.effect, length, start: delay, label: entry.label });
+  return run.effect(`${controlId}|${place}`, scene, { done: sceneDone(verb, opts, scriptId) });
+}
+
+function animateSwapImpl(target, text, effectName, opts, scriptId = '') {
+  const verb = 'ce.anim.swap';
+  const named = sceneTarget(verb, target);
+  if (!named) return false;
+  if (!named.control._children?.Text || (named.place !== 'Transform' && named.place !== 'Text')) {
+    addScriptTrace('error', '', `${verb}: ${named.controlName} has no words of its own to swap.`);
+    return false;
+  }
+  if (text === undefined || text === null) { addScriptTrace('error', '', `${verb}: no new words were given.`); return false; }
+  const family = effectName === undefined || effectName === null || effectName === '' ? 'crossfade' : swapFamily(effectName);
+  if (!family) { addScriptTrace('error', '', `${verb}: "${effectName}" is not a text effect; try roll, push, wipe or crossfade.`); return false; }
+  const run = liveSceneRun();
+  if (!run) return false;
+  const controlId = named.control._children.Core.id;
+  const key = `${controlId}|Text`;
+  const leave = { kind: 'text', effect: family, way: 'out', iterations: 1 };
+  const arrive = { kind: 'text', effect: family, way: 'in', iterations: 1 };
+  const done = sceneDone(verb, opts, scriptId);
+  // The old words leave; then the new ones are written and arrive. Cut short by another effect on
+  // the same words, the swap reports done(false) and the new words are not written.
+  const out = oneOffScene({ controlId, target: 'Text', effect: leave, length: textSpanFor(leave, named.control._children.Text.content), label: `${family} out` });
+  return run.effect(key, out, {
+    done: (completed) => {
+      if (!completed) { done?.(false); return; }
+      setValue(`${named.controlName}.Text.content`, String(text));
+      const inScene = oneOffScene({ controlId, target: 'Text', effect: arrive, length: textSpanFor(arrive, String(text)), label: `${family} in` });
+      run.effect(key, inScene, { done });
+    },
+  });
+}
+
+function animatePatternImpl(target, opts) {
+  const verb = 'ce.anim.pattern';
+  const steps = String(target ?? '').split('.').map((step) => step.trim()).filter(Boolean);
+  const control = steps.length ? controlNamed(steps[0]) : null;
+  if (!control) { addScriptTrace('error', '', `${verb}: no control named "${steps[0] ?? ''}".`); return false; }
+  const name = String(control._children?.Core?.name ?? steps[0]);
+  // Control[.part][.pattern]: a part's background when the next step names a part.
+  const parts = control._children?.Parts?._children ?? {};
+  const partKey = steps[1] ? Object.keys(parts).find((part) => part.toLowerCase() === steps[1].toLowerCase()) : null;
+  const background = partKey ? parts[partKey]?._children?.Background : control._children?.Background;
+  const base = partKey ? `${name}.Parts.${partKey}.Background.Patterns` : `${name}.Background.Patterns`;
+  const wanted = steps[partKey ? 2 : 1] ?? null;
+  const layers = patternEntries(background).map(([key]) => key);
+  const chosen = wanted ? layers.filter((key) => key.toLowerCase() === wanted.toLowerCase()) : layers;
+  if (!chosen.length) {
+    addScriptTrace('error', '', `${verb}: ${wanted ? `no pattern "${wanted}" on` : 'no patterns on'} ${partKey ? `${name}'s ${partKey}` : name}.${layers.length ? ` Its patterns: ${layers.join(', ')}.` : ' Add one on its Background tab.'}`);
+    return false;
+  }
+  const keys = ['tint', 'opacity', 'speed', 'direction'].filter((key) => opts?.[key] !== undefined && opts?.[key] !== null);
+  if (!keys.length) { addScriptTrace('error', '', `${verb}: nothing to change; give tint, opacity, speed or direction.`); return false; }
+  for (const layer of chosen) for (const key of keys) setValue(`${base}.${layer}.${key}`, opts[key]);
+  return true;
 }
 
 /** Advance every animation to `nowMs` and write the values. Exported so tests drive time directly
@@ -5905,6 +6190,11 @@ function pushCommand(explicit, ownerName, command, memberId = null) {
     const outside = outsideWords(memberId, commandBounds(command), { w: Number(t.width), h: Number(t.height) }, drawState.strokeWidth);
     drawSaid(`${id}\u0000${memberId}`, outside);
   }
+  // Out of the scenery ground, as a control a script writes to is (stores/scriptTouchedControls.js).
+  // The ground is a picture baked from the document, and a drawing is not in the document: drawn on
+  // a folded Label or Background, the drawing was recorded and published and never shown, so the
+  // scope trace this API was made for (over a Background) never appeared in Preview.
+  noteScriptTouchedControl(id);
   const list = drawCommands.get(id) ?? [];
   list.push({
     ...command,
@@ -7531,7 +7821,17 @@ const DEFINE_SPECS = {
     // A keyframe animation's playing (utils/keyframeAnimation.js readKeyframes, keyframePlayer.js),
     // and the curve of the "custom" easing and the feel of "spring" (utils/easing.js readEasing).
     // The Animation tab writes all six.
-    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring'],
+    // A text effect's own settings (utils/textEffects.js readTextEffect), which the Animation tab
+    // writes for the Text kind; and the preset an animation follows (utils/animationPresetModel.js
+    // LINK_KEY), which Apply writes. The Components showcase's knobs carry all of them.
+    extra: ['iterations', 'direction', 'loop', 'hold', 'bezier', 'spring',
+      'effect', 'way', 'split', 'order', 'stagger', 'scatter', 'scale', 'spins', 'glyphs', 'colour', 'preset',
+      // Words thrown from a knob's pointer or a button's key (utils/keyframeAnimation.js readEmit):
+      // what they show, and a button's words of its own.
+      'shows', 'from', 'travel', 'size', 'words',
+      // A keyframe animation on Each step mirrored on a step back (keyframeAnimation.js mirroredEntry);
+      // on a choice group's every option, each a little after the last (optionStagger.js).
+      'followTurn', 'optionStagger', 'optionOrder'],
   },
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],
@@ -7553,6 +7853,8 @@ const DEFINE_SPECS = {
       'shadowOffset', 'shadowColour', 'shadowBlur', 'taper', 'aspect', 'shiftY',
       // A plate's grooves and a bar pointer's second bar (models/directionKnobParts.js).
       'grooves', 'grooveLength', 'grooveWidth', 'markFrom', 'markTo', 'markWidth', 'markColour',
+      // Where a knob's readout sits: at the pointer's tip, or in the cap (`centre`).
+      'anchor',
       // A plate's, a fader cap's or a button part's rendered look (utils/renderedLookCore.js).
       'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop',
       'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',
@@ -9745,7 +10047,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     animateResume: (path) => animationResumeImpl(path),
     animateReverse: (path) => animationReverseImpl(path),
     animateFinish: (path) => animationFinishImpl(path),
-    animatePlay: (control, animation) => animatePlayImpl(control, animation),
+    animatePlay: (control, animation, opts) => animatePlayImpl(control, animation, opts, scriptId),
+    animateSeek: (scene, position) => animateSeekImpl(scene, position),
+    animateEffect: (target, effect, opts) => animateEffectImpl(target, effect, opts, scriptId),
+    animateSwap: (target, text, effect, opts) => animateSwapImpl(target, text, effect, opts, scriptId),
+    animatePattern: (target, opts) => animatePatternImpl(target, opts),
     // ce.ui — a message for whoever is using the panel
     uiNotify: (message, opts) => uiNotifyImpl(message, opts),
     uiDismiss: (id) => uiDismissImpl(id),
@@ -10533,6 +10839,8 @@ function samplePayload(event) {
   if (event === 'onValueChange' || event === 'onValueChanged') return 64;
   if (event === 'onActiveHandleChanged') return { activeHandle: 'current', previousActiveHandle: 'start' };
   if (event && event.startsWith('on') && (event.includes('Pointer') || event.includes('Click'))) return { x: 0, y: 0 };
+  if (event === 'onLongPress') return { x: 0, y: 0, held: 500 };
+  if (event === 'onFlick') return { x: 0, y: 0, direction: 'up', speed: 900 };
   return undefined;
 }
 
@@ -11393,6 +11701,7 @@ export function approveCurrentPanelScripts(extraScript = pendingApprovalScript, 
   const request = executionRequest(extraScript);
   approveExecution(request.key, request.fingerprint, allowNative);
   pendingApprovalScript = null;
+  pausedMarkersSaid.clear();
   if (!ensurePanelExecutionApproved(extraScript)) return;
   if (live.inited && get(previewModeEnabled) === true) {
     live.prevPreviewOn = false;

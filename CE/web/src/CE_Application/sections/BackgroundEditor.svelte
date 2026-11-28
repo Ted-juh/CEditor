@@ -19,6 +19,7 @@
   import { deepClone } from '../utils/deepClone.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import LayerEffectsSection from '../panels/LayerEffectsSection.svelte';
+  import PatternsEditor from './PatternsEditor.svelte';
   import { browseGoesToSelection } from '../utils/browseTargets.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
@@ -559,6 +560,9 @@
         />
       {/if}
     {/each}
+
+    <!-- Patterns: tinted, tiled, moving, behind the content or in front of it (utils/patternLayers.js). -->
+    <PatternsEditor controlId={core?.id ?? ''} background={resolvedBackground} {pathPrefix} {set} />
   </div>
 {/if}
 

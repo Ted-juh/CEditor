@@ -5,13 +5,26 @@
   // are Labels of their own beside it (utils/labelShows.js), as a knob's are: it draws neither.
   // Visual only; the live value + peak are injected by the preview surface onto the Meter section
   // (Meter.__value / Meter.__peak).
+  //
+  // Every lamp (models/meterDeviceParts.js METER_CELL_PART) plays here too, on a meter drawn in LED
+  // segments: while an animation or a colour frame is put on it, each segment is drawn as a lamp of
+  // its own that says where it stands along the row, from the top and out from the level
+  // (utils/optionStagger.js), so one animation reaches them one after another, as on a meter drawn
+  // with parts (editor/MeterDeviceParts.svelte). Nothing playing, a segment is drawn as it always was.
+  import { METER_CELL_PART } from '../models/meterDeviceParts.js';
+  import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { optionRankVars } from '../utils/optionStagger.js';
   import {
-    meterConfig, meterPosition, meterZones, meterFillColourAt,
+    meterConfig, meterDrawnPosition, meterZones, meterFillColourAt,
     meterSegmentsLit, meterSegmentCenter, meterTicks, meterTickLabel,
     meterArcPath, meterArcAngle, meterPolar,
   } from '../utils/meterLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  // `drawnValue`: where a value effect puts the needle or the bar instead, 0 to 1 of the scale, or
+  // null (utils/valueDrawn.js) — a power-up sweep; the reading and the peak stay the meter's own.
+  // `partAnimations`, `partColours`: what plays on the meter's parts, of which this look has one,
+  // every lamp.
+  let { control = null, width = 0, height = 0, drawnValue = null, partAnimations = null, partColours = null } = $props();
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
     const s = String(hex ?? '').replace(/^#/, '').trim();
@@ -27,8 +40,7 @@
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
 
   let cfg = $derived(meterConfig(control));
-  let value = $derived(cfg.__value !== undefined ? cfg.__value : cfg.value);
-  let pos = $derived(meterPosition(value, cfg));
+  let pos = $derived(Number.isFinite(drawnValue) ? Math.max(0, Math.min(1, drawnValue)) : meterDrawnPosition(cfg));
   let peak = $derived(cfg.__peak); // normalized 0..1, or undefined in static editor view
   let orientation = $derived(String(cfg.orientation ?? 'horizontal'));
   let vertical = $derived(orientation === 'vertical');
@@ -42,6 +54,18 @@
   let trackCss = $derived(css(cfg.trackColour, 'rgba(20,20,20,1)'));
   let peakCss = $derived(css(cfg.peakColour, 'rgba(242,242,242,1)'));
   let zones = $derived(meterZones(cfg));
+
+  // What plays on every lamp, or null: its moves, a lamp's own (a box's for a bar's segment, a
+  // shape's for an arc's), and its colour frames, which a bar's segment paints as its background and
+  // an arc's as its stroke.
+  let lampsPlay = $derived.by(() => {
+    if (!(segments > 0)) return null;
+    const list = partAnimations?.get?.(METER_CELL_PART) ?? null;
+    const channels = partColours?.get?.(METER_CELL_PART) ?? null;
+    if (!list?.length && !channels) return null;
+    return { box: animationDeclaration(list), shape: animationDeclaration(list, { svg: true }), colours: colourVariables(channels) };
+  });
+  const lampVars = (index, lit) => `${optionRankVars(index, segments, lit - 1)}${lampsPlay.colours}`;
 
   // A CSS gradient across the FULL track (colours are absolute positions), so a
   // clipped window 0..pos reveals the right hues. Hard steps unless `gradient`.
@@ -92,7 +116,7 @@
   });
 </script>
 
-<div class="meter" class:vertical style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px;`}>
+<div class="meter" data-drawn={pos.toFixed(4)} class:vertical style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px;`}>
   <div class="meter-body">
     {#if arc}
       <svg class="meter-arc" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} preserveAspectRatio="xMidYMid meet">
@@ -100,9 +124,18 @@
           {@const lit = meterSegmentsLit(pos, segments)}
           {@const gap = Math.min(0.8 / segments, Math.max(0, num(cfg.segmentGap, 2)) / Math.max(1, arcGeo.r * Math.abs(num(cfg.arcSweep, 270)) * Math.PI / 180))}
           {#each Array(segments) as _, i (i)}
+            {#if lampsPlay}
+              <g style={lampVars(i, lit)}><g data-lamp={i} data-lamp-lit={i < lit ? '' : undefined} data-part-moves={lampsPlay.shape ? '' : undefined} style={lampsPlay.shape || undefined}>
+                <path class="meter-arc-segment" class:lit={i < lit}
+                  d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, i / segments + gap / 2, (i + 1) / segments - gap / 2, cfg.arcStart, cfg.arcSweep)}
+                  fill="none" stroke={i < lit ? css(meterFillColourAt(meterSegmentCenter(i, segments), cfg)) : trackCss} stroke-width={arcGeo.stroke}
+                  style="animation:var(--ce-kf-stroke, none);" />
+              </g></g>
+            {:else}
             <path class="meter-arc-segment" class:lit={i < lit}
               d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, i / segments + gap / 2, (i + 1) / segments - gap / 2, cfg.arcStart, cfg.arcSweep)}
               fill="none" stroke={i < lit ? css(meterFillColourAt(meterSegmentCenter(i, segments), cfg)) : trackCss} stroke-width={arcGeo.stroke} />
+            {/if}
           {/each}
         {:else}
           <path d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, 0, 1, cfg.arcStart, cfg.arcSweep)}
@@ -141,10 +174,22 @@
       <div class="meter-segments" style={`${barStyle} gap:${num(cfg.segmentGap, 2)}px;`}>
         {#each Array(segments) as _, i (i)}
           {@const idx = vertical ? segments - 1 - i : i}
+          {#if lampsPlay}
+            <!-- A lamp of its own (lampsPlay): its place along the row, its moves, and inside them
+                 its paint, whose colour frames run on the background it lights with. -->
+            <div class="seg-lamp" data-lamp={idx} data-lamp-lit={idx < lit ? '' : undefined} data-part-moves={lampsPlay.box ? '' : undefined}
+                 style={`${lampVars(idx, lit)}${lampsPlay.box}`}>
+              <div class="seg"
+                   class:lit={idx < lit}
+                   class:peak={idx === peakSeg - 1 && idx >= lit}
+                   style={`background:${idx < lit ? css(meterFillColourAt(meterSegmentCenter(idx, segments), cfg)) : trackCss}; border-radius:${num(cfg.rounded, 3)}px; --peak-colour:${peakCss}; animation:var(--ce-kf-paint, none);`}></div>
+            </div>
+          {:else}
           <div class="seg"
                class:lit={idx < lit}
                class:peak={idx === peakSeg - 1 && idx >= lit}
                style={`background:${idx < lit ? css(meterFillColourAt(meterSegmentCenter(idx, segments), cfg)) : trackCss}; border-radius:${num(cfg.rounded, 3)}px; --peak-colour:${peakCss};`}></div>
+          {/if}
         {/each}
         {#if cfg.showTicks === true}
           {#each ticks as t (t.pos)}
@@ -213,6 +258,8 @@
   .meter.vertical .meter-segments { flex-direction: column; }
   .seg { flex: 1 1 0; min-width: 0; min-height: 0; transition: background 60ms linear; }
   .seg.peak { box-shadow: inset 0 0 0 1px var(--peak-colour); }
+  .seg-lamp { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; }
+  .seg-lamp > .seg { flex: 1 1 auto; }
 
   .meter-arc { width: 100%; height: 100%; display: block; }
 </style>

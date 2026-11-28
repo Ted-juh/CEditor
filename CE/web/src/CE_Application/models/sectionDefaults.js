@@ -1059,6 +1059,14 @@ export const SECTION_DEFAULTS = {
     // Arc geometry (orientation = arc): clockwise from 3 o'clock in SVG space.
     arcStart: 135,
     arcSweep: 270,
+    // What moves it by itself (utils/meterMotion.js). A needle's ballistics, as drawn: ms to rise to
+    // a new level and to fall back, and how far past it swings (0 to 0.5 of the move); 0 and 0, it
+    // jumps. A test signal in Preview, so it moves with nothing connected: '' none, 'program',
+    // 'sweep', 'bursts'; never in an exported plug-in.
+    riseTime: 0,
+    fallTime: 0,
+    overshoot: 0,
+    testSignal: '',
   },
 
   /** Macro — one knob driving many assignments (depth · curve · range) via fan-out. */

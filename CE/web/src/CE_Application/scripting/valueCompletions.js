@@ -271,6 +271,11 @@ function detailOf(arg, label, context) {
     case 'control': return controlTypes(context?.panel).get(label) ?? 'control';
     case 'enum': return arg.name ?? '';
     case 'deviceParameter': return arg.meaning?.choiceNames?.[label] ?? 'parameter';
+    // The Animation Designer's calls (animValueKinds.js): a place by the timeline's name for it, an
+    // effect by its category, a swap's by its effect's name.
+    case 'animTarget': case 'swapEffect': return arg.meaning?.choiceNames?.[label] ?? '';
+    case 'animEffect': return arg.meaning?.cards?.find((card) => card.name === label)?.category ?? 'effect';
+    case 'scene': return 'scene';
     default: return KIND_WORDS[arg.kind] ?? '';
   }
 }

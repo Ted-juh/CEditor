@@ -572,6 +572,7 @@ inline constexpr Token kBaseControlSetTokens[] = {
     { "border.surface", "66FFFFFF" },
     { "border.field", "665B5B5B" },
     { "border.mixed", "FFFFD166" },
+    { "control.readout", "{control.cap}" },
     { "section.surface", "{surface}" },
 };
 

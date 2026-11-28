@@ -1,0 +1,1144 @@
+{
+  "formatVersion": 4,
+  "panelGuid": "7a443f8b-c0b5-4e1a-9f3d-7a443f8b7a44",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Meter Together",
+  "scriptId": "component_meter-together",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1000,
+  "height": 594,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF0B0D0B",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": false,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "phosphor"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {"name":"Title","id":"ctrl_1771293067000","controlType":"Label"},
+        "Transform": {"x":30,"y":22,"width":620,"height":34},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Meter · Together","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Note","id":"ctrl_1771293067001","controlType":"Label"},
+        "Transform": {"x":30,"y":58,"width":940,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"scenes over a row of meters: what they draw moves, each a little after the last, and comes back to its level.","_children":{"Fill":{"colour":"FF9CC7AA"},"Font":{"family":"Space Grotesk","size":13},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOnCaption","id":"ctrl_1771293067002","controlType":"Label"},
+        "Transform": {"x":30,"y":122,"width":230,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Power-on","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOnHow","id":"ctrl_1771293067003","controlType":"Label"},
+        "Transform": {"x":30,"y":146,"width":230,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PANEL OPENS","_children":{"Fill":{"colour":"FF39FF7A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOnWhat","id":"ctrl_1771293067004","controlType":"Label"},
+        "Transform": {"x":30,"y":164,"width":230,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"each sweeps to full scale and back, in turn","_children":{"Fill":{"colour":"FF9CC7AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn1","id":"ctrl_1771293067005","controlType":"Meter"},
+        "Transform": {"x":280,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.35}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn2","id":"ctrl_1771293067006","controlType":"Meter"},
+        "Transform": {"x":398,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.5}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn3","id":"ctrl_1771293067007","controlType":"Meter"},
+        "Transform": {"x":516,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.42}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn4","id":"ctrl_1771293067008","controlType":"Meter"},
+        "Transform": {"x":634,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.6}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn5","id":"ctrl_1771293067009","controlType":"Meter"},
+        "Transform": {"x":752,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"PowerOn6","id":"ctrl_1771293067010","controlType":"Meter"},
+        "Transform": {"x":870,"y":120,"width":110,"height":48},
+        "Meter": {"value":0.46}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpectrumCaption","id":"ctrl_1771293067011","controlType":"Label"},
+        "Transform": {"x":30,"y":240,"width":230,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Spectrum","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpectrumHow","id":"ctrl_1771293067012","controlType":"Label"},
+        "Transform": {"x":30,"y":264,"width":230,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF39FF7A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"SpectrumWhat","id":"ctrl_1771293067013","controlType":"Label"},
+        "Transform": {"x":30,"y":282,"width":230,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the row moves like an analyser","_children":{"Fill":{"colour":"FF9CC7AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum1","id":"ctrl_1771293067014","controlType":"Meter"},
+        "Transform": {"x":280,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.35}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum2","id":"ctrl_1771293067015","controlType":"Meter"},
+        "Transform": {"x":398,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.5}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum3","id":"ctrl_1771293067016","controlType":"Meter"},
+        "Transform": {"x":516,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.42}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum4","id":"ctrl_1771293067017","controlType":"Meter"},
+        "Transform": {"x":634,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.6}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum5","id":"ctrl_1771293067018","controlType":"Meter"},
+        "Transform": {"x":752,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Spectrum6","id":"ctrl_1771293067019","controlType":"Meter"},
+        "Transform": {"x":870,"y":238,"width":110,"height":48},
+        "Meter": {"value":0.46}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseCaption","id":"ctrl_1771293067020","controlType":"Label"},
+        "Transform": {"x":30,"y":358,"width":230,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Chase","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseHow","id":"ctrl_1771293067021","controlType":"Label"},
+        "Transform": {"x":30,"y":382,"width":230,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ALWAYS","_children":{"Fill":{"colour":"FF39FF7A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"ChaseWhat","id":"ctrl_1771293067022","controlType":"Label"},
+        "Transform": {"x":30,"y":400,"width":230,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"a peak runs along the row","_children":{"Fill":{"colour":"FF9CC7AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase1","id":"ctrl_1771293067023","controlType":"Meter"},
+        "Transform": {"x":280,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.35}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase2","id":"ctrl_1771293067024","controlType":"Meter"},
+        "Transform": {"x":398,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.5}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase3","id":"ctrl_1771293067025","controlType":"Meter"},
+        "Transform": {"x":516,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.42}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase4","id":"ctrl_1771293067026","controlType":"Meter"},
+        "Transform": {"x":634,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.6}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase5","id":"ctrl_1771293067027","controlType":"Meter"},
+        "Transform": {"x":752,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Chase6","id":"ctrl_1771293067028","controlType":"Meter"},
+        "Transform": {"x":870,"y":356,"width":110,"height":48},
+        "Meter": {"value":0.46}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceCaption","id":"ctrl_1771293067029","controlType":"Label"},
+        "Transform": {"x":30,"y":476,"width":230,"height":22},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Beat bounce","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":16},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceHow","id":"ctrl_1771293067030","controlType":"Label"},
+        "Transform": {"x":30,"y":500,"width":230,"height":16},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TRANSPORT BEAT","_children":{"Fill":{"colour":"FF39FF7A"},"Font":{"family":"Space Grotesk","weight":"Medium","weightValue":600,"size":10,"letterSpacing":1.5},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"BounceWhat","id":"ctrl_1771293067031","controlType":"Label"},
+        "Transform": {"x":30,"y":518,"width":230,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"the row kicks up on each beat","_children":{"Fill":{"colour":"FF9CC7AA"},"Font":{"family":"Space Grotesk"},"Multiline":{"lineHeight":1.25},"Position":{"justification":"left"}}}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce1","id":"ctrl_1771293067032","controlType":"Meter"},
+        "Transform": {"x":280,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.35}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce2","id":"ctrl_1771293067033","controlType":"Meter"},
+        "Transform": {"x":398,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.5}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce3","id":"ctrl_1771293067034","controlType":"Meter"},
+        "Transform": {"x":516,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.42}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce4","id":"ctrl_1771293067035","controlType":"Meter"},
+        "Transform": {"x":634,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.6}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce5","id":"ctrl_1771293067036","controlType":"Meter"},
+        "Transform": {"x":752,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Bounce6","id":"ctrl_1771293067037","controlType":"Meter"},
+        "Transform": {"x":870,"y":474,"width":110,"height":48},
+        "Meter": {"value":0.46}
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ],
+  "animationScenes": [
+    {
+      "id": "sc_meter-together",
+      "name": "Power-on",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 1800,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_meter-together_1",
+          "controlId": "ctrl_1771293067005",
+          "target": "Value",
+          "start": 300,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_5",
+          "controlId": "ctrl_1771293067006",
+          "target": "Value",
+          "start": 420,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_9",
+          "controlId": "ctrl_1771293067007",
+          "target": "Value",
+          "start": 540,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_13",
+          "controlId": "ctrl_1771293067008",
+          "target": "Value",
+          "start": 660,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_17",
+          "controlId": "ctrl_1771293067009",
+          "target": "Value",
+          "start": 780,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_21",
+          "controlId": "ctrl_1771293067010",
+          "target": "Value",
+          "start": 900,
+          "length": 900,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutCubic",
+            "frames": [
+              {
+                "at": 0,
+                "value": 0
+              },
+              {
+                "at": 0.5,
+                "value": 1
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_meter-together_2",
+      "name": "Spectrum",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 2400,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_meter-together_2",
+          "controlId": "ctrl_1771293067014",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.28726169734856
+              },
+              {
+                "at": 0.4,
+                "value": 0.3417938948697704
+              },
+              {
+                "at": 0.6,
+                "value": 0.5576059217171188
+              },
+              {
+                "at": 0.8,
+                "value": 0.7400175161575524
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_6",
+          "controlId": "ctrl_1771293067015",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.5856292888158293
+              },
+              {
+                "at": 0.4,
+                "value": 0.373338101671572
+              },
+              {
+                "at": 0.6,
+                "value": 0.2551428832272204
+              },
+              {
+                "at": 0.8,
+                "value": 0.4784735167696667
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_10",
+          "controlId": "ctrl_1771293067016",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.8158833378324022
+              },
+              {
+                "at": 0.4,
+                "value": 0.6578534607090956
+              },
+              {
+                "at": 0.6,
+                "value": 0.4570600200148724
+              },
+              {
+                "at": 0.8,
+                "value": 0.23225714518767998
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_14",
+          "controlId": "ctrl_1771293067017",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.9373541665574312
+              },
+              {
+                "at": 0.4,
+                "value": 0.8614983515620793
+              },
+              {
+                "at": 0.6,
+                "value": 0.7238585177995207
+              },
+              {
+                "at": 0.8,
+                "value": 0.5372902408765873
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_18",
+          "controlId": "ctrl_1771293067018",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.9285864325445721
+              },
+              {
+                "at": 0.4,
+                "value": 0.9483030610363403
+              },
+              {
+                "at": 0.6,
+                "value": 0.8981281013518849
+              },
+              {
+                "at": 0.8,
+                "value": 0.782747900242438
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_22",
+          "controlId": "ctrl_1771293067019",
+          "target": "Value",
+          "start": 0,
+          "length": 2400,
+          "effect": {
+            "kind": "value",
+            "easing": "inOutSine",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.2,
+                "value": 0.7911287770412658
+              },
+              {
+                "at": 0.4,
+                "value": 0.9029353090505305
+              },
+              {
+                "at": 0.6,
+                "value": 0.9490876059072006
+              },
+              {
+                "at": 0.8,
+                "value": 0.9252750380104486
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_meter-together_3",
+      "name": "Chase",
+      "trigger": {
+        "type": "panelOpen"
+      },
+      "length": 1570,
+      "loop": true,
+      "clips": [
+        {
+          "id": "cl_meter-together_3",
+          "controlId": "ctrl_1771293067023",
+          "target": "Value",
+          "start": 0,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_7",
+          "controlId": "ctrl_1771293067024",
+          "target": "Value",
+          "start": 110,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_11",
+          "controlId": "ctrl_1771293067025",
+          "target": "Value",
+          "start": 220,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_15",
+          "controlId": "ctrl_1771293067026",
+          "target": "Value",
+          "start": 330,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_19",
+          "controlId": "ctrl_1771293067027",
+          "target": "Value",
+          "start": 440,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_23",
+          "controlId": "ctrl_1771293067028",
+          "target": "Value",
+          "start": 550,
+          "length": 520,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.3,
+                "value": 0.95
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sc_meter-together_4",
+      "name": "Beat bounce",
+      "trigger": {
+        "type": "beat",
+        "every": 1
+      },
+      "length": 530,
+      "loop": false,
+      "clips": [
+        {
+          "id": "cl_meter-together_4",
+          "controlId": "ctrl_1771293067032",
+          "target": "Value",
+          "start": 0,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.41159742456428994
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_8",
+          "controlId": "ctrl_1771293067033",
+          "target": "Value",
+          "start": 18,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.35273840796835376
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_12",
+          "controlId": "ctrl_1771293067034",
+          "target": "Value",
+          "start": 36,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.2686675651640081
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_16",
+          "controlId": "ctrl_1771293067035",
+          "target": "Value",
+          "start": 54,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.24576570551128213
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_20",
+          "controlId": "ctrl_1771293067036",
+          "target": "Value",
+          "start": 72,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.33388169435327963
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "cl_meter-together_24",
+          "controlId": "ctrl_1771293067037",
+          "target": "Value",
+          "start": 90,
+          "length": 440,
+          "effect": {
+            "kind": "value",
+            "easing": "outQuad",
+            "frames": [
+              {
+                "at": 0
+              },
+              {
+                "at": 0.12,
+                "by": 0.40011651054600217
+              },
+              {
+                "at": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

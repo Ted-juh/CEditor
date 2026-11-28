@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "92c016e6",
+  "fingerprint": "9d6ad164",
   "set": {
     "id": "graphite-studio",
     "name": "Graphite",
@@ -71,6 +71,7 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166",
+      "control.readout": "{control.cap}",
       "section.surface": "FF1E2023"
     },
     "lamp": {

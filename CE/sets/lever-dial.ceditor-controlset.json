@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "62472f68",
+  "fingerprint": "cf068e4c",
   "set": {
     "id": "lever-dial",
     "name": "Lever Dial",
@@ -71,6 +71,7 @@
       "display.screen": "FF140505",
       "display.backlight": "FF302323",
       "panel.surface": "FF34332D",
+      "control.readout": "{text.label}",
       "section.surface": "FF292823"
     },
     "lamp": {

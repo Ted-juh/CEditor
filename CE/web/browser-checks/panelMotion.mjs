@@ -289,6 +289,155 @@ await wait(60);
 check('and with both off, hover animates again', async () => {});
 assert.match((await transition('btn')).duration, /^0\.4s/);
 
+// --- Gestures: the States tab's Events row, played by a real mouse ------------------------------
+// Each gesture is pointed at the control as a person would (utils/gestureEvents.js recognises it on
+// the preview surface) and must start exactly its own animation, which the fired lamps record.
+
+const clickerBox = await page.locator('.canvas-control[data-control-id="clicker"]').boundingBox();
+const cx = clickerBox.x + clickerBox.width / 2;
+const cy = clickerBox.y + clickerBox.height / 2;
+const firedOn = async (id) => (await ev(() => window.__motion.activity()))[id] ?? { names: [], seq: 0 };
+async function gestureFires(label, act) {
+  const before = (await firedOn('clicker')).seq;
+  await act();
+  await wait(120);
+  const after = await firedOn('clicker');
+  return { names: after.seq !== before ? after.names : [], playing: (await ev(() => window.__motion.keyframes('clicker'))).name };
+}
+
+const clicked = await gestureFires('click', () => page.mouse.click(cx, cy));
+check('a click plays the click animation, and only that one', () => {
+  assert.deepEqual(clicked.names, ['bump'], JSON.stringify(clicked));
+  assert.match(clicked.playing, /ce-kf-/, clicked.playing);
+});
+await wait(1000);
+
+const held = await gestureFires('long press', async () => {
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await wait(650);
+});
+await page.mouse.up();
+check('holding still for half a second plays the long-press animation before the button is let go', () => {
+  assert.deepEqual(held.names, ['hold'], JSON.stringify(held));
+});
+await wait(1000);
+
+const flung = await gestureFires('flick', async () => {
+  await page.mouse.move(cx, cy + 10);
+  await page.mouse.down();
+  await page.mouse.move(cx, cy - 10, { steps: 2 });
+  await page.mouse.move(cx, cy - 40, { steps: 2 });
+  await page.mouse.up();
+});
+check('a fast release upwards plays the upward flick; it is not a click', () => {
+  assert.deepEqual(flung.names, ['fling'], JSON.stringify(flung));
+});
+await wait(1000);
+
+const wheeled = await gestureFires('wheel', async () => {
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, -120);
+});
+check('turning the wheel up plays the wheel-up animation', () => {
+  assert.deepEqual(wheeled.names, ['spin'], JSON.stringify(wheeled));
+});
+const wheeledDown = await gestureFires('wheel down', () => page.mouse.wheel(0, 120));
+check('and turning it down plays nothing: no animation answers it', () => {
+  assert.deepEqual(wheeledDown.names, [], JSON.stringify(wheeledDown));
+});
+
+// --- The Text engine: real words, a piece at a time ------------------------------------------------
+
+const playedText = await ev(() => window.__motion.scriptPlay('caption', 'typeIn'));
+await wait(120);
+const typing = await ev(() => window.__motion.words('caption'));
+check('a script plays a typewriter on a Label: its words become ten letters, each animated', () => {
+  assert.equal(playedText, true);
+  assert.equal(typing.text, 'Typewriter');
+  assert.equal(typing.pieces, 10, JSON.stringify(typing));
+  assert.ok(typing.animations.length && typing.animations.every((name) => /^ce-tx-/.test(name)), JSON.stringify(typing));
+});
+
+const resting = await ev(() => window.__motion.words('knobName'));
+check('the name Label shows the knob\'s name at rest, as plain words', () => {
+  assert.equal(resting.text, 'knob', JSON.stringify(resting));
+  assert.equal(resting.ghostText, '');
+});
+await set('knob', { pressed: true, dragging: true });
+await wait(100);
+const pressed = await ev(() => window.__motion.words('knobName'));
+check('pressing the knob swaps in its value, pushed in, while the name leaves on a ghost of itself', () => {
+  assert.notEqual(pressed.text, 'knob', JSON.stringify(pressed));
+  assert.ok(pressed.animations.some((name) => /^ce-tx-/.test(name)), JSON.stringify(pressed));
+  assert.equal(pressed.ghostText, 'knob', JSON.stringify(pressed));
+  assert.ok(pressed.ghostAnimations.some((name) => /^ce-tx-/.test(name)), JSON.stringify(pressed));
+});
+await wait(900);
+const settled = await ev(() => window.__motion.words('knobName'));
+check('and the ghost is gone once its effect has run', () => {
+  assert.equal(settled.ghostText, '', JSON.stringify(settled));
+});
+await set('knob', { pressed: false, dragging: false });
+await wait(100);
+const released = await ev(() => window.__motion.words('knobName'));
+check('letting go brings the name back, typed in letter by letter, the value leaving on its ghost', () => {
+  assert.equal(released.text, 'knob', JSON.stringify(released));
+  assert.equal(released.pieces, 4, JSON.stringify(released));
+  assert.equal(released.ghostText, pressed.text, JSON.stringify(released));
+});
+
+// --- Pattern and Paint: a gradient that eases, one that spins, and a wave -----------------------
+
+const restingChrome = await ev(() => window.__motion.gradient('chrome'));
+check('a gradient fill is written to ease: its angle is a registered property the gradient reads', () => {
+  assert.ok(restingChrome, 'the chrome button paints a gradient');
+  assert.equal(restingChrome.angle, '90deg', JSON.stringify(restingChrome));
+  assert.match(restingChrome.image, /^linear-gradient\(90deg, /, JSON.stringify(restingChrome));
+});
+await set('chrome', { hover: true });
+await wait(450);
+const midChrome = await ev(() => window.__motion.gradient('chrome'));
+check('on hover it turns and recolours over a second instead of jumping: mid-way it is between', () => {
+  const angle = parseFloat(midChrome.angle);
+  assert.ok(angle > 120 && angle < 240, JSON.stringify(midChrome));
+  assert.doesNotMatch(midChrome.colour1, /rgb\(255, 0, 0\)|rgb\(232, 238, 243\)/, `the middle stop is on its way to red: ${midChrome.colour1}`);
+});
+await wait(800);
+const endChrome = await ev(() => window.__motion.gradient('chrome'));
+check('and arrives where the Hover state put it', () => {
+  assert.equal(endChrome.angle, '270deg', JSON.stringify(endChrome));
+  assert.equal(endChrome.colour1, 'rgb(255, 0, 0)', JSON.stringify(endChrome));
+});
+await set('chrome', { hover: false });
+
+const spinA = await ev(() => window.__motion.gradient('spinner'));
+await wait(300);
+const spinB = await ev(() => window.__motion.gradient('spinner'));
+check('a keyframe loop turns a conic gradient while the control stays where it is', () => {
+  assert.match(spinA.image, /^conic-gradient/, JSON.stringify(spinA));
+  assert.notEqual(spinA.turn, spinB.turn, `${spinA.turn} then ${spinB.turn}`);
+  assert.match(spinB.turn, /deg$/);
+});
+
+const waveA = await ev(() => window.__motion.patterns('wave'));
+await wait(250);
+const waveB = await ev(() => window.__motion.patterns('wave'));
+check('the Wave label draws a sine row behind its words and dots in front of them', () => {
+  assert.deepEqual(waveA.map((layer) => `${layer.name}:${layer.place}`), ['pattern1:behind', 'pattern2:front']);
+  const [behind, front] = waveA;
+  assert.equal(behind.afterText, false, 'behind is before the words');
+  assert.equal(front.afterText, true, 'in front is after them');
+  assert.equal(behind.tint, 'rgb(20, 184, 166)');
+  assert.match(behind.mask, /^url\("data:image\/svg\+xml/);
+  assert.equal(behind.moveY, null, 'a row only moves along itself');
+  assert.ok(front.moveX !== null && front.moveY !== null, 'the diagonal has a mover on each axis');
+});
+check('and both move on their own, a tile at a time', () => {
+  assert.notEqual(waveA[0].moveX, waveB[0].moveX, `${waveA[0].moveX} then ${waveB[0].moveX}`);
+  assert.notEqual(waveA[1].moveY, waveB[1].moveY, `${waveA[1].moveY} then ${waveB[1].moveY}`);
+});
+
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));
   await browser.close();

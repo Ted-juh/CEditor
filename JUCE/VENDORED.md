@@ -62,10 +62,10 @@ the pending I/O run on the same thread; close keeps the handle alive until the r
 and passed five consecutive runs after it. Reapply this fix on JUCE upgrades unless upstream has
 equivalent cancellation draining and completion accounting.
 
-### 2. Linux webview bridge: messages framed in bytes
+### 2. Linux webview bridge: messages framed in bytes, and read as UTF-8
 
 **File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp`,
-`CommandReceiver::sendCommand`.
+`CommandReceiver::sendCommand`, and `CommandReceiver::tryNextRead` for the reading.
 
 **Guard:** none needed — the file is compiled on Linux only, and the change is a correction, not a
 behaviour switch. Windows uses WebView2 and never reaches this code.
@@ -83,6 +83,14 @@ left its surplus bytes at the head of the next message — so every event after 
 too. A real synth's factory list has such names (`µcomputer`, `Café`, `™`); the first library
 event of the session carried them, and from the page's side the library simply never came. Found
 running the app on Linux with a 3,600-preset Surge XT library (2026-09-08, commit `08a2c85`).
+
+**And read as UTF-8 (2026-11-28).** With the frame right, the receiver still built the message with
+`String (buffer, length)`, which reads each byte as a character of its own (Latin-1): the bytes of
+a UTF-8 "·" came out as "Â·". Every message crosses this pipe one way or the other (a script the
+host runs in the page, an event either way), so on Linux any non-ASCII text a panel or a library
+carried arrived garbled: "Button · Switch", the panel's own title, read "Button Â· Switch" in an
+exported plug-in. Found clicking an exported Button Switch panel in the standalone player on Linux.
+The patch reads it with `String::fromUTF8`. Windows never reaches this code.
 
 **Upstream status (checked 2026-10-01).** Half of it is fixed: JUCE 9.0.0 counts bytes
 (`f9f79a18f`, "Linux: WebBrowserComponent: Fix emitting non-ASCII event data", 2026-06-21). The

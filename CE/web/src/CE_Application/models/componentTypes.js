@@ -272,11 +272,17 @@ export const COMPONENT_TYPES = {
       { id: 'option_1', displayText: 'Option 1', internalValue: 'option_1', sendValue: 0, selectedByDefault: true },
       { id: 'option_2', displayText: 'Option 2', internalValue: 'option_2', sendValue: 1 },
     ],
+    // A segmented strip, and a change reported like a Toggle's (docs/design/choice-group.md). The
+    // padding is the strip's inset round its options, paid once; the gap spaces keys, rings and
+    // lamps, and a strip's or a tab row's options touch.
     behavior: {
       selectionMode: 'single',
-      visualStyle: 'radio',
+      visualStyle: 'segmented',
+      optionSizing: 'auto',
       allowDeselect: false,
+      emitValueChange: true,
     },
+    contentLayout: { paddingLeft: 2, paddingRight: 2, paddingTop: 2, paddingBottom: 2, gap: 4 },
     value: { showMapping: true },
   }),
 

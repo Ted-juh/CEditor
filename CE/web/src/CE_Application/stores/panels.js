@@ -475,7 +475,15 @@ instrumentHostTabOpen.subscribe((open) => {
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);
 
-/** Active editor tab descriptor: { type: 'panel'|'settings'|'documentation'|'deviceProfile'|'component'|'script', id } */
+/**
+ * Open Animation Designer tabs (components/animationDesigner/AnimationDesigner.svelte), by the id
+ * of the panel each edits: one a panel, as the script workspace is. The tab is a view of its panel's
+ * scenes and animations and writes them by the panel's id; it is never the active panel, so paste,
+ * insert and delete never reach a panel nobody can see. Closing the panel closes it.
+ */
+export const animationDesignerTabs = writable([]);
+
+/** Active editor tab descriptor: { type: 'panel'|'settings'|'documentation'|'instrumentHost'|'deviceProfile'|'component'|'script'|'screen'|'animation', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
 /** Per-panel Device Profile Designer companions keyed by panel id. */
@@ -515,8 +523,8 @@ export const scriptRuntimePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, instrumentHostTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments, documentationTabOpen],
-  ([$panels, $settingsTabOpen, $instrumentHostTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments, $documentationTabOpen]) => {
+  [panels, settingsTabOpen, instrumentHostTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments, documentationTabOpen, animationDesignerTabs],
+  ([$panels, $settingsTabOpen, $instrumentHostTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments, $documentationTabOpen, $animationDesignerTabs]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -587,6 +595,13 @@ export const editorTabs = derived(
       });
     }
 
+    // The Animation Designer edits its panel: the panel's dirty dot is its own.
+    for (const panelId of $animationDesignerTabs) {
+      const panel = $panels.find((entry) => entry.id === panelId);
+      if (!panel) continue;
+      tabs.push({ id: panelId, tabType: 'animation', name: `Animation · ${panel.name}`, modified: false });
+    }
+
     return tabs;
   }
 );
@@ -603,6 +618,9 @@ function resolvePanelSelection(list, activeId, tab) {
   // off-screen panel while a script workspace was in front.
   if (tab?.type === 'script') return null;
   if (tab?.type === 'screen') return null;
+  // The Animation Designer writes its panel by id (components/animationDesigner), and has undo of
+  // its own (registerHistoryContext); it is not the panel, for the reason above.
+  if (tab?.type === 'animation') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -932,6 +950,8 @@ export function closePanel(id) {
     delete next[id];
     return next;
   });
+  // Its Animation Designer goes with it: a designer of a panel that is not open edits nothing.
+  if (get(animationDesignerTabs).includes(id)) closeAnimationDesigner(id, { toPanel: false });
 
   panels.update(list => {
     const idx = list.findIndex(p => p.id === id);
@@ -1070,6 +1090,12 @@ export function setActiveEditorTab(tab) {
     return;
   }
 
+  if (tab.tabType === 'animation' || tab.type === 'animation') {
+    activeEditorTab.set({ type: 'animation', id: tab.id });
+    clearSelection();
+    return;
+  }
+
   const panelId = tab.id ?? null;
   if (panelId != null) {
     setActivePanel(panelId);
@@ -1135,6 +1161,11 @@ export function closeActiveEditorTab() {
     return;
   }
 
+  if (tab.type === 'animation') {
+    closeAnimationDesigner(tab.id);
+    return;
+  }
+
   if (tab.type === 'panel' && tab.id != null) {
     closePanel(tab.id);
     return;
@@ -1144,6 +1175,25 @@ export function closeActiveEditorTab() {
   if (resolvedPanelId != null) {
     closePanel(resolvedPanelId);
   }
+}
+
+/** Open the Animation Designer on a panel (the active one when none is named), or go to it. */
+export function openAnimationDesigner(panelId = get(resolvedActivePanelId)) {
+  if (panelId == null || !get(panels).some((panel) => panel.id === panelId)) return false;
+  animationDesignerTabs.update((list) => (list.includes(panelId) ? list : [...list, panelId]));
+  activeEditorTab.set({ type: 'animation', id: panelId });
+  clearSelection();
+  return true;
+}
+
+/** Close a panel's Animation Designer; in front, its panel comes back unless `toPanel` is false. */
+export function closeAnimationDesigner(panelId, { toPanel = true } = {}) {
+  animationDesignerTabs.update((list) => list.filter((id) => id !== panelId));
+  const tab = get(activeEditorTab);
+  if (tab?.type !== 'animation' || tab.id !== panelId) return;
+  const panelOpen = toPanel && get(panels).some((panel) => panel.id === panelId);
+  if (panelOpen) setActivePanel(panelId);
+  else activeEditorTab.set({ type: 'panel', id: get(activePanelId) ?? null });
 }
 
 /** Update a panel's properties */
@@ -1183,6 +1233,11 @@ export function saveActiveEditorDocument({ saveAs = false } = {}) {
   const tab = get(activeEditorTab);
   if (tab?.type === 'screen') {
     saveScreenDocument(tab.id, { saveAs });
+    return;
+  }
+  // The Animation Designer edits its panel's scenes and animations: Save saves that panel.
+  if (tab?.type === 'animation') {
+    savePanelById(tab.id, saveAs);
     return;
   }
   if (tab?.type === 'script') {
@@ -1322,7 +1377,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'instrumentHost' || tab?.type === 'documentation' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
+  if (tab?.type === 'settings' || tab?.type === 'instrumentHost' || tab?.type === 'documentation' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen' || tab?.type === 'animation') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -1367,7 +1422,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen' || tab?.type === 'animation') return;
   syncPanelSelection();
 });
 

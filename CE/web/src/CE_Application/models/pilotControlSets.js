@@ -164,8 +164,10 @@ export const MACHINED_CONTROL_SET = {
     'control.tick.minor': '881B1D20',
     'accent': 'FF2CB8DA',
     'accent.hot': 'FF8FE9FF',
-    'text.primary': 'FF1B1D20',
-    'text.label': 'FF1B1D20',
+    // A shade under the slot's 1B1D20, so a label reads at 4.5:1 on the bead-blasted plate as it is
+    // drawn (787C81): 1B1D20 read at 4.02 (component-presets.md, "Four sets' captions").
+    'text.primary': 'FF0F1012',
+    'text.label': 'FF0F1012',
     'text.muted': 'FF3E4247',
     'text.focus': 'FF0F5C70',
     'text.inverse': 'FFF4F6F8',
