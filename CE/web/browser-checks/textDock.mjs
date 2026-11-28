@@ -1,6 +1,7 @@
 /** The compact Text dock in the full application: real fields, selection, history and layout. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -12,10 +13,7 @@ const server = process.env.CE_TEXT_DOCK_URL ? null : await createServer({
 });
 if (server) await server.listen();
 const url = process.env.CE_TEXT_DOCK_URL || `http://127.0.0.1:${server.httpServer.address().port}/`;
-const browser = await chromium.launch(process.env.CHROMIUM_PATH
-  ? { executablePath: process.env.CHROMIUM_PATH }
-  : process.platform === 'win32' ? { channel: 'msedge' }
-    : { executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' }));
 const page = await browser.newPage({ viewport: { width: 1700, height: 1000 } });
 const failures = [];
 page.on('pageerror', (error) => failures.push(String(error)));

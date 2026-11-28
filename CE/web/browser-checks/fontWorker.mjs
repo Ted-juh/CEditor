@@ -12,10 +12,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 
 const base = process.env.CE_BEHAVIOUR_URL ?? 'http://127.0.0.1:5199/';
 const mono = `data:font/woff2;base64,${readFileSync(new URL('../src/assets/fonts/liberation-mono-regular.woff2', import.meta.url)).toString('base64')}`;
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox'] });
 const failures = [];
 const check = (name, fn) => {
   try { fn(); console.log(`  ok  ${name}`); } catch (error) { failures.push(name); console.log(`  FAIL ${name}\n       ${error.message}`); }

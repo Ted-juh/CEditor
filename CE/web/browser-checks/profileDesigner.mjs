@@ -20,6 +20,7 @@
  *   - a profile with no model opens empty and says so, without an error
  */
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -41,8 +42,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, resolve));
 
-const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox'] });
 const failures = [];
 const base = `http://127.0.0.1:${server.address().port}/profileDesigner.html`;
 

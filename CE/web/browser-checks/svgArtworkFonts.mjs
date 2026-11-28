@@ -11,6 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 
 const base = process.env.CE_BEHAVIOUR_URL ?? 'http://127.0.0.1:5199/';
 const failures = [];
@@ -18,7 +19,7 @@ const check = (name, fn) => {
   try { fn(); console.log(`  ok  ${name}`); } catch (error) { failures.push(name); console.log(`  FAIL ${name}\n       ${error.message}`); }
 };
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));

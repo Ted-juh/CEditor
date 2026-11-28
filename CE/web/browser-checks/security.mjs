@@ -1,14 +1,14 @@
-// Run with: node browser-checks/security.mjs (Edge on Windows, or CHROMIUM_PATH).
+// Run with: node browser-checks/security.mjs (Edge on Windows, the installed Chromium elsewhere, or CHROMIUM_PATH).
 import { createServer, preview } from 'vite';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const executablePath = process.env.CHROMIUM_PATH ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 const server = await createServer({ root, server: { host: '127.0.0.1', port: 0, strictPort: false, open: false } });
 await server.listen();
-const browser = await chromium.launch({ executablePath, headless: true });
+const browser = await chromium.launch({ ...chromiumLaunchOptions({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' }), headless: true });
 const errors = [];
 let built;
 try {

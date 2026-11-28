@@ -13,6 +13,7 @@
  *   - there is no slider and no JSON box in the tab
  */
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -31,8 +32,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, resolve));
 
-const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox'] });
 // The dock this tab lives in is wide and short: the owner's is about 1760 px across, and the dock
 // opens 420 px tall for this tab, of which the tab strip takes some. The tab has to fit that.
 const page = await browser.newPage({ viewport: { width: 1760, height: 390 } });
