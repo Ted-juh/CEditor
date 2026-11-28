@@ -10,7 +10,7 @@
  * (Needle, value effects: the reading and what it sends stay as they are), and its reading, a
  * Label that shows its value, changing (Readout). Phase 2 plays on the meter's own parts (Parts),
  * on its level as it clips or crosses a line (Level), on how its needle moves (Ballistics: settings,
- * not animations) and on every lamp of a row (Segments).
+ * not animations), on every lamp of a row (Segments) and on the words it draws itself (Words).
  *
  * A meter has no States, so nothing here waits for the pointer to be over it: what a hand plays, a
  * click or a double-click plays (utils/gestureEvents.js).
@@ -31,6 +31,7 @@ export const METER_PRESET_GROUPS = Object.freeze([
   { id: 'level', label: 'Level', note: 'as the level clips or crosses a line: heard, never sent' },
   { id: 'ballistics', label: 'Ballistics', note: 'how the needle gets to each new level; the reading does not wait' },
   { id: 'segments', label: 'Segments', note: 'every lamp of a row, one after another' },
+  { id: 'words', label: 'Words', note: 'its own words, a letter at a time, and its scale\'s numbers' },
 ]);
 
 const METER = 'Meter';
@@ -238,11 +239,38 @@ const SEGMENTS = [
   },
 ];
 
+// On the words a meter draws itself (utils/svgWords.js): its legend ("SIGNAL", "LEVEL", "VU"), a
+// letter at a time where the browser set it, and its scale's numbers, which no set turns on: Numbers in
+// turn turns them on, as Lamp flash turns on its lamp.
+const WORDS = [
+  {
+    id: 'type-on', name: 'Type on', how: 'panel opens', what: 'its legend types itself in as the panel opens', type: METER,
+    animations: { typeOn: words('typeOn', ONCE_OPEN, 'legend', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 110, duration: 260, delay: 400, iterations: 1 }) },
+  },
+  {
+    id: 'shimmer', name: 'Shimmer', how: 'always', what: 'a light runs along its legend, over and over', type: METER,
+    animations: { shimmer: words('shimmer', ONCE_OPEN, 'legend', 'shimmer', 'in', { split: 'letter', order: 'forward', stagger: 90, duration: 700, colour: 'FFFFD27A', ...FOREVER }) },
+  },
+  {
+    id: 'shatter', name: 'Shatter', how: 'as it clips', what: 'its legend bursts apart and gathers again as the level clips', type: METER,
+    animations: { shatter: words('shatter', CLIP, 'legend', 'explode', 'in', { split: 'letter', order: 'random', stagger: 25, duration: 560, scatter: 30, scale: 2.2 }) },
+  },
+  {
+    id: 'roll-call', name: 'Roll call', how: 'level past 70%', what: 'its legend rolls up a letter at a time as the level climbs past 70%', type: METER,
+    animations: { rollCall: words('rollCall', crossing(0.7), 'legend', 'roll', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 260, direction: 'up' }) },
+  },
+  {
+    id: 'numbers-in-turn', name: 'Numbers in turn', how: 'panel opens', what: 'its scale\'s numbers, turned on, write themselves round the dial', type: METER,
+    fields: { 'Parts.scale.numerals': true },
+    animations: { numbersInTurn: words('numbersInTurn', ONCE_OPEN, 'scale', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 90, duration: 260, delay: 300, iterations: 1 }) },
+  },
+];
+
 export const METER_PRESETS = buildComponentPresets({
   component: 'Meter',
   prefix: 'meter',
   groups: METER_PRESET_GROUPS,
-  byGroup: { attention: ATTENTION, needle: NEEDLE, readout: READOUT, parts: PARTS, level: LEVEL, ballistics: BALLISTICS, segments: SEGMENTS },
+  byGroup: { attention: ATTENTION, needle: NEEDLE, readout: READOUT, parts: PARTS, level: LEVEL, ballistics: BALLISTICS, segments: SEGMENTS, words: WORDS },
 });
 
 export const meterPresetId = (slug) => `ce:meter:${slug}`;

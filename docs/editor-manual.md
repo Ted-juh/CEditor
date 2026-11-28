@@ -1279,7 +1279,7 @@ There are four kinds, and two more for what a value draws:
   each of them, and **Each lamp** sets them off one after another: along the row, from the top
   down, out from the level, or **Scattered**. A text effect plays on the words a meter draws itself:
   its legend ("LEVEL", "VU", or its reading in figures), a letter, a word or a figure at a time, and
-  its scale's numbers, a number at a time. **On each step
+  its scale's numbers, a number at a time. A key's legend plays a letter or a word at a time too. **On each step
   of the value** plays once each time the value comes to another step, while it is turned too: as
   many steps as the control has (a knob of five choices, four), one every 5% on a knob with none,
   or the number under **Steps**. A detent felt as you turn. With **Step back** set to
@@ -1385,8 +1385,9 @@ that shows the meter's reading and plays on each new one; **Parts**, on its own 
 that flares, a face that warms, a needle that burns bright, a glint on its cover, a scale that lights
 up); **Level**, as the level clips or crosses a line (a flash, a shudder, a red wash, "OVER" thrown);
 **Ballistics**, how its needle moves (VU, PPM, Bouncy, Lazy, Sticky peak), which are settings and
-not animations, so they are set rather than linked; and **Segments**, on every lamp of a row, one
-after another. A meter has no states, so what a hand plays there, a click or a double-click plays.
+not animations, so they are set rather than linked; **Segments**, on every lamp of a row, one
+after another; and **Words**, on the words it draws itself (Type on, Shimmer, Shatter, Roll call, and
+Numbers in turn, which turns its scale's numbers on). A meter has no states, so what a hand plays there, a click or a double-click plays.
 Each row
 says what plays it (hover, let go, panel opens, a flick) and what it does, and **Apply** puts it on
 the selected controls, linked, as one of yours. A few need something the control may not show: a
@@ -1590,8 +1591,8 @@ then choose **Preview** to play it, or open the **Animation Designer** to see ho
   sweeping, kicking and trembling; **Readout**, readings that roll, spin and push as the level moves;
   and **Meter Together**, rows of lamps that power on in turn, move like an analyser, chase a peak
   and bounce on the beat; then **Meter Parts**, **Meter Level**, **Meter Ballistics** (five needles
-  on one signal, each moving its own way) and **Meter Segments**, each meter on a test signal of
-  its own so it moves in Preview with nothing plugged in.
+  on one signal, each moving its own way), **Meter Segments** and **Meter Words**, each meter on a test
+  signal of its own so it moves in Preview with nothing plugged in.
 
 Most of them play by themselves. A few wait for you:
 

@@ -11,8 +11,8 @@
    * (`partAnimations`, on a group inside the part's own travel, so it adds to the key going down); a
    * colour frame recolours what it fills (`partColours`, the shape channel, read by every shape it
    * paints with); a state change eases its colour and opacity (`partTransitions`, a lamp that fades
-   * up as it lights); and a text effect plays on the legend's words (`partTexts`, whole, as SVG text
-   * plays one). Every part sets all of these, `none` where it has nothing, so none borrows the
+   * up as it lights); and a text effect plays on the legend's words (`partTexts`), a letter or a word
+   * at a time where the browser set them (utils/svgWords.js), or whole. Every part sets all of these, `none` where it has nothing, so none borrows the
    * control's own.
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
@@ -24,8 +24,9 @@
   import { activeControlSet } from '../stores/controlSets.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
-  import { markPieceStyles } from '../utils/anatomyWords.js';
   import { textEffectClips } from '../utils/textEffects.js';
+  import { wordPieces, wordsSplit } from '../utils/svgWords.js';
+  import { measureLetters } from './measureLetters.js';
 
   let { parts = {}, active = false, uid = 'device', partAnimations = null, partColours = null, partTransitions = null, partTexts = null } = $props();
 
@@ -168,9 +169,22 @@
   const paint = (colour) => `fill:${colour};transition:var(--ce-colour-transition, none);animation:var(--ce-kf-shape, none);`;
 
   // A text effect on the legend's words, whole: SVG text has no letters to move one at a time.
+  // A text effect on the legend's words: its letters (or words) where the browser set them, measured
+  // from the word drawn whole and hidden (./measureLetters.js); whole until then, or when played whole.
+  let letterAt = $state({});
+  const measured = (key, at) => {
+    const was = letterAt[key];
+    if (was && was.end === at.end && was.xs.join() === at.xs.join()) return;
+    letterAt = { ...letterAt, [key]: at };
+  };
   function legendWords(item) {
-    if (!item.words) return '';
-    return markPieceStyles({ ...item.words.effect, split: 'whole' }, [legendText(item)], { phase: item.words.phase, seedText: `legend:${item.words.name}`, at: item.words.at ?? null })[0] ?? '';
+    if (!item.words) return null;
+    const text = { x: item.box.x + item.box.w / 2, y: item.box.y + item.box.h / 2, text: legendText(item), size: numberOr(item.part.fontSize, 11) };
+    const key = `${text.text}|${text.x}|${text.y}|${text.size}`;
+    const split = wordsSplit(item.words.effect, [text]);
+    const pieces = wordPieces(item.words.effect, [text], [split === 'whole' ? null : (letterAt[key] ?? null)],
+      { phase: item.words.phase, seedText: `legend:${item.words.name}`, at: item.words.at ?? null, central: true });
+    return { pieces, measure: split === 'whole' ? null : { ...text, key } };
   }
   const legendText = (item) => (active ? (item.part.onText ?? '') : (item.part.offText ?? ''));
 
@@ -214,8 +228,20 @@
           {#if fx && textEffectClips(item.words?.effect)}
             <clipPath id={`${uid}-legend-clip`}><rect x={item.box.x} y={item.box.y} width={item.box.w} height={item.box.h} /></clipPath>
           {/if}
-          <text x={item.box.x + item.box.w / 2} y={item.box.y + item.box.h / 2} text-anchor="middle" dominant-baseline="central"
-            font-size={numberOr(item.part.fontSize, 11)} font-family="inherit" style={fx || undefined} data-word-piece={fx ? '' : undefined}>{legendText(item)}</text>
+          {#if fx}
+            <!-- A piece each: the word whole, or its letters where the word had them. -->
+            {#each fx.pieces as piece, i (i)}
+              <text x={piece.x} y={piece.y} text-anchor={piece.anchor} dominant-baseline="central"
+                font-size={piece.size} font-family="inherit" style={piece.style || undefined} data-word-piece="">{piece.text}</text>
+            {/each}
+            {#if fx.measure}
+              <text use:measureLetters={{ key: fx.measure.key, measured }} x={fx.measure.x} y={fx.measure.y} text-anchor="middle" dominant-baseline="central"
+                font-size={fx.measure.size} font-family="inherit" visibility="hidden" aria-hidden="true">{fx.measure.text}</text>
+            {/if}
+          {:else}
+            <text x={item.box.x + item.box.w / 2} y={item.box.y + item.box.h / 2} text-anchor="middle" dominant-baseline="central"
+              font-size={numberOr(item.part.fontSize, 11)} font-family="inherit">{legendText(item)}</text>
+          {/if}
         </g>
       {:else if item.d}
         {#if item.shadow}

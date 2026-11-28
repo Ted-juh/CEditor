@@ -289,7 +289,13 @@ export function meterPartsNotDrawn(preset, drawn) {
   const hidden = wanted.filter((part) => (part === METER_CELL_PART
     ? !meterDrawsCells(drawn)
     : drawn._children.Parts?._children?.[part]?.visible !== true && !turnedOn(part)));
-  return hidden.length ? `It plays on the meter's ${names(hidden)}, which this meter's set does not draw.` : '';
+  if (hidden.length) return `It plays on the meter's ${names(hidden)}, which this meter's set does not draw.`;
+  // Words on its scale want the scale's numbers, which no set shows unless the preset turns them on.
+  const onScaleWords = Object.values(preset.animations ?? {}).some((node) => node?.kind === 'text' && (node.targets ?? []).some((t) => String(t?.path ?? '') === 'Parts.scale'));
+  if (onScaleWords && drawn._children.Parts?._children?.scale?.numerals !== true && preset.fields?.['Parts.scale.numerals'] !== true) {
+    return 'It plays on the scale\'s numbers, and this meter\'s scale shows none.';
+  }
+  return '';
 }
 
 /**

@@ -24,9 +24,10 @@
  *   - Segments (Gimbal Ring): Cascade's lamps come on along the row, Sparkle's in a scattered
  *     order, Ripple's out from the level as it clips; Peak drop's peak lamp drops as the level falls.
  *
- * And the words a meter draws itself (utils/meterWords.js), on a meter built here: a typewriter on
- * Anodised's "LEVEL" writes it a letter at a time, each where the word had it; on its scale's numbers,
- * a number at a time.
+ *   - Words (Reel): Type on writes "SIGNAL" a letter at a time as the panel opens, each where the word
+ *     had it; Shimmer keeps running along it; Shatter bursts it as the level clips, Roll call rolls it
+ *     as the level passes 70%; Numbers in turn writes the scale's numbers round the dial.
+ *   And on a key built here (utils/svgWords.js is shared): its legend typed a letter at a time.
  *
  *   node browser-checks/meterShowcase.mjs
  */
@@ -378,43 +379,55 @@ try {
     assert.ok(segs[1] >= 1, `Peak drop ${segs[1]}`);
   });
 
-  // --- Words inside the meter ---------------------------------------------------------------------
+  // --- Words, on Reel ----------------------------------------------------------------------------
+  ids = await open('Words');
+  await kit.preview(true);
+  await page.waitForTimeout(500);
+  const pieces = (id, attr = '[data-word-piece]') => page.evaluate(({ sel, attr }) => [...document.querySelectorAll(`${sel} ${attr}`)]
+    .map((t) => ({ text: t.textContent, x: Number(t.getAttribute('x')), delay: parseFloat(getComputedStyle(t).animationDelay) || 0, name: getComputedStyle(t).animationName, loops: getComputedStyle(t).animationIterationCount })), { sel: inPreview(id), attr });
+  const typed = await pieces(ids.TypeOn);
+  check('Words: Type on writes "SIGNAL" a letter at a time as the panel opens, each where the word had it', () => {
+    assert.deepEqual(typed.map((p) => p.text), ['S', 'I', 'G', 'N', 'A', 'L']);
+    assert.ok(typed.every((p, i) => p.name !== 'none' && (i === 0 || (p.x > typed[i - 1].x && p.delay > typed[i - 1].delay))), JSON.stringify(typed));
+  });
+  const numbers = await pieces(ids.NumbersInTurn);
+  check('Words: Numbers in turn turns the scale\'s numbers on and writes them round the dial', () => {
+    assert.ok(numbers.length >= 5, `${numbers.length} numbers`);
+    assert.equal(numbers[0].text, '-60');
+    assert.equal(new Set(numbers.map((p) => p.delay)).size, numbers.length);
+  });
+  const shimmer = await pieces(ids.Shimmer);
+  check('Words: Shimmer keeps running along the legend', () => assert.ok(shimmer.length === 6 && shimmer.every((p) => p.loops === 'infinite'), JSON.stringify(shimmer)));
+  const wordPlays = await plays([at(ids.Shatter, 'legend'), at(ids.RollCall, 'legend')], 8500);
+  check('Words: Shatter bursts the legend as the level clips; Roll call rolls it as the level passes 70%', () => {
+    assert.ok(wordPlays[0] >= 2, `Shatter ${wordPlays[0]}`);
+    assert.ok(wordPlays[1] >= 1, `Roll call ${wordPlays[1]}`);
+  });
+
+  // --- A key's legend, a letter at a time (the same pieces) -----------------------------------------
   await kit.preview(false);
   ids = await page.evaluate(async () => {
     const { panelMaker } = await window.__ceImport('/scripts/festivalKit.js');
     const { serializePanel, deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
     const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
     const { words } = await window.__ceImport('/src/CE_Application/utils/componentPresetKit.js');
-    const f = panelMaker('meter-words', 'Meter words', { set: 'anodised', bg: 'FFC2C7CD', width: 700, height: 300, fields: { gridEnabled: false } });
-    const typed = f.add('Meter', 'Typed', 40, 60, 260, 160);
-    typed._children.Animations = { _type: 'Animations', enabled: true, _children: {
+    const f = panelMaker('key-words', 'Key words', { set: 'neon', bg: 'FF101218', width: 600, height: 300, fields: { gridEnabled: false } });
+    const key = f.add('ToggleButton', 'Key', 60, 60, 200, 140);
+    Object.assign(key._children.Parts._children.legend, { offText: 'MUTE', onText: 'LIVE', fontSize: 16 });
+    key._children.Animations = { _type: 'Animations', enabled: true, _children: {
       typed: words('typed', { type: 'always' }, 'legend', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 120, duration: 300, iterations: 1 }),
     } };
-    const numbers = f.add('Meter', 'Numbers', 340, 60, 260, 160);
-    numbers._children.Parts._children.scale.numerals = true;
-    numbers._children.Animations = { _type: 'Animations', enabled: true, _children: {
-      typed: words('typed', { type: 'always' }, 'scale', 'typewriter', 'in', { split: 'letter', order: 'forward', stagger: 60, duration: 300, iterations: 1 }),
-    } };
-    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/meter-words.cepanel', null);
+    const panel = deserializePanel(serializePanel(f.scenes([])), '/tmp/key-words.cepanel', null);
     addPanel(panel);
     return Object.fromEntries(panel.controls.map((c) => [c._children.Core.name, c._children.Core.id]));
   });
   await kit.settle(500);
   await kit.preview(true);
   await page.waitForTimeout(500);
-  const pieces = (id) => page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-word-piece]`)]
-    .map((t) => ({ text: t.textContent, x: Number(t.getAttribute('x')), delay: parseFloat(getComputedStyle(t).animationDelay) || 0, playing: getComputedStyle(t).animationName !== 'none' })), inPreview(id));
-  const legend = await pieces(ids.Typed);
-  check('Words: a typewriter on the legend writes "LEVEL" a letter at a time, each where the word had it', () => {
-    assert.deepEqual(legend.map((p) => p.text), ['L', 'E', 'V', 'E', 'L']);
-    assert.ok(legend.every((p, i) => p.playing && (i === 0 || (p.x > legend[i - 1].x && p.delay > legend[i - 1].delay))), JSON.stringify(legend));
-  });
-  const numerals = await pieces(ids.Numbers);
-  const shown = await page.evaluate((sel) => document.querySelectorAll(`${sel} [data-numeral]`).length, inPreview(ids.Numbers));
-  check('Words: on the scale\'s numbers, a number at a time', () => {
-    assert.ok(numerals.length >= 5 && numerals.every((p) => p.playing), `${numerals.length} numbers`);
-    assert.equal(new Set(numerals.map((p) => p.delay)).size, numerals.length);
-    assert.equal(shown, 0, 'drawn as pieces, not again as they were');
+  const keyLetters = await pieces(ids.Key);
+  check('Words: a key\'s legend types a letter at a time too, each where the word had it', () => {
+    assert.deepEqual(keyLetters.map((p) => p.text), ['M', 'U', 'T', 'E']);
+    assert.ok(keyLetters.every((p, i) => i === 0 || (p.x > keyLetters[i - 1].x && p.delay > keyLetters[i - 1].delay)), JSON.stringify(keyLetters));
   });
 
   assert.deepEqual(kit.failures, [], 'no page errors');

@@ -27,11 +27,12 @@ const byId = (slug) => METER_PRESETS.find((entry) => entry.slug === slug);
 const SETS = {
   'meter-attention': 'graphite', 'meter-needle': 'valve', 'meter-readout': 'ivory', 'meter-together': 'phosphor',
   'meter-parts': 'anodised', 'meter-level': 'carbon-pro', 'meter-ballistics': 'valve-console', 'meter-segments': 'gimbal-ring',
+  'meter-words': 'reel',
 };
 const PHASE_ONE = new Set(['attention', 'needle', 'readout']);
 
-test('the catalogue: seven groups in order, each preset an ordinary preset under Meter, ids of its own', () => {
-  assert.deepEqual(METER_PRESET_GROUPS.map((group) => group.id), ['attention', 'needle', 'readout', 'parts', 'level', 'ballistics', 'segments']);
+test('the catalogue: eight groups in order, each preset an ordinary preset under Meter, ids of its own', () => {
+  assert.deepEqual(METER_PRESET_GROUPS.map((group) => group.id), ['attention', 'needle', 'readout', 'parts', 'level', 'ballistics', 'segments', 'words']);
   assert.deepEqual(METER_PRESETS.map((entry) => entry.slug), [
     'pulse', 'breathe', 'knock', 'beat-pulse', 'look-here', 'pop-in',
     'self-test', 'wake-up', 'beat-kick', 'tap-sweep', 'shiver', 'drop-out',
@@ -40,6 +41,7 @@ test('the catalogue: seven groups in order, each preset an ordinary preset under
     'clip-flash', 'clip-shake', 'red-wash', 'peak-flare', 'over-thrown',
     'vu', 'ppm', 'bouncy', 'lazy', 'sticky-peak',
     'cascade', 'ripple', 'sparkle', 'peak-drop',
+    'type-on', 'shimmer', 'shatter', 'roll-call', 'numbers-in-turn',
   ]);
   for (const entry of METER_PRESETS) {
     assert.equal(entry.id, meterPresetId(entry.slug));
@@ -86,7 +88,7 @@ test('a needle preset moves what the level draws and hands back to the level; no
 });
 
 test('nothing loops that does not say so', () => {
-  const loops = new Set(['pulse', 'breathe', 'shiver', 'sparkle']);
+  const loops = new Set(['pulse', 'breathe', 'shiver', 'sparkle', 'shimmer']);
   for (const entry of METER_PRESETS) {
     for (const node of Object.values(entry.preset.animations)) {
       assert.equal(node.iterations === 'infinite', loops.has(entry.slug), `${entry.slug}: ${node.iterations === 'infinite' ? 'loops' : 'plays once'}`);
@@ -97,12 +99,12 @@ test('nothing loops that does not say so', () => {
 test('the library lists them under Meter, after the Choice group, by group', () => {
   assert.deepEqual(COMPONENT_PRESETS.map((entry) => entry.component), ['Knob', 'Slider', 'Button', 'Choice group', 'Meter']);
   const meter = COMPONENT_PRESETS.find((entry) => entry.component === 'Meter');
-  assert.deepEqual(meter.groups.map((group) => group.label), ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments']);
+  assert.deepEqual(meter.groups.map((group) => group.label), ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments', 'Words']);
   assert.equal(meter.groups.reduce((n, group) => n + group.entries.length, 0), METER_PRESETS.length);
 });
 
 test('the showcase: one panel a group and Together, every meter (or its reading) wearing its preset, each panel in a set of its own', () => {
-  assert.deepEqual(METER_PANELS.map(([id]) => id), ['meter-attention', 'meter-needle', 'meter-readout', 'meter-together', 'meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments']);
+  assert.deepEqual(METER_PANELS.map(([id]) => id), ['meter-attention', 'meter-needle', 'meter-readout', 'meter-together', 'meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments', 'meter-words']);
   const taken = new Set([...KNOB_PANELS, ...SLIDER_PANELS, ...BUTTON_PANELS, ...CHOICE_PANELS].map(([, make]) => make().controlSet.id));
   const seen = new Set();
   for (const [id, make] of METER_PANELS) {
@@ -184,7 +186,7 @@ test('applied as Apply applies it, a preset is linked to the library\'s', () => 
 // --- Phase 2: its parts, its level, its needle, its lamps (2026-11-27) ----------------------------
 
 test('phase 2: each preset goes on a meter as its panel\'s set draws it, and is refused where a set draws no such part', () => {
-  const PANEL_SET = { parts: 'anodised', level: 'carbon-pro', ballistics: 'valve-console', segments: 'gimbal-ring' };
+  const PANEL_SET = { parts: 'anodised', level: 'carbon-pro', ballistics: 'valve-console', segments: 'gimbal-ring', words: 'reel' };
   for (const entry of METER_PRESETS.filter((e) => !PHASE_ONE.has(e.group))) {
     const drawn = resolveControlForSet(createControl('Meter'), getControlSet(PANEL_SET[entry.group]));
     const { patch, reason } = applyPresetPatch(createControl('Meter'), entry.preset, { drawn });
@@ -230,7 +232,7 @@ test('phase 2: Ballistics are settings alone, survive their own file, and set ho
 });
 
 test('phase 2: each panel\'s meters run a test signal, so they move in Preview with nothing plugged in', () => {
-  for (const [id, make] of METER_PANELS.filter(([panelId]) => ['meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments'].includes(panelId))) {
+  for (const [id, make] of METER_PANELS.filter(([panelId]) => ['meter-parts', 'meter-level', 'meter-ballistics', 'meter-segments', 'meter-words'].includes(panelId))) {
     const meters = make().controls.filter((control) => control._children.Core.controlType === 'Meter');
     assert.ok(meters.length >= 4, id);
     for (const meter of meters) assert.ok(['program', 'bursts'].includes(meter._children.Meter.testSignal), `${id} ${meter._children.Core.name}`);
@@ -241,4 +243,31 @@ test('phase 2: each panel\'s meters run a test signal, so they move in Preview w
   const parts = METER_PANELS.find(([panelId]) => panelId === 'meter-parts')[1]();
   const lamp = parts.controls.find((c) => c._children.Core.name === 'LampFlash')._children.Parts._children.lamp;
   assert.deepEqual([lamp.visible, lamp._children.Layout.x, lamp._children.Layout.y], [true, 73, 20], 'its lamp, in the dial face');
+});
+
+// --- Words: on the words a meter draws itself (2026-11-28) -----------------------------------------
+
+test('Words: text effects on its legend, a letter at a time, and on its scale\'s numbers, which Numbers in turn turns on', () => {
+  const entries = METER_PRESETS.filter((e) => e.group === 'words');
+  for (const entry of entries) {
+    for (const node of Object.values(entry.preset.animations)) assert.equal(node.kind, 'text', entry.slug);
+  }
+  const target = (slug) => Object.values(byId(slug).preset.animations)[0].targets[0].path;
+  assert.deepEqual(['type-on', 'shimmer', 'shatter', 'roll-call'].map(target), ['Parts.legend', 'Parts.legend', 'Parts.legend', 'Parts.legend']);
+  assert.equal(target('numbers-in-turn'), 'Parts.scale');
+  assert.equal(byId('numbers-in-turn').preset.fields['Parts.scale.numerals'], true);
+  for (const slug of ['type-on', 'shimmer', 'shatter', 'roll-call']) assert.equal(Object.values(byId(slug).preset.animations)[0].split, 'letter', `${slug}: a letter at a time`);
+  assert.deepEqual(Object.values(byId('shatter').preset.animations)[0].trigger, { type: 'clip' });
+  assert.deepEqual(Object.values(byId('roll-call').preset.animations)[0].trigger, { type: 'level', at: 0.7, way: 'up' });
+  // Refused where the set draws no legend, and on a scale with no numbers unless the preset turns them on.
+  const carbon = resolveControlForSet(createControl('Meter'), getControlSet('carbon-pro'));
+  assert.match(applyPresetPatch(createControl('Meter'), byId('type-on').preset, { drawn: carbon }).reason, /legend, which this meter's set does not draw/);
+  const reel = resolveControlForSet(createControl('Meter'), getControlSet('reel'));
+  const bare = { ...byId('numbers-in-turn').preset, fields: {} };
+  assert.match(applyPresetPatch(createControl('Meter'), bare, { drawn: reel }).reason, /scale's numbers, and this meter's scale shows none/);
+  assert.ok(applyPresetPatch(createControl('Meter'), byId('numbers-in-turn').preset, { drawn: reel }).patch);
+  // The panel's numbers read as whole decibels.
+  const words = METER_PANELS.find(([id]) => id === 'meter-words')[1]();
+  const numbers = words.controls.find((c) => c._children.Core.name === 'NumbersInTurn')._children.Meter;
+  assert.deepEqual([numbers.valueMin, numbers.valueMax], [-60, 0]);
 });

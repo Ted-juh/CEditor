@@ -844,7 +844,7 @@ assert.deepEqual(await ev(() => window.__anim.builtinRows()), [{
 }, {
   component: 'Choice group', groups: ['Attention', 'Choosing', 'Thumb', 'The chosen', 'Appear', 'Hover', 'New options'], count: 30, first: 'Pulse always',
 }, {
-  component: 'Meter', groups: ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments'], count: 36, first: 'Pulse always',
+  component: 'Meter', groups: ['Attention', 'Needle', 'Readout', 'Parts', 'Level', 'Ballistics', 'Segments', 'Words'], count: 41, first: 'Pulse always',
 }]);
 await ev(() => window.__anim.libraryButton('ce:knob:lift', 'Apply'));
 await settle();

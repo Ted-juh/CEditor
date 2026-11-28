@@ -1057,9 +1057,9 @@ Verified locally:
 meter, "LEVEL" on its face: they did not. A text effect could be aimed at the legend, and the tab took
 it, and nothing played; the same gap phase 2 closed for keyframes. Fourteen sets draw a legend: a word
 (LEVEL, VU, SIGNAL) or the reading as figures in cells (Neon, Obsidian, Ladder); none draws its
-scale's numbers until an author turns them on. Now (`utils/meterWords.js`, `MeterDeviceParts.svelte`):
+scale's numbers until an author turns them on. Now (`utils/svgWords.js`, `MeterDeviceParts.svelte`):
 - *The legend's word, a letter at a time.* SVG text has no letters to move on their own, which is why a
-  key's legend plays an effect only whole. A meter's is measured instead: the word is drawn whole and
+  key's legend played an effect only whole. A meter's is measured instead (and since, a key's too): the word is drawn whole and
   hidden, the browser says where it set each letter (`getStartPositionOfChar`), and each letter is
   drawn there as a piece of its own, typed, scattered or rolled along the word as a Label's are. A word
   at a time splits at the spaces; whole plays it as one. Until the letters are measured (the first
@@ -1070,10 +1070,31 @@ scale's numbers until an author turns them on. Now (`utils/meterWords.js`, `Mete
   (`currentColor`) while it plays on them, not from the part's colour frames.
 - A text effect on a meter plays on When it clips and When it crosses a level too.
 
-`meterWords.test.js` (new) holds the pieces, each letter where it was measured, the fall-back to whole,
-words, figures and numbers, and the wiring; `meterShowcase` types "LEVEL" a letter at a time in
-Preview, each letter where the word had it, and the scale's numbers a number at a time. No preset or
-panel plays on them yet.
+`svgWords.test.js` (new) holds the pieces, each letter where it was measured, the fall-back to whole,
+words, figures and numbers, and the wiring.
+
+*Then presets, a panel, and a key's legend* (the owner said yes to all three). The same pieces
+(`utils/svgWords.js`, the measuring in `editor/measureLetters.js`) now play a key's legend a letter at
+a time as well, centred on its key as it is drawn. None of the Button's presets changes: the two on a
+legend (Roll on, Roll off) roll it whole. A **Words** group under Meter, after Segments:
+
+| Preset | When | What |
+|---|---|---|
+| Type on | panel opens | its legend types itself in |
+| Shimmer | always | a light runs along its legend |
+| Shatter | as it clips | its legend bursts apart and gathers again |
+| Roll call | level past 70% | its legend rolls up a letter at a time |
+| Numbers in turn | panel opens | its scale's numbers, turned on, write themselves round the dial |
+
+No set turns its scale's numbers on, so Numbers in turn does (`Parts.scale.numerals`, a field a
+preset may now set), as Lamp flash turns on the lamp; a preset on the scale's words is refused where
+the scale shows none and the preset does not turn them on. The panel, **Meter Words**, is in Reel, a
+radio's dial with SIGNAL on it, which no other component's panel uses; its Numbers in turn meter reads
+-60 to 0 dB, so its numbers are whole (on a 0 to 1 reading they are 0.08, 0.17, and crowd the dial).
+Reel the effect, which spins through other letters in a Label, only rolls on SVG letters, so Roll call
+rolls. `meterPresets.test.js` holds the group, its targets and triggers, the refusals and the panel;
+`meterShowcase` plays the panel (Type on a letter at a time, Numbers in turn round the dial, Shimmer
+looping, Shatter at the clips, Roll call past 70%) and types a key's legend a letter at a time.
 
 Left open:
 - Every lamp is a part only on a meter drawn with parts that light cells; the plain look's LED

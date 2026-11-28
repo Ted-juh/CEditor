@@ -102,6 +102,8 @@ export function cleanPreset(raw) {
     else if (path === 'Parts.lamp.visible' && typeof value === 'boolean') fields[path] = value;
     // A meter's marker made its peak lamp: lit by the held peak rather than the reading.
     else if (path === 'Parts.marker.source' && ['reading', 'peak'].includes(value)) fields[path] = value;
+    // A meter's scale's numbers, which no set turns on, turned on to play on.
+    else if (path === 'Parts.scale.numerals' && typeof value === 'boolean') fields[path] = value;
     // A meter's needle: its ballistics (utils/meterMotion.js), and the peak it holds.
     else if (METER_FIELD_RANGES[path] && Number.isFinite(Number(value))) fields[path] = Math.min(METER_FIELD_RANGES[path][1], Math.max(METER_FIELD_RANGES[path][0], Number(value)));
     else if (path === 'Meter.peakHold' && typeof value === 'boolean') fields[path] = value;

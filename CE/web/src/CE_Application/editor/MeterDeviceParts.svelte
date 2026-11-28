@@ -14,7 +14,7 @@
    * shape channel); a change eases its colour and opacity (`partTransitions`). Every part sets all of
    * these, `none` where it has nothing, so none borrows the control's own.
    *
-   * A text effect plays on the words the meter draws (`partTexts`, utils/meterWords.js): its legend,
+   * A text effect plays on the words the meter draws (`partTexts`, utils/svgWords.js): its legend,
    * a letter or a word at a time where the browser set them (measured from the word drawn whole and
    * hidden), or a figure at a time where it draws figures in cells; and its scale's numbers, a number
    * at a time. The words then take their colour from the effect (`currentColor`), not the part's
@@ -31,7 +31,8 @@
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { optionRankVars } from '../utils/optionStagger.js';
   import { METER_CELL_PART } from '../models/meterDeviceParts.js';
-  import { legendWordPieces, meterWordsSplit, numeralPieces } from '../utils/meterWords.js';
+  import { numeralPieces, wordPieces, wordsSplit } from '../utils/svgWords.js';
+  import { measureLetters } from './measureLetters.js';
 
   let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter', partAnimations = null, partColours = null, partTransitions = null, partTexts = null } = $props();
 
@@ -158,24 +159,14 @@
   const wordsOn = (name) => partTexts?.get?.(name)?.at(-1) ?? null;
 
   // Where the browser set each letter of a legend's words, measured from the word drawn whole and
-  // hidden: by the word, its place, size and face. Measured again once the fonts are in.
+  // hidden (./measureLetters.js): by the word, its place, size and face.
   let letterAt = $state({});
   const letterKey = (text, family) => `${text.text}|${text.x}|${text.y}|${text.size}|${family}`;
-  function measureLetters(node, key) {
-    const read = (k, again = false) => {
-      if (!again && letterAt[k]) return;
-      try {
-        const n = node.getNumberOfChars();
-        if (!n) return;
-        const xs = Array.from({ length: n }, (_, i) => node.getStartPositionOfChar(i).x);
-        letterAt = { ...letterAt, [k]: { xs, end: node.getEndPositionOfChar(n - 1).x } };
-      } catch { /* not laid out yet: the words play whole */ }
-    };
-    read(key);
-    let current = key;
-    document.fonts?.ready?.then(() => read(current, true));
-    return { update(next) { current = next; read(next); } };
-  }
+  const measured = (key, at) => {
+    const was = letterAt[key];
+    if (was && was.end === at.end && was.xs.join() === at.xs.join()) return;
+    letterAt = { ...letterAt, [key]: at };
+  };
 
   /** A text effect on a legend's words or a scale's numbers, as pieces to draw; null for none. */
   function wordsPlaying(item) {
@@ -183,9 +174,9 @@
     if (!words) return null;
     const opts = { phase: words.phase, seedText: `${item.name}:${words.name}`, at: words.at ?? null };
     if (item.name === 'legend' && item.drawing.texts.length) {
-      const split = meterWordsSplit(words.effect, item.drawing.texts);
+      const split = wordsSplit(words.effect, item.drawing.texts);
       const measure = split === 'whole' ? [] : item.drawing.texts.map((text) => ({ ...text, key: letterKey(text, item.fontFamily) }));
-      return { pieces: legendWordPieces(words.effect, item.drawing.texts, measure.map((m) => letterAt[m.key] ?? null), opts), measure, labels: false };
+      return { pieces: wordPieces(words.effect, item.drawing.texts, measure.map((m) => letterAt[m.key] ?? null), opts), measure, labels: false };
     }
     if (item.drawing.labels.length) return { pieces: numeralPieces(words.effect, item.drawing.labels, opts), measure: [], labels: true };
     return null;
@@ -302,9 +293,9 @@
     {/if}
     {/if}
     {#if item.words && !item.words.labels}
-      {@render wordPieces(item, item.words.pieces, '')}
+      {@render drawWords(item, item.words.pieces, '')}
       {#each item.words.measure as m (m.key)}
-        <text use:measureLetters={m.key} x={m.x} y={m.y} text-anchor="middle" font-size={m.size} font-family={item.fontFamily} visibility="hidden" aria-hidden="true">{m.text}</text>
+        <text use:measureLetters={{ key: m.key, measured }} x={m.x} y={m.y} text-anchor="middle" font-size={m.size} font-family={item.fontFamily} visibility="hidden" aria-hidden="true">{m.text}</text>
       {/each}
     {:else}
       {#each item.drawing.texts as text, i (i)}
@@ -319,7 +310,7 @@
          lights its numerals. -->
     <g style={item.timing}><g style={item.moves || undefined}>
     {#if item.words?.labels}
-      {@render wordPieces(item, item.words.pieces, 'central')}
+      {@render drawWords(item, item.words.pieces, 'central')}
     {:else}
       {#each item.drawing.labels as label, i (i)}
         <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" style={paint(item.textColour)} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
@@ -331,7 +322,7 @@
 
 <!-- Words in a text effect, a piece each: coloured by the effect (currentColor, the part's colour
      under it), each moving about its own box, a roll or a push cut to a box about it. -->
-{#snippet wordPieces(item, pieces, baseline)}
+{#snippet drawWords(item, pieces, baseline)}
   <g style={`color:${item.textColour};fill:currentColor;`} opacity={item.opacity}>
     {#each pieces as piece, i (i)}
       {#if piece.clip}

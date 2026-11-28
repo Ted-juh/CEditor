@@ -710,9 +710,12 @@ const METER_LOOKS = {
     note: 'how the needle gets to each new level, set by one built-in preset a meter. All five hear one test signal',
   },
   segments: { set: 'gimbal-ring', bg: 'FF263238', ink: 'FFE6F2F1', how: 'FF9ED5D4', what: 'FFB1C5C8', size: [208, 130], meter: { testSignal: 'bursts' } },
+  words: { set: 'reel', bg: 'FF5E6A5E', ink: 'FFF3EEDD', how: 'FFF0D58C', what: 'FFE4DECB', size: [208, 130], meter: { testSignal: 'program' } },
 };
+// A meter that wants other settings than its group's: numbers that read as whole decibels.
+const METER_SETTINGS = { 'numbers-in-turn': { valueMin: -60, valueMax: 0, valueSuffix: ' dB' } };
 // A preset that wants another signal than its group's: one that clips often, or one that moves all the time.
-const METER_SIGNALS = { 'lamp-flash': 'bursts', cascade: 'program', sparkle: 'program' };
+const METER_SIGNALS = { 'lamp-flash': 'bursts', cascade: 'program', sparkle: 'program', shatter: 'bursts' };
 // The clip lamp, which no set draws, inside Anodised's dial face (its corner of the frame is off the case).
 const METER_PART_LAYOUTS = { 'lamp-flash': { lamp: { x: 73, y: 20, width: 5, height: 8 } } };
 // Where each starts: a sweep or a kick shows best from a level part-way up.
@@ -743,6 +746,7 @@ function meterGroupPanel(group) {
     const { valueMin = 0, valueMax = 1 } = look.meter;
     meter._children.Meter.value = valueMin + (valueMax - valueMin) * (METER_LEVELS[entry.slug] ?? 0.6);
     if (look.meter.testSignal) meter._children.Meter.testSignal = METER_SIGNALS[entry.slug] ?? look.meter.testSignal;
+    Object.assign(meter._children.Meter, METER_SETTINGS[entry.slug] ?? {});
     for (const [part, layout] of Object.entries(METER_PART_LAYOUTS[entry.slug] ?? {})) Object.assign(meter._children.Parts._children[part]._children.Layout, layout);
     meter._children.Core.description = `${entry.name}: ${entry.what}.`;
     let captionTop = y + mh + 12;
