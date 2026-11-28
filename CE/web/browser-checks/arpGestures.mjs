@@ -2,6 +2,7 @@
 // Run: node browser-checks/arpGestures.mjs (CHROMIUM_PATH selects a local browser).
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
@@ -10,7 +11,7 @@ const server = await createServer({
   server: { host: '127.0.0.1', port: 0 },
 });
 await server.listen();
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({ viewport: { width: 1100, height: 950 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

@@ -9,6 +9,7 @@
  *   - the operating system's reduced-motion setting and the preview's own switch stop all of it
  */
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -27,8 +28,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, resolve));
 
-const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 600, height: 300 } });
 const failures = [];
 page.on('pageerror', (error) => failures.push(String(error)));

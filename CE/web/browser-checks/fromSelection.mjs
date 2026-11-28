@@ -4,6 +4,7 @@
  * compares the panel before and after the command, pixel by pixel.
  */
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -23,12 +24,11 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, resolve));
 
-const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 // --disable-lcd-text: Chromium draws text in a composited layer with greyscale anti-aliasing and
 // other text with sub-pixel (coloured) anti-aliasing. A component's text can land in such a layer,
 // so the same glyphs would compare as different colours. One smoothing mode for both shots keeps the
 // comparison about the design, not about which layer the compositor picked.
-const browser = await chromium.launch({ executablePath, args: ['--no-sandbox', '--disable-lcd-text'] });
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--no-sandbox', '--disable-lcd-text'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 300 } });
 const failures = [];
 page.on('pageerror', (error) => failures.push(String(error)));

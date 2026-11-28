@@ -3,6 +3,7 @@
  * See setSwatches.entry.js.
  */
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -17,7 +18,7 @@ const server = createServer(async (req, res) => {
   try { const body = await readFile(join(ROOT, url)); res.writeHead(200, { 'content-type': TYPES[extname(url)] ?? 'application/octet-stream' }); res.end(body); } catch { res.writeHead(404); res.end(); }
 });
 await new Promise((resolve) => server.listen(0, resolve));
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error).slice(0, 300)));

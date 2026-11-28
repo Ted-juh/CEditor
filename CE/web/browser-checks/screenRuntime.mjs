@@ -1,13 +1,14 @@
 /** Integration: main's soft-key/menu runtime in the merged editor. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const server=await createServer({root,configFile:join(root,'vite.config.js'),server:{host:'127.0.0.1',port:5174,strictPort:false}});
 await server.listen();
-const browser=await chromium.launch({channel:'msedge'});
+const browser=await chromium.launch(chromiumLaunchOptions({channel:'msedge'}));
 const page=await browser.newPage({viewport:{width:1500,height:950}});
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 try{

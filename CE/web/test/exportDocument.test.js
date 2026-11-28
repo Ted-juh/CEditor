@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { exportFormFor, isExportForm } from '../../../tools/scripts/lib/exportDocument.mjs';
 import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
 import { expandControl } from '../src/CE_Application/stores/documentShape.js';
+import { chromiumLaunchOptions } from '../browser-checks/chromiumLaunch.mjs';
 
 const read = (file) => JSON.parse(readFileSync(new URL(`../../qa/${file}`, import.meta.url), 'utf8'));
 
@@ -81,7 +82,11 @@ test('a panel with no rendered part asks for no images and starts no browser', a
   assert.equal((await exportFormFor(doc, 'QA-08-export.cepanel')).renderedLookImages, undefined);
 });
 
-test('a saved panel\'s rendered parts are baked into its export where a browser is', { skip: !process.env.CHROMIUM_PATH && 'set CHROMIUM_PATH to draw them' }, async () => {
+// A browser the browser checks' launcher names: CHROMIUM_PATH, or off Windows the Chromium this
+// repo's Linux containers have. On Windows without CHROMIUM_PATH it names none, and this is skipped.
+const drawingBrowser = chromiumLaunchOptions().executablePath;
+
+test('a saved panel\'s rendered parts are baked into its export where a browser is', { skip: !drawingBrowser && 'no browser to draw them in; set CHROMIUM_PATH' }, async () => {
   const payload = await exportFormFor(renderedStarter(), 'brassworks.cepanel');
   const specs = Object.keys(payload.renderedLookImages ?? {}).map((key) => JSON.parse(key)[0]);
   // Eight turns of the knurled cap, the ridged fader cap and the dished key: what the parts ask for.

@@ -9,9 +9,10 @@
 // So the images are drawn in headless Chromium, which has WebGL (software, through SwiftShader),
 // with CE/web/src/CE_Application/utils/renderedLookCore.js loaded into a bare page as it is: the
 // exact shader and drawing the editor uses, from the specs the editor's parts ask for
-// (renderedLookJobs over each control as its set draws it). Playwright finds the browser: its own,
-// CHROMIUM_PATH, or Edge on Windows. Without one, the export goes ahead without the images and says
-// so, and those parts draw their plain fill, as before.
+// (renderedLookJobs over each control as its set draws it). The browser is CHROMIUM_PATH, the
+// installed Chromium off Windows (as the browser checks find it), Playwright's own, or Edge or
+// Chrome on Windows. Without one, the export goes ahead without the images and says so, and those
+// parts draw their plain fill, as before.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -36,10 +37,24 @@ async function findChromium() {
   return null;
 }
 
+// The browser checks' launcher (CE/web/browser-checks/chromiumLaunch.mjs): CHROMIUM_PATH, or else
+// off Windows the Chromium this repo's Linux containers have, which Playwright's own default does not
+// find there. It is in a source checkout only. An installation ships tools/scripts and not
+// browser-checks, and loads this file without ever baking (export-panel-vst3.mjs, through
+// exportDocument.mjs, with the payload the app made), so it is loaded here, when a bake wants a
+// browser, and gone without where it is not.
+async function preferredLaunchOptions() {
+  try {
+    const { chromiumLaunchOptions } = await import(pathToFileURL(path.join(WEB, 'browser-checks/chromiumLaunch.mjs')).href);
+    return chromiumLaunchOptions();
+  } catch {
+    return process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
+  }
+}
+
 async function launch(chromium) {
-  const tries = [];
-  if (process.env.CHROMIUM_PATH) tries.push({ executablePath: process.env.CHROMIUM_PATH });
-  tries.push({});
+  const tries = [await preferredLaunchOptions()];
+  if (tries[0].executablePath) tries.push({});
   if (process.platform === 'win32') tries.push({ channel: 'msedge' }, { channel: 'chrome' });
   let last = null;
   for (const options of tries) {

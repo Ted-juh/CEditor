@@ -36,10 +36,11 @@
 // state is already on its periodic orbit when frame 0 is taken.
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromiumLaunchOptions } from '../../CE/web/browser-checks/chromiumLaunch.mjs';
 
 import { decodePng, encodeGif } from './lib/animatedGif.mjs';
 import { LOOP_SECONDS, SCENES } from './displayDemos/scenes.mjs';
@@ -137,13 +138,6 @@ async function startServer() {
   }
   proc.kill();
   throw new Error(`the dev server did not come up on port ${PORT}`);
-}
-
-function chromiumPath() {
-  const dir = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  const build = readdirSync(dir).find((d) => /^chromium-\d+$/.test(d));
-  if (!build) throw new Error(`no chromium under ${dir}`);
-  return join(dir, build, 'chrome-linux', 'chrome');
 }
 
 /* ------------------------------------------------------------------ the page side ------------ */
@@ -450,7 +444,7 @@ mkdirSync(outDir, { recursive: true });
 const requireFromWeb = createRequire(join(web, 'package.json'));
 const { chromium } = requireFromWeb('playwright-core');
 const server = await startServer();
-const browser = await chromium.launch({ executablePath: chromiumPath() });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({
   viewport: { width: 1400, height: 900 },
   deviceScaleFactor: SCALE,

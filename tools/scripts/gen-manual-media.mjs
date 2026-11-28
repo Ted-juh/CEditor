@@ -20,7 +20,7 @@
 //   node tools/scripts/gen-manual-media.mjs --check     → non-zero if any capture is missing
 //   node tools/scripts/gen-manual-media.mjs --only arp  → one capture, while iterating
 //
-// Needs Chromium (PLAYWRIGHT_BROWSERS_PATH) and a free port. It starts and stops its own dev
+// Needs Chromium (the browser checks' launcher finds it; CHROMIUM_PATH names another) and a free port. It starts and stops its own dev
 // server. It is NOT part of `npm test`: it is slow, it needs a browser, and the page falls back to
 // prose when a capture is absent — a missing picture must not be able to fail a build that has
 // nothing to do with it.
@@ -31,10 +31,11 @@
 // that failed with --only; the manifest merges rather than replaces, so the rest survive.
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { chromiumLaunchOptions } from '../../CE/web/browser-checks/chromiumLaunch.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
@@ -290,13 +291,6 @@ async function startServer() {
 
 /* ------------------------------------------------------------------ the capturing ------------ */
 
-function chromiumPath() {
-  const dir = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  const build = readdirSync(dir).find((d) => /^chromium-\d+$/.test(d));
-  if (!build) throw new Error(`no chromium under ${dir}`);
-  return join(dir, build, 'chrome-linux', 'chrome');
-}
-
 /**
  * Put a panel on screen and photograph its surface.
  *
@@ -390,7 +384,7 @@ if (checking) {
   const requireFromWeb = createRequire(join(web, 'package.json'));
   const { chromium } = requireFromWeb('playwright-core');
   const server = await startServer();
-  const browser = await chromium.launch({ executablePath: chromiumPath() });
+  const browser = await chromium.launch(chromiumLaunchOptions());
   const page = await browser.newPage({
     // Deviceless 2x, so the pictures stay sharp where the manual scales them down.
     viewport: { width: 1500, height: 950 }, deviceScaleFactor: 2,

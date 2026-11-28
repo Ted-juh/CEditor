@@ -4,6 +4,7 @@
 import { createServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,9 +23,7 @@ const server = await createServer({ configFile: false, plugins: [svelte()], root
   optimizeDeps: { entries: ['ctrl49ScreenLab.html'] },
   server: { host: '127.0.0.1', port: 18766, fs: { allow: [repo] } }, logLevel: 'error' });
 await server.listen();
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH
-  ?? (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-    : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome') });
+const browser = await chromium.launch(chromiumLaunchOptions({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' }));
 try {
   const page = await browser.newPage({ viewport: { width: 1000, height: 600 } });
   const errors = [];

@@ -158,8 +158,11 @@ runs either one at a time, as before; any other number sets the workers. A worke
 5300 + n for the checks and 5400 + n for the harness, so neither touches a dev server on 5173.
 
 `npm run test:everything` runs `test:all`, `test:browser` and `test:component-behavior` one after
-the other, each whatever the one before did, and ends on a summary; on Windows the browser checks
-find Chrome or Edge themselves when `CHROMIUM_PATH` is not set.
+the other, each whatever the one before did, and ends on a summary. Every browser check gets its
+browser from `browser-checks/chromiumLaunch.mjs`, so `CHROMIUM_PATH` need not be set: on Windows
+they find Chrome or Edge themselves, and elsewhere they use `/opt/pw-browsers/chromium`, the link to
+whichever Chromium build the container has. (They used to name build 1194's path, and all failed at
+launch when the container moved to 1243.) `CHROMIUM_PATH` still overrides both.
 
 `npm run test:component-behavior` runs the component acceptance harness, `componentBehavior.mjs`:
 96 cases, each a control edited through the inspector, driven by the pointer and the keys, saved
